@@ -30,3 +30,19 @@
 | 동시 묶음 커밋 (§3.1.10 F) | ✅ A·B 동시 시도 → B 성공, A "앞서 바뀜"(422) → 다시 시도 성공. force 없음, 커밋 2개·파일 6개 모두 남음, 덮어쓰기 0 |
 | 출입증 보관 | 임시 폴더 0600 파일, 값 출력 0 |
 | 저장소 만들기 재확인 (H17) | ✅ 설치 후 새 이름 `ideatrail-spike-2`로 `POST /user/repos` → **비공개 저장소 생성 성공**, 그리고 **앱 설치 범위에 자동 포함**(Only select인데도). 결론: 가입 때 "앱 설치(저장소 1개 선택) → 엔진이 기록용 저장소 자동 생성" 가능. Administration: Read & write는 유지(저장소 만들기에 필요). 설치 전엔 403이므로 **설치가 먼저** |
+
+## S1 OpenTimestamps 확정 (2026-11-14 17:33 확인)
+| 확인 | 결과 |
+|---|---|
+| 확정 시간 | 15:44 제출 → **비트코인 블록 975755(16:06:55 KST)에 포함, 약 22분**. alice·bob 달력은 확정본 줌, finney(eternitywall)는 17:33에도 대기 |
+| 우리 Go 코드가 받은 대기 영수증 | `.ots`로 감싸 `ots upgrade` → alice·bob 2개 **확정 성공**(같은 블록) |
+| 블록 탐색기 2곳 대조 | mempool.space·blockstream.info 둘 다 merkle root `c484ebc9…00d9` = 영수증 계산값 ✅ (ots는 뒤집힌 바이트 순서로 표시) |
+| 함정 | 확정본 받기는 **제출한 집계 서버(a.pool…)+원래 지문으로 조회하면 404**. 영수증 안의 **달력 주소(alice/bob/finney) + 영수증 연산을 적용한 값**으로 조회해야 함 → Cron 설계(§anchors)에 반영 |
+
+### S1 Step 4 라이브러리 조사
+| 후보 | 상태 | 판단 |
+|---|---|---|
+| `nbd-wtf/opentimestamps` (Go) | Unlicense, 마지막 push 2024-10, ★5, btcd 의존 | 그대로 의존 X — **참고해 최소 파서 직접 작성**(sha256·append·prepend + pending/bitcoin 증명만, 300줄 안팎) |
+| `javascript-opentimestamps` | LGPL-3.0, 2023 이후 멈춤, `request`·`bitcore-lib` 등 낡은 의존성 | 쓰지 않음 |
+| `@otskit/client` 0.7.2 | MIT, 1인 관리, 생긴 지 얼마 안 됨 | 보안 핵심엔 쓰지 않음 |
+| 결론 | Go(엔진)·TS(브라우저 검증) 각각 최소 구현 + **이번 실제 영수증(spike.txt.ots, p1·p2)을 공통 시험 벡터**로 사용 | M5에서 구현 |
