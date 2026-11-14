@@ -1,0 +1,23 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version-file: engine/go.mod }
+      - uses: pnpm/action-setup@v4          # 버전은 web/package.json의 "packageManager"에서
+        with: { package_json_file: web/package.json }
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: cd web && pnpm install --frozen-lockfile
+      - run: cd engine && go test ./...
+      - run: cd web && pnpm vitest run
