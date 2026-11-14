@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"golang.org/x/text/unicode/norm"
 )
@@ -44,8 +45,11 @@ type Entry struct {
 }
 
 // NormalizePath는 암호-통신-규격 §7 경로 규칙을 적용한다:
-// NFC, `\`→`/`, 빈 조각(앞뒤 `/`)·`.`·`..` 조각이면 오류, 대소문자는 그대로.
+// 잘못된 UTF-8은 오류, NFC, `\`→`/`, 빈 조각(앞뒤 `/`)·`.`·`..` 조각이면 오류, 대소문자는 그대로.
 func NormalizePath(p string) (string, error) {
+	if !utf8.ValidString(p) {
+		return "", fmt.Errorf("%w: 잘못된 UTF-8 %q", ErrInvalidPath, p)
+	}
 	q := strings.ReplaceAll(norm.NFC.String(p), "\\", "/")
 	for _, s := range strings.Split(q, "/") {
 		if s == "" || s == "." || s == ".." {

@@ -31,6 +31,9 @@ func loadVectors(t *testing.T) []vector {
 	if err := json.Unmarshal(b, &f); err != nil {
 		t.Fatal(err)
 	}
+	if len(f.Vectors) == 0 {
+		t.Fatal("시험 벡터가 비어 있음")
+	}
 	return f.Vectors
 }
 
@@ -71,7 +74,11 @@ func TestManifestVectors(t *testing.T) {
 		}
 		m, err := Manifest(es)
 		if v.ExpectError != "" {
-			if !errors.Is(err, wantErr[v.ExpectError]) {
+			we, ok := wantErr[v.ExpectError]
+			if !ok {
+				t.Fatalf("%s: 모르는 expect_error %q", v.Name, v.ExpectError)
+			}
+			if !errors.Is(err, we) {
 				t.Errorf("%s: want %s, got %v", v.Name, v.ExpectError, err)
 			}
 			continue

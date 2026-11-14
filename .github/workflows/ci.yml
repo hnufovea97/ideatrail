@@ -1,5 +1,9 @@
 name: ci
-on: [push, pull_request]
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions:
+  contents: read
 jobs:
   test:
     strategy:
@@ -20,4 +24,5 @@ jobs:
         with: { node-version: 24 }
       - run: cd web && pnpm install --frozen-lockfile
       - run: cd engine && go test ./...
+      - run: cd web && pnpm typecheck
       - run: cd web && pnpm vitest run
