@@ -15,3 +15,4 @@
 ## 메모
 - 2026-11-14 founder 지시로 커밋 작성자 이메일을 `fovea@nate.com`으로 바꾸고 push 전 커밋 전체를 다시 썼어요(개발 저장소 12개, S3 저장소 1개).
 - 비공개 임시 저장소 2개 생성 승인 받음. `ideatrail-s3` 생성·push 완료, `ideatrail-spike`는 F-2 client_id를 받은 뒤 S4가 만들어요.
+- 2026-11-14 S2 Safari 1차: caps `extension:prf: true`, `userVerifyingPlatformAuthenticator: false`, 창 없이 `NotAllowedError`. 원인 추정 = 클릭 뒤 `await getClientCapabilities()`가 먼저 돌아 Safari의 사용자 동작이 끊김. **M4 가입 화면 규칙: 버튼 클릭 처리기에서 다른 await 없이 바로 `credentials.create/get` 호출**. 페이지를 만들기·확인 두 버튼으로 고쳐 재시험.
