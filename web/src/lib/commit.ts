@@ -12,7 +12,7 @@ const concat = (...parts: Uint8Array[]) => {
   let o = 0; for (const p of parts) { out.set(p, o); o += p.length; }
   return out;
 };
-const sha256 = async (b: Uint8Array) => new Uint8Array(await crypto.subtle.digest("SHA-256", b));
+const sha256 = async (b: Uint8Array) => new Uint8Array(await crypto.subtle.digest("SHA-256", b as Uint8Array<ArrayBuffer>));
 
 /** 설계문서 §3.1.10 A — 엔진(Go)과 같은 결과를 내야 한다 */
 export async function commit(nonce: Uint8Array, content: Uint8Array): Promise<Uint8Array> {
