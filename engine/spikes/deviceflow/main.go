@@ -45,10 +45,14 @@ func post(u string, v url.Values, out any) error {
 func copyAndOpen(code, link string) {
 	switch runtime.GOOS {
 	case "darwin":
-		c := exec.Command("pbcopy"); c.Stdin = strings.NewReader(code); c.Run()
+		c := exec.Command("pbcopy")
+		c.Stdin = strings.NewReader(code)
+		c.Run()
 		exec.Command("open", link).Run()
 	case "windows":
-		c := exec.Command("clip"); c.Stdin = strings.NewReader(code); c.Run()
+		c := exec.Command("clip")
+		c.Stdin = strings.NewReader(code)
+		c.Run()
 		exec.Command("rundll32", "url.dll,FileProtocolHandler", link).Run()
 	}
 }
@@ -132,11 +136,11 @@ func api(method, path string, body, out any) (int, error) {
 }
 
 // createRepo: ① 엔진이 비공개 저장소를 만들 수 있나 ③ 설치된 저장소 목록을 찾을 수 있나
-func createRepo() error {
+func createRepo(name string) error {
 	var r struct {
 		FullName string `json:"full_name"`
 	}
-	if _, err := api("POST", "/user/repos", map[string]any{"name": "ideatrail-spike", "private": true, "auto_init": true}, &r); err != nil {
+	if _, err := api("POST", "/user/repos", map[string]any{"name": name, "private": true, "auto_init": true}, &r); err != nil {
 		fmt.Println("① 만들기 실패:", err)
 	} else {
 		fmt.Println("① 만들기 성공:", r.FullName)
@@ -240,7 +244,11 @@ func main() {
 	case "login":
 		err = login()
 	case "create-repo":
-		err = createRepo()
+		name := "ideatrail-spike"
+		if len(os.Args) > 2 {
+			name = os.Args[2]
+		}
+		err = createRepo(name)
 	case "batch-commit":
 		if len(os.Args) < 3 {
 			err = errors.New("사용법: batch-commit <owner>/<repo>")
