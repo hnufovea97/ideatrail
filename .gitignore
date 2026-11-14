@@ -1,0 +1,10 @@
+engine/spikes/ots/pending-*.bin
+engine/spikes/ots/digest.hex
+engine/spikes/ots/spike.txt*
+node_modules/
+dist/
+.wrangler/
+.dev.vars
+.env*
+*.local
+bin/

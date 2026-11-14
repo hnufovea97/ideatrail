@@ -1,0 +1,5 @@
+* text=auto eol=lf
+spec/fixtures/** -text
+spec/vectors/** -text
+*.exe binary
+*.bin binary
