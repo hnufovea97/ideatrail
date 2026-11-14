@@ -1,0 +1,50 @@
+{
+  "version": "sha256-nonce-v1",
+  "vectors": [
+    {"name": "empty content",
+     "nonce_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+     "content_hex": "",
+     "commitment_hex": "c12cf9cbbc9c37b4c8ba2bae6b4e4cfb6d65fd78ecbe85320fdd3045d46e6cdb"},
+    {"name": "hello",
+     "nonce_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+     "content_hex": "ec9588eb859520ec9584ec9db4eb9494ec96b4",
+     "commitment_hex": "f7b87f77f0bee93db8e6c0d61e05c3220fc10ff484e10ea21a29fda935f7ea13"},
+    {"name": "short memo",
+     "nonce_hex": "abababababababababababababababababababababababababababababababab",
+     "content_hex": "eab080eab384ebb68020ec95b120ec9584ec9db4eb9494ec96b43a20ec9881ec8898eca69d20ec82aceca784ec9cbceba19c20ec9e90eb8f9920ec9e85eba0a5",
+     "commitment_hex": "1fa489570a2e9cf33f4489dce1091d8ca002076ec99ee551153ad5012b8ccda9"},
+    {"name": "manifest 3 files",
+     "nonce_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+     "manifest_entries": [
+       {"path": "spec.md", "content_hex": "2320737065630a"},
+       {"path": "README.md", "content_hex": "68690a"},
+       {"path": "src/a.go", "content_hex": "7061636b61676520610a"}],
+     "manifest_hex": "69646561747261696c2f6d616e69666573742d7631000000000300000009524541444d452e6d6498ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be400000007737065632e6d641b355baa30768cee67e2f1f9ff2d45584cb42f9413881d9104579d26cff1d2e8000000087372632f612e676f7b39baa38a2ec2b8d111bbbd8e448e80226477ab40105d9d2123d4dc18067438",
+     "commitment_hex": "c382a565282343af42980a30010d9dee6e8aaaaac27943e123add75b037cdb1c"},
+    {"name": "manifest nfc paths",
+     "nonce_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+     "manifest_entries": [
+       {"path": "\uba54\ubaa8.md", "content_hex": "2320eba994ebaaa80d0a"},
+       {"path": "src/b.go", "content_hex": "7061636b61676520620a"}],
+     "manifest_hex": "69646561747261696c2f6d616e69666573742d76310000000002000000087372632f622e676f983aab874348ab0e62d9fa51e0719b12f570234284c1f21c740bb6d3ca7cf11d00000009eba994ebaaa82e6d64ec31477593f875f64f8088237b8fcb61ff1817195b27b1cdb8a452287934cd70",
+     "commitment_hex": "3b30e4ce89b1e73fd7cb897e4fe629bf2a32feb17cba11950d3f3f8590e617af"},
+    {"name": "manifest nfd + backslash paths (same as nfc)",
+     "nonce_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+     "manifest_entries": [
+       {"path": "\u1106\u1166\u1106\u1169.md", "content_hex": "2320eba994ebaaa80d0a"},
+       {"path": "src\\b.go", "content_hex": "7061636b61676520620a"}],
+     "manifest_hex": "69646561747261696c2f6d616e69666573742d76310000000002000000087372632f622e676f983aab874348ab0e62d9fa51e0719b12f570234284c1f21c740bb6d3ca7cf11d00000009eba994ebaaa82e6d64ec31477593f875f64f8088237b8fcb61ff1817195b27b1cdb8a452287934cd70",
+     "commitment_hex": "3b30e4ce89b1e73fd7cb897e4fe629bf2a32feb17cba11950d3f3f8590e617af"},
+    {"name": "manifest duplicate after normalization",
+     "nonce_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+     "manifest_entries": [
+       {"path": "a/b.md", "content_hex": "31"},
+       {"path": "a\\b.md", "content_hex": "32"}],
+     "expect_error": "duplicate_path"},
+    {"name": "manifest dot-dot segment",
+     "nonce_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+     "manifest_entries": [
+       {"path": "../x.md", "content_hex": "31"}],
+     "expect_error": "invalid_path"}
+  ]
+}
