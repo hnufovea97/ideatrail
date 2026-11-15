@@ -6,7 +6,7 @@
 | S2 패스키 PRF (Mac) | ✅ Safari / ❌ 웨일 / — Chrome 미설치 | Safari: 같은 값 재현. 웨일: PRF 없음 → 가입 화면에서 실제 결과로 판정·다른 경로 안내 |
 | S2 패스키 PRF (Windows) | Phase B 대기 | `prfserve.exe`(내장 서버)로 Chrome·Edge 시험 |
 | S3 서명 없는 실행 (Mac) | ✅ | git clone한 arm64 바이너리 경고 없이 실행. `com.apple.quarantine` 없음(provenance만). `spctl` 평가는 rejected지만 quarantine이 없어 실행은 막지 않음 → ADR-0001 Mac 유지 가능. 브라우저로 받은 파일은 다를 수 있음 → M6 실제 `/plugin install` 경로로 재확인 |
-| S3 서명 없는 실행 (Windows) | ❌ 1차 | 2026-11-15 git clone한 `hello-windows-amd64.exe`가 **"애플리케이션 제어 정책에서 이 파일을 차단했습니다"**(ApplicationFailedException)로 실행 안 됨. 관리자 PowerShell. SmartScreen 경고가 아니라 **차단** → Smart App Control(스마트 앱 컨트롤) 또는 회사 정책(WDAC/AppLocker) 추정, 원인 확인 중. 같은 PC에서 deviceflow·prfserve exe도 막힐 가능성 큼 → ADR-0001(서명 없는 Go 바이너리) 재검토 필요, G0 안건 |
+| S3 서명 없는 실행 (Windows) | ❌ | 2026-11-15 git clone한 `hello-windows-amd64.exe`가 "애플리케이션 제어 정책에서 이 파일을 차단했습니다"로 실행 불가(우회 버튼 없음). 원인 확정: **Smart App Control = On**, CodeIntegrity 정책 `VerifiedAndReputable`(서명·평판 없는 실행 파일 차단). 개인 Windows 11 기본 환경에서 재현되는 조건 → **ADR-0001(서명 없는 Go 바이너리) 재검토, G0 안건**. S4·S2 exe 시험은 보류, S2는 PowerShell HttpListener로 대체 |
 | S4 GitHub 기기 코드·저장소 생성 (Mac) | ✅ | 로그인·만료 끄기(Opt-out 함정)·저장소 자동 생성(설치 뒤)·동시 커밋 충돌 처리 모두 통과(아래 S4 표). Windows는 Phase B |
 
 ## 라이브러리 후보
