@@ -1,0 +1,10 @@
+// 로컬·시험용. 배포 값(도메인·D1 id·Cron)은 M2b에서 설정 초안 §1대로 채운다
+{
+  "name": "ideatrail-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [{ "binding": "DB", "database_name": "ideatrail", "database_id": "local", "migrations_dir": "migrations" }],
+  "ratelimits": [{ "name": "IP_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
+  "vars": { "RP_ID": "localhost", "RP_NAME": "Ideatrail", "APP_ORIGIN": "http://localhost:4321" }
+}
