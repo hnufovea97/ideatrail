@@ -42,8 +42,8 @@ export function accountPayload() {
 }
 
 /** Full signup through a fresh pairing session. Returns the browser (signed in), authenticator and ids. */
-export async function signUp(b = browser()) {
-  const pairing = await seedPairing();
+export async function signUp(b = browser(), existing?: { sessionId: string }) {
+  const pairing = existing ?? (await seedPairing());
   const auth = await createAuthenticator(RP);
   const o = await b.call("POST", "/v1/webauthn/register/options", { pairing_session_id: pairing.sessionId });
   const { challenge_id, user_id, options } = (await o.json()) as { challenge_id: string; user_id: string; options: { challenge: string; user: { id: string } } };

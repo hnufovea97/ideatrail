@@ -5,6 +5,7 @@ import { appCors, limitBody, safeLogger, securityHeaders } from "./http/middlewa
 import { bindingLimiter, type Limiter } from "./http/rate-limit";
 import { requireConfirmed } from "./auth/session";
 import { webauthnRoutes } from "./routes/webauthn";
+import { pairingRoutes } from "./routes/pairing";
 import { accountRoutes, logoutHandlers } from "./routes/account";
 import { requireStepup } from "./auth/stepup";
 import { requireSession } from "./auth/session";
@@ -23,6 +24,7 @@ export function createApp(deps: AppDeps = {}) {
 
   app.route("/v1/webauthn", webauthnRoutes(limiter));
   app.route("/v1/account", accountRoutes());
+  app.route("/v1/pairing", pairingRoutes(limiter));
   app.post("/v1/logout", ...logoutHandlers);
 
   testRoutes(app);
