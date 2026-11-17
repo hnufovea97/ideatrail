@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import rfc from "../../../../spec/vectors/hpke_rfc9180.json";
-import ours from "../../../../spec/vectors/hpke_ideatrail.json";
+import rfc from "../../../spec/vectors/hpke_rfc9180.json";
+import ours from "../../../spec/vectors/hpke_ideatrail.json";
 import { open, openAuth, seal, sealAuth, KIND } from "./seal";
 import { recipientContext } from "./testing";
 import { buildAAD, type AAD } from "./format";

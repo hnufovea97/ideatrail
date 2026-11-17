@@ -1,0 +1,6 @@
+{
+  "name": "ideatrail",
+  "private": true,
+  "packageManager": "pnpm@12.18.0",
+  "scripts": { "test": "pnpm -r test", "typecheck": "pnpm -r typecheck" }
+}

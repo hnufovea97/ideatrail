@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import sk from "../../../../spec/vectors/subkey.json";
-import xc from "../../../../spec/vectors/xchacha.json";
+import sk from "../../../spec/vectors/subkey.json";
+import xc from "../../../spec/vectors/xchacha.json";
 import { xchacha20poly1305 } from "@noble/ciphers/chacha.js";
 import { subkey } from "./subkey";
 import { relock, unlock, PURPOSES, type Purpose } from "./relock";

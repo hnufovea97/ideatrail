@@ -1,6 +1,5 @@
-import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { fromB64u, toB64u, toHex, utf8 } from "./bytes";
+import { toHex, utf8 } from "./bytes";
 import { idField, joinFields, orDash, SEP_SIGN } from "./format";
 
 /** The six signed message types (spec §8). Numbers are bigint: sequences are uint64. */
@@ -11,10 +10,6 @@ export type Signable =
   | { type: "storage_link"; userId: string; engineId: string; tokenSealed: Uint8Array; unixTs: bigint }
   | { type: "repo_head"; userId: string; engineId: string; commitSha: string; unixTs: bigint }
   | { type: "approval"; userId: string; approvalId: string; kind: string; summarySealed: Uint8Array; apprSeq: bigint };
-
-const SEED_LEN = 32;
-const PUB_LEN = 32;
-const SIG_LEN = 64;
 
 const h = (b: Uint8Array) => toHex(sha256(b));
 const U64_MAX = 2n ** 64n - 1n;
@@ -65,20 +60,3 @@ function fields(s: Signable): string[] {
 
 /** Bytes to sign: join(0x0A, fields), empty fields as "-". */
 export const messageFor = (s: Signable): Uint8Array => utf8(joinFields(SEP_SIGN, fields(s).map((f) => orDash(f))));
-
-export function sign(seed: Uint8Array, msg: Uint8Array): string {
-  if (seed.length !== SEED_LEN) throw new Error("bad_key");
-  return toB64u(ed25519.sign(msg, seed));
-}
-
-/** Strict RFC 8032 verification (zip215: false) to match Go crypto/ed25519 and WebCrypto. */
-export function verify(pub: Uint8Array, msg: Uint8Array, sig: string): boolean {
-  if (pub.length !== PUB_LEN) return false;
-  try {
-    const raw = fromB64u(sig);
-    if (raw.length !== SIG_LEN) return false;
-    return ed25519.verify(raw, msg, pub, { zip215: false });
-  } catch {
-    return false;
-  }
-}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import padData from "../../../../spec/vectors/pad.json";
-import idData from "../../../../spec/vectors/ids.json";
+import padData from "../../../spec/vectors/pad.json";
+import idData from "../../../spec/vectors/ids.json";
 import { pad } from "./pad";
 import { CROCKFORD, encodeBase32 } from "./ids";
 import { fromHex, toHex } from "./bytes";

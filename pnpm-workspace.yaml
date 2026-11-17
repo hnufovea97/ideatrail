@@ -1,2 +1,6 @@
+packages:
+  - web
+  - api
+  - packages/*
 # 공급망: 배포된 지 14일(20160분) 안 된 버전은 설치하지 않음 (M1 계획 공급망 규칙)
 minimumReleaseAge: 20160

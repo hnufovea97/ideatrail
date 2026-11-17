@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import e from "../../../../spec/vectors/envelope.json";
+import e from "../../../spec/vectors/envelope.json";
 import { PRF_SALT, prfWrapKey, recoveryWrapKey, wrapMasterKey, unwrapMasterKey, recoveryLookupId, lookupHash } from "./envelope";
 import { wrapMasterKeyWithNonce } from "./testing";
 import { formatRecoveryKey, parseRecoveryKey } from "./recovery";

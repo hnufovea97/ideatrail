@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import data from "../../../../spec/vectors/sign.json";
+import data from "../../../spec/vectors/sign.json";
 import { messageFor, sign, verify, type Signable } from "./sign";
 import { fromB64u, fromHex, toB64u, toHex } from "./bytes";
 
