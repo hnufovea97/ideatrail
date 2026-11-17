@@ -11,6 +11,7 @@ import { envelopeRoutes, recoveryRoutes } from "./routes/recovery";
 import { recordRoutes } from "./routes/records";
 import { deltaRoutes } from "./routes/deltas";
 import { approvalRoutes, inboxRoutes } from "./routes/approvals";
+import { syncRoutes } from "./routes/sync";
 import { anchorRoutes, importAllowanceRoutes, repoHeadRoutes, storageLinkRoutes } from "./routes/anchors";
 import { accountRoutes, logoutHandlers } from "./routes/account";
 import { requireStepup } from "./auth/stepup";
@@ -43,6 +44,7 @@ export function createApp(deps: AppDeps = {}) {
   app.route("/v1/import-allowance", importAllowanceRoutes());
   app.route("/v1/approvals", approvalRoutes());
   app.route("/v1/inbox", inboxRoutes());
+  app.route("/v1/sync", syncRoutes());
   app.post("/v1/logout", ...logoutHandlers);
 
   if (deps.testRoutes) testRoutes(app);
