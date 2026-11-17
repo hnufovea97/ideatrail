@@ -1,18 +1,19 @@
-# M0 실험 보고서 (작성 중 — Mac 완료, Windows Phase B 대기)
+# M0 실험 보고서 (Mac 완료 · Windows는 기능 완성 뒤로 미룸)
 
 | 실험 | 상태 | 결과 |
 |---|---|---|
 | S1 OTS 직접 제출 | ✅ (Mac) | 22분 만에 블록 975755 확정, 탐색기 2곳 대조 일치. 확정본은 **영수증 안 달력 주소**로 받아야 함(아래 S1 표) |
 | S2 패스키 PRF (Mac) | ✅ Safari / ❌ 웨일 / — Chrome 미설치 | Safari: 같은 값 재현. 웨일: PRF 없음 → 가입 화면에서 실제 결과로 판정·다른 경로 안내 |
-| S2 패스키 PRF (Windows) | Phase B 대기 | `prfserve.exe`(내장 서버)로 Chrome·Edge 시험 |
+| S2 패스키 PRF (Windows) | ⏸ 미룸 | 2026-11-17 founder 결정: Windows 시험은 기능을 다 만든 뒤 한꺼번에. 시험 방법은 PowerShell HttpListener로 준비해 둠(ideatrail-s3 README 5번) |
 | S3 서명 없는 실행 (Mac) | ✅ | git clone한 arm64 바이너리 경고 없이 실행. `com.apple.quarantine` 없음(provenance만). `spctl` 평가는 rejected지만 quarantine이 없어 실행은 막지 않음 → ADR-0001 Mac 유지 가능. 브라우저로 받은 파일은 다를 수 있음 → M6 실제 `/plugin install` 경로로 재확인 |
 | S3 서명 없는 실행 (Windows) | ❌ | 2026-11-15 git clone한 `hello-windows-amd64.exe`가 "애플리케이션 제어 정책에서 이 파일을 차단했습니다"로 실행 불가(우회 버튼 없음). 원인 확정: **Smart App Control = On**, CodeIntegrity 정책 `VerifiedAndReputable`(서명·평판 없는 실행 파일 차단). 개인 Windows 11 기본 환경에서 재현되는 조건 → **ADR-0001(서명 없는 Go 바이너리) 재검토, G0 안건**. S4·S2 exe 시험은 보류, S2는 PowerShell HttpListener로 대체 |
-| S4 GitHub 기기 코드·저장소 생성 (Mac) | ✅ | 로그인·만료 끄기(Opt-out 함정)·저장소 자동 생성(설치 뒤)·동시 커밋 충돌 처리 모두 통과(아래 S4 표). Windows는 Phase B |
+| S4 GitHub 기기 코드·저장소 생성 (Mac) | ✅ | 로그인·만료 끄기(Opt-out 함정)·저장소 자동 생성(설치 뒤)·동시 커밋 충돌 처리 모두 통과(아래 S4 표). Windows는 ⏸ 미룸(exe가 스마트 앱 컨트롤에 막혀 그대로는 못 함) |
 
 ## 라이브러리 후보
 → 아래 "S1 Step 4 라이브러리 조사"로 대체됨 (결론: 최소 파서 직접 작성 + 실제 영수증 벡터)
 
 ## 메모
+- 2026-11-17 founder 결정: **Windows 시험은 기능을 다 만든 뒤(M6 이후) 한꺼번에.** M1~M5는 Mac 기준으로 진행하고, Windows 대응 코드(경로·권한·잠금)는 지금처럼 같이 짜되 실기기 확인만 미룬다. 단 스마트 앱 컨트롤 대응(서명 또는 실행 방식)은 Windows 시험 전에 정해야 함.
 - 2026-11-14 founder 지시로 커밋 작성자 이메일을 `fovea@nate.com`으로 바꾸고 push 전 커밋 전체를 다시 썼어요(개발 저장소 12개, S3 저장소 1개).
 - 비공개 임시 저장소 2개 생성 승인 받음. `ideatrail-s3` 생성·push 완료, `ideatrail-spike`는 F-2 client_id를 받은 뒤 S4가 만들어요.
 - 2026-11-14 S2 Safari 1차: caps `extension:prf: true`, `userVerifyingPlatformAuthenticator: false`, 창 없이 `NotAllowedError`. 원인 추정 = 클릭 뒤 `await getClientCapabilities()`가 먼저 돌아 Safari의 사용자 동작이 끊김. **M4 가입 화면 규칙: 버튼 클릭 처리기에서 다른 await 없이 바로 `credentials.create/get` 호출**. 페이지를 만들기·확인 두 버튼으로 고쳐 재시험.
