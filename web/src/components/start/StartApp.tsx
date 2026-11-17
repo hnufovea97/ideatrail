@@ -5,6 +5,7 @@ import { prfSupport, type CapabilityEnv } from "../../lib/capability";
 import { clearFragment, engineKeysMatch, parseStartLink } from "../../lib/fragment";
 import type { SignupContext } from "../../lib/signup/context";
 import { initialState, reduce, type StopReason } from "../../lib/signup/machine";
+import { DoneStep } from "./DoneStep";
 import { FoldersStep } from "./FoldersStep";
 import { GithubStep } from "./GithubStep";
 import { IntroStep } from "./IntroStep";
@@ -73,6 +74,8 @@ export default function StartApp() {
       return <RecoveryStep {...props} />;
     case "folders":
       return <FoldersStep {...props} />;
+    case "done":
+      return <DoneStep {...props} />;
     default:
       return <Busy />;
   }
