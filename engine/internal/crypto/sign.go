@@ -3,13 +3,28 @@ package crypto
 import (
 	"crypto/ed25519"
 	"errors"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 )
 
-// ErrBadKey means a key had the wrong length.
+// ErrBadKey means a key was nil, of the wrong type, or the wrong length.
 var ErrBadKey = errors.New("bad_key")
+
+var (
+	sha256HexRe = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	commitSHARe = regexp.MustCompile(`^(?:[0-9a-f]{40}|[0-9a-f]{64})$`) // git SHA-1 or SHA-256
+	timeRe      = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$`)
+)
+
+// matchField validates a non-empty field against re.
+func matchField(re *regexp.Regexp, s string) error {
+	if !re.MatchString(s) {
+		return ErrBadField
+	}
+	return nil
+}
 
 // Request is the signed API request (spec §8).
 type Request struct {
@@ -80,7 +95,10 @@ func signMsg(fields ...string) ([]byte, error) {
 		dashed[i] = orDash(f)
 	}
 	s, err := joinFields(sepSign, dashed)
-	return []byte(s), err
+	if err != nil {
+		return nil, err
+	}
+	return []byte(s), nil
 }
 
 func joinParents(ps []string) (string, error) {
@@ -94,6 +112,9 @@ func joinParents(ps []string) (string, error) {
 		}
 	}
 	slices.Sort(sorted)
+	if len(slices.Compact(slices.Clone(sorted))) != len(sorted) {
+		return "", ErrBadField // duplicate parent
+	}
 	return strings.Join(sorted, ","), nil
 }
 
@@ -114,6 +135,9 @@ func (r Record) Message() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := errors.Join(matchField(sha256HexRe, r.CommitmentHex), matchField(timeRe, r.RecordedAt)); err != nil {
+		return nil, ErrBadField
+	}
 	return signMsg("ideatrail-v1-record", f[0], f[1], f[2], parents, r.CommitmentHex,
 		hexSHA(r.MetaSealed), hexSHA(r.BodySealed), hexSHA(r.NonceSealed), u64(r.LogSeq), r.RecordedAt)
 }
@@ -121,6 +145,9 @@ func (r Record) Message() ([]byte, error) {
 func (d Delta) Message() ([]byte, error) {
 	f, err := ids(d.UserID, d.RootID, d.DeltaID)
 	if err != nil {
+		return nil, err
+	}
+	if err := matchField(timeRe, d.CreatedAt); err != nil {
 		return nil, err
 	}
 	return signMsg("ideatrail-v1-delta", f[0], f[1], f[2], hexSHA(d.DeltaSealed), u64(d.LogSeq), d.CreatedAt)
@@ -137,6 +164,9 @@ func (s StorageLink) Message() ([]byte, error) {
 func (h RepoHead) Message() ([]byte, error) {
 	f, err := ids(h.UserID, h.EngineID)
 	if err != nil {
+		return nil, err
+	}
+	if err := matchField(commitSHARe, h.CommitSHA); err != nil {
 		return nil, err
 	}
 	return signMsg("ideatrail-v1-repohead", f[0], f[1], h.CommitSHA, i64(h.UnixTS))

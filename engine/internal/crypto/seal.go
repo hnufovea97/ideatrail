@@ -1,9 +1,9 @@
 package crypto
 
 import (
-	"bytes"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/cloudflare/circl/hpke"
@@ -43,14 +43,11 @@ var (
 	ErrDecrypt = errors.New("decrypt_failed")
 )
 
+const modeAuth = 2 // RFC 9180 mode_auth, used only for kind 7
+
 const (
 	encLen = 32
 	tagLen = 16
-)
-
-type (
-	kemPriv = kem.PrivateKey
-	kemPub  = kem.PublicKey
 )
 
 var (
@@ -73,15 +70,22 @@ func (k Kind) Name() (string, error) {
 
 // BuildAAD joins IT1, name, the validated fields and crypto_version with 0x1F.
 func BuildAAD(name string, a AAD) ([]byte, error) {
-	user, err1 := idField(a.UserID)
-	root, err2 := idField(a.RootID)
-	rec, err3 := idField(a.RecordID)
-	ver, err4 := numField(a.Version)
-	if err := errors.Join(err1, err2, err3, err4); err != nil {
-		return nil, ErrBadField
+	fields := []string{"IT1", name}
+	for _, f := range []struct {
+		v     string
+		check func(string) (string, error)
+	}{{a.UserID, idField}, {a.RootID, idField}, {a.RecordID, idField}, {a.Version, numField}} {
+		v, err := f.check(f.v)
+		if err != nil {
+			return nil, err
+		}
+		fields = append(fields, v)
 	}
-	s, err := joinFields(sepAAD, []string{"IT1", name, user, root, rec, ver, CryptoVersion})
-	return []byte(s), err
+	s, err := joinFields(sepAAD, append(fields, CryptoVersion))
+	if err != nil {
+		return nil, err
+	}
+	return []byte(s), nil
 }
 
 // GenerateKEMKey derives an X25519 key pair from 32 bytes read from r.
@@ -94,8 +98,16 @@ func GenerateKEMKey(r io.Reader) (kem.PrivateKey, kem.PublicKey, error) {
 	return priv, pub, nil
 }
 
+// ParseKEMPrivate parses a 32-byte X25519 private key.
 func ParseKEMPrivate(b []byte) (kem.PrivateKey, error) { return kemScheme.UnmarshalBinaryPrivateKey(b) }
-func ParseKEMPublic(b []byte) (kem.PublicKey, error)   { return kemScheme.UnmarshalBinaryPublicKey(b) }
+
+// ParseKEMPublic parses a 32-byte X25519 public key.
+func ParseKEMPublic(b []byte) (kem.PublicKey, error) { return kemScheme.UnmarshalBinaryPublicKey(b) }
+
+// isX25519 reports whether k is a non-nil key of our KEM scheme (circl panics on foreign or nil keys).
+func isX25519(k interface{ Scheme() kem.Scheme }) bool {
+	return k != nil && k.Scheme() == kemScheme
+}
 
 func prepare(kind Kind, a AAD, auth bool) (info, aad []byte, err error) {
 	name, err := kind.Name()
@@ -128,6 +140,9 @@ func seal(rnd io.Reader, kind Kind, recipient kem.PublicKey, sender kem.PrivateK
 	if err != nil {
 		return nil, err
 	}
+	if !isX25519(recipient) || (sender != nil && !isX25519(sender)) {
+		return nil, ErrBadKey
+	}
 	snd, err := suite.NewSender(recipient, info)
 	if err != nil {
 		return nil, err
@@ -140,17 +155,17 @@ func seal(rnd io.Reader, kind Kind, recipient kem.PublicKey, sender kem.PrivateK
 		enc, sealer, err = snd.Setup(rnd)
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hpke setup: %w", err)
 	}
 	if kind != KindOriginal {
 		plaintext = Pad(plaintext)
 	}
 	ct, err := sealer.Seal(plaintext, aad)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hpke seal: %w", err)
 	}
-	out := make([]byte, 0, len(Magic)+1+len(enc)+len(ct))
-	out = append(append(append(append(out, Magic...), byte(kind)), enc...), ct...)
+	out := make([]byte, 0, headerLen+len(enc)+len(ct))
+	out = append(append(append(append(out, magic...), byte(kind)), enc...), ct...)
 	return out, nil
 }
 
@@ -172,6 +187,9 @@ func open(kind Kind, recipient kem.PrivateKey, senderPub kem.PublicKey, a AAD, b
 	if err != nil {
 		return nil, err
 	}
+	if !isX25519(recipient) || (senderPub != nil && !isX25519(senderPub)) {
+		return nil, ErrBadKey
+	}
 	pt, err := decrypt(kind, recipient, senderPub, info, aad, blob)
 	if err != nil {
 		return nil, ErrDecrypt
@@ -180,10 +198,10 @@ func open(kind Kind, recipient kem.PrivateKey, senderPub kem.PublicKey, a AAD, b
 }
 
 func decrypt(kind Kind, recipient kem.PrivateKey, senderPub kem.PublicKey, info, aad, blob []byte) ([]byte, error) {
-	if len(blob) < len(Magic)+1+encLen+tagLen || !bytes.Equal(blob[:3], Magic) || blob[3] != byte(kind) {
+	if len(blob) < headerLen+encLen+tagLen || string(blob[:len(magic)]) != magic || blob[len(magic)] != byte(kind) {
 		return nil, ErrDecrypt
 	}
-	enc, ct := blob[4:4+encLen], blob[4+encLen:]
+	enc, ct := blob[headerLen:headerLen+encLen], blob[headerLen+encLen:]
 	rcv, err := suite.NewReceiver(recipient, info)
 	if err != nil {
 		return nil, err

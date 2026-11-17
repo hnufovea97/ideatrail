@@ -5,5 +5,5 @@ test:
 
 .PHONY: vectors
 vectors:
-	cd engine && go run ./cmd/genvectors ../spec/vectors
+	cd engine && go test ./internal/crypto -run TestCommittedVectorsUpToDate -update
 	cd web && GEN_BROWSER_SEALS=1 pnpm vitest run browser-seals

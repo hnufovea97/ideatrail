@@ -1,27 +1,6 @@
 package crypto
 
-import (
-	"bytes"
-	"os"
-	"path/filepath"
-	"testing"
-)
-
-func TestCommittedVectorsUpToDate(t *testing.T) {
-	files, err := BuildVectors()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for name, want := range files {
-		got, err := os.ReadFile(filepath.Join("../../../spec/vectors", name))
-		if err != nil {
-			t.Fatalf("%s: %v (run: make vectors)", name, err)
-		}
-		if !bytes.Equal(got, want) {
-			t.Errorf("%s is stale — run: make vectors", name)
-		}
-	}
-}
+import "testing"
 
 func TestXChaChaStandardVector(t *testing.T) {
 	// draft-irtf-cfrg-xchacha-03 §A.3.1 ciphertext ‖ tag

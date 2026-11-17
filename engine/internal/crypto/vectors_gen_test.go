@@ -1,8 +1,10 @@
 package crypto
 
-// Deterministic shared test vectors (spec §14). Written by cmd/genvectors and checked by
-// TestCommittedVectorsUpToDate. Browser-only primitives (relock, subkey, envelope) are
-// computed here directly so that TS output can be cross-checked against Go.
+// Deterministic shared test vectors (spec §14), test-only so none of this ships in the engine.
+// `go test ./internal/crypto -run TestCommittedVectorsUpToDate -update` (make vectors) rewrites
+// spec/vectors; without -update the test fails when committed files are stale.
+// Browser-only primitives (relock, subkey, envelope) are computed here directly so TS output
+// can be cross-checked against Go. Errors here are programming errors, so must() panics.
 
 import (
 	"crypto/ed25519"
@@ -11,8 +13,15 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"flag"
 	"io"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
+	"testing"
+
+	"github.com/cloudflare/circl/kem"
 
 	"golang.org/x/crypto/chacha20poly1305"
 )
@@ -41,7 +50,7 @@ func (d *detReader) Read(p []byte) (int, error) {
 
 func take(label string, n int) []byte {
 	b := make([]byte, n)
-	_, _ = io.ReadFull(det(label), b)
+	must(io.ReadFull(det(label), b))
 	return b
 }
 
@@ -136,13 +145,13 @@ func hpkeVectors() (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	rb, _ := skR.MarshalBinary()
-	rp, _ := pkR.MarshalBinary()
-	sb, _ := skS.MarshalBinary()
-	sp, _ := pkS.MarshalBinary()
+	rb := must(skR.MarshalBinary())
+	rp := must(pkR.MarshalBinary())
+	sb := must(skS.MarshalBinary())
+	sp := must(pkS.MarshalBinary())
 	rows := []row{}
 	for k := KindRecordMeta; k <= KindFolderSuggestions; k++ {
-		name, _ := k.Name()
+		name := must(k.Name())
 		a := AAD{UserID: vUser, RootID: vRoot, RecordID: vRecord, Version: "0"}
 		switch k {
 		case KindEngineInbox:
@@ -151,20 +160,20 @@ func hpkeVectors() (any, error) {
 			a = AAD{UserID: vUser}
 		}
 		pt := []byte(`{"kind":"` + name + `"}`)
-		var sender kemPriv
+		var sender kem.PrivateKey
 		mode := 0
 		if k == KindEngineInbox {
-			sender, mode = skS, 2
+			sender, mode = skS, modeAuth
 		}
 		sealed, err := seal(det("eph/"+name), k, pkR, sender, a, pt)
 		if err != nil {
 			return nil, err
 		}
-		aad, _ := BuildAAD(name, a)
+		aad := must(BuildAAD(name, a))
 		r := row{Kind: int(k), KindName: name, Mode: mode, RecipientPriv: hx(rb), RecipientPub: hx(rp),
 			UserID: a.UserID, RootID: a.RootID, RecordID: a.RecordID, Version: a.Version,
 			AADHex: hx(aad), PlaintextHex: hx(pt), SealedHex: hx(sealed)}
-		if mode == 2 {
+		if mode == modeAuth {
 			r.SenderPriv, r.SenderPub = hx(sb), hx(sp)
 		}
 		rows = append(rows, r)
@@ -201,7 +210,7 @@ func signCases() []signCase {
 }
 
 func signVectors() (any, error) {
-	seed, _ := hex.DecodeString("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60")
+	seed := must(hex.DecodeString("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"))
 	priv := ed25519.NewKeyFromSeed(seed)
 	type row struct {
 		Name       string            `json:"name"`
@@ -225,11 +234,7 @@ func signVectors() (any, error) {
 }
 
 func hkdf32(ikm, salt []byte, info string) []byte {
-	k, err := hkdf.Key(sha256.New, ikm, salt, info, 32)
-	if err != nil {
-		panic(err) // only fails for absurd lengths
-	}
-	return k
+	return must(hkdf.Key(sha256.New, ikm, salt, info, 32))
 }
 
 func subkeyOf(mk []byte, purpose string) []byte {
@@ -239,20 +244,18 @@ func subkeyOf(mk []byte, purpose string) []byte {
 func subkeyVectors() (any, error) {
 	mk := take("mk", 32)
 	keys := map[string]string{}
-	for _, p := range append(slicesClone(relockPurposes), "record/"+vRecord) {
+	for _, p := range append(slices.Clone(relockPurposes), "record/"+vRecord) {
 		keys[p] = hx(subkeyOf(mk, p))
 	}
 	return map[string]any{"mk_hex": hx(mk), "subkeys": keys}, nil
 }
-
-func slicesClone(s []string) []string { return append([]string(nil), s...) }
 
 func relockBytes(key []byte, kindByte byte, nonce, aad, pt []byte) ([]byte, error) {
 	a, err := chacha20poly1305.NewX(key)
 	if err != nil {
 		return nil, err
 	}
-	out := append(append(append([]byte{}, Magic...), kindByte), nonce...)
+	out := append(append(append([]byte{}, magic...), kindByte), nonce...)
 	return a.Seal(out, nonce, Pad(pt), aad), nil
 }
 
@@ -267,9 +270,9 @@ var xchachaStd = map[string]string{
 }
 
 func xchachaVectors() (any, error) {
-	k, _ := hex.DecodeString(xchachaStd["key_hex"])
-	n, _ := hex.DecodeString(xchachaStd["nonce_hex"])
-	ad, _ := hex.DecodeString(xchachaStd["aad_hex"])
+	k := must(hex.DecodeString(xchachaStd["key_hex"]))
+	n := must(hex.DecodeString(xchachaStd["nonce_hex"]))
+	ad := must(hex.DecodeString(xchachaStd["aad_hex"]))
 	a, err := chacha20poly1305.NewX(k)
 	if err != nil {
 		return nil, err
@@ -337,4 +340,37 @@ func envelopeVectors() (any, error) {
 			"envelope_hex": hx(renv), "lookup_id": lookupID, "lookup_hash": hx(lh[:]),
 		},
 	}, nil
+}
+
+const vectorsDir = "../../../spec/vectors"
+
+var update = flag.Bool("update", false, "rewrite spec/vectors from the generator")
+
+func TestCommittedVectorsUpToDate(t *testing.T) {
+	files, err := BuildVectors()
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		path := filepath.Join(vectorsDir, name)
+		if *update {
+			if err := os.WriteFile(path, files[name], 0o644); err != nil {
+				t.Fatal(err)
+			}
+			t.Logf("wrote %s", name)
+			continue
+		}
+		got, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("%s: %v (run: make vectors)", name, err)
+		}
+		if string(got) != string(files[name]) {
+			t.Errorf("%s is stale — run: make vectors", name)
+		}
+	}
 }

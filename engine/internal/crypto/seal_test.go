@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cloudflare/circl/hpke"
+	"github.com/cloudflare/circl/kem"
 )
 
 const (
@@ -103,7 +104,7 @@ func goodAAD() AAD { return AAD{UserID: tUser, RootID: tRoot, RecordID: tRecord,
 func TestSealLayoutAndRoundTrip(t *testing.T) {
 	skR, pkR := must2(t)
 	sealed := must(Seal(KindRecordMeta, pkR, goodAAD(), []byte(`{"t":1}`)))
-	if !bytes.Equal(sealed[:3], Magic) || sealed[3] != byte(KindRecordMeta) || len(sealed) != 4+32+256+16 {
+	if string(sealed[:3]) != magic || sealed[3] != byte(KindRecordMeta) || len(sealed) != 4+32+256+16 {
 		t.Fatalf("bad layout len=%d", len(sealed))
 	}
 	if pt, err := Open(KindRecordMeta, skR, goodAAD(), sealed); err != nil || string(pt) != `{"t":1}` {
@@ -111,7 +112,7 @@ func TestSealLayoutAndRoundTrip(t *testing.T) {
 	}
 }
 
-func must2(t *testing.T) (skR kemPriv, pkR kemPub) {
+func must2(t *testing.T) (skR kem.PrivateKey, pkR kem.PublicKey) {
 	t.Helper()
 	sk, pk, err := GenerateKEMKey(rand.Reader)
 	if err != nil {
@@ -224,4 +225,55 @@ func TestSealEncNeverRepeats(t *testing.T) {
 		}
 		seen[k] = true
 	}
+}
+
+func TestNilOrForeignKeysAreRejected(t *testing.T) {
+	skR, pkR := must2(t)
+	sealed := must(Seal(KindDelta, pkR, goodAAD(), []byte("x")))
+	if _, err := Seal(KindDelta, nil, goodAAD(), []byte("x")); err != ErrBadKey {
+		t.Errorf("nil recipient: %v", err)
+	}
+	if _, err := SealAuth(KindEngineInbox, pkR, nil, AAD{}, []byte("x")); err != ErrAuthMode {
+		t.Errorf("nil sender: %v", err)
+	}
+	if _, err := Open(KindDelta, nil, goodAAD(), sealed); err != ErrBadKey {
+		t.Errorf("nil recipient on open: %v", err)
+	}
+	if _, err := OpenAuth(KindEngineInbox, skR, nil, AAD{}, sealed); err != ErrAuthMode {
+		t.Errorf("nil sender on open: %v", err)
+	}
+	foreign, _ := must2Foreign(t)
+	if _, err := Seal(KindDelta, foreign, goodAAD(), []byte("x")); err != ErrBadKey {
+		t.Errorf("foreign key: %v", err)
+	}
+}
+
+func must2Foreign(t *testing.T) (kem.PublicKey, kem.PrivateKey) {
+	t.Helper()
+	pub, priv, err := hpke.KEM_P256_HKDF_SHA256.Scheme().GenerateKeyPair()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pub, priv
+}
+
+func FuzzOpen(f *testing.F) {
+	sk, pk, _ := GenerateKEMKey(rand.Reader)
+	f.Add(must(Seal(KindDelta, pk, goodAAD(), []byte("x"))))
+	f.Add([]byte("IT1"))
+	f.Fuzz(func(t *testing.T, blob []byte) {
+		if pt, err := Open(KindDelta, sk, goodAAD(), blob); err == nil && string(pt) != "x" {
+			t.Fatalf("opened a forged blob: %q", pt)
+		}
+	})
+}
+
+func FuzzUnpad(f *testing.F) {
+	f.Add(Pad([]byte("abc")))
+	f.Add([]byte{0x80})
+	f.Fuzz(func(t *testing.T, b []byte) {
+		if out, err := Unpad(b); err == nil && len(Pad(out)) != len(b) {
+			t.Fatalf("unpad accepted non-canonical length %d", len(b))
+		}
+	})
 }

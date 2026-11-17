@@ -13,8 +13,11 @@ import (
 // CryptoVersion is the trailing AAD field and crypto_version (spec §1).
 const CryptoVersion = "1"
 
-// Magic prefixes every sealed or relocked blob (spec §1).
-var Magic = []byte("IT1")
+// magic prefixes every sealed or relocked blob (spec §1); headerLen adds the kind byte.
+const (
+	magic     = "IT1"
+	headerLen = len(magic) + 1
+)
 
 const (
 	sepAAD  = "\x1f"
@@ -25,6 +28,7 @@ const (
 var ErrBadField = errors.New("bad_field")
 
 func joinFields(sep string, fields []string) (string, error) {
+	// callers convert ("", err) to (nil, err)
 	for _, f := range fields {
 		if strings.ContainsAny(f, "\x1f\n") {
 			return "", ErrBadField
@@ -43,8 +47,8 @@ func orDash(s string) string {
 // B64 encodes base64url without padding (spec §1).
 func B64(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
 
-// UnB64 decodes base64url without padding.
-func UnB64(s string) ([]byte, error) { return base64.RawURLEncoding.DecodeString(s) }
+// UnB64 decodes canonical base64url without padding (non-zero trailing bits are rejected).
+func UnB64(s string) ([]byte, error) { return base64.RawURLEncoding.Strict().DecodeString(s) }
 
 func hexSHA(b []byte) string {
 	h := sha256.Sum256(b)

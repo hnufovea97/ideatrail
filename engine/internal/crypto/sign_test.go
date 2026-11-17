@@ -15,6 +15,10 @@ var (
 	rfc8032EmptySig = "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"
 )
 
+var tCommit = strings.Repeat("ab", 32)
+
+const tTime = "2026-11-14T05:12:03Z"
+
 func TestRFC8032KnownAnswer(t *testing.T) {
 	priv := ed25519.NewKeyFromSeed(rfc8032Seed)
 	if hex.EncodeToString(priv.Public().(ed25519.PublicKey)) != rfc8032Pub {
@@ -27,22 +31,22 @@ func TestRFC8032KnownAnswer(t *testing.T) {
 }
 
 func TestRecordMessageLayout(t *testing.T) {
-	r := Record{UserID: tUser, RootID: tRoot, RecordID: tRecord, Parents: []string{tOther, tUser}, CommitmentHex: "cc",
-		MetaSealed: []byte("m"), BodySealed: []byte("b"), NonceSealed: []byte("n"), LogSeq: 42, RecordedAt: "2026-11-14T05:12:03Z"}
-	want := strings.Join([]string{"ideatrail-v1-record", tUser, tRoot, tRecord, tUser + "," + tOther, "cc",
-		hexSHA([]byte("m")), hexSHA([]byte("b")), hexSHA([]byte("n")), "42", "2026-11-14T05:12:03Z"}, "\n")
+	r := Record{UserID: tUser, RootID: tRoot, RecordID: tRecord, Parents: []string{tOther, tUser}, CommitmentHex: tCommit,
+		MetaSealed: []byte("m"), BodySealed: []byte("b"), NonceSealed: []byte("n"), LogSeq: 42, RecordedAt: tTime}
+	want := strings.Join([]string{"ideatrail-v1-record", tUser, tRoot, tRecord, tUser + "," + tOther, tCommit,
+		hexSHA([]byte("m")), hexSHA([]byte("b")), hexSHA([]byte("n")), "42", tTime}, "\n")
 	if got := string(must(r.Message())); got != want {
 		t.Fatalf("got %q", got)
 	}
 	r.Parents = nil
-	if got := string(must(r.Message())); !strings.Contains(got, tRecord+"\n-\ncc") {
+	if got := string(must(r.Message())); !strings.Contains(got, tRecord+"\n-\n"+tCommit) {
 		t.Fatalf("no-parent case: %q", got)
 	}
 }
 
 func TestEmptyFieldsBecomeDash(t *testing.T) {
-	got := string(must(RepoHead{UserID: tUser, EngineID: tOther, UnixTS: 1}.Message()))
-	if got != "ideatrail-v1-repohead\n"+tUser+"\n"+tOther+"\n-\n1" {
+	got := string(must(Approval{UserID: tUser, ApprovalID: tOther, ApprSeq: 1}.Message()))
+	if got != "ideatrail-v1-approval\n"+tUser+"\n"+tOther+"\n-\n"+hexSHA(nil)+"\n1" {
 		t.Fatalf("got %q", got)
 	}
 }
@@ -102,11 +106,25 @@ func TestSignRejectsBadFields(t *testing.T) {
 		"newline":       RepoHead{UserID: tUser, EngineID: tOther, CommitSHA: "a\nb", UnixTS: 1},
 		"unit_sep":      Approval{UserID: tUser, ApprovalID: tOther, Kind: "a\x1fb"},
 		"bad_user_id":   RepoHead{UserID: "u", EngineID: tOther, CommitSHA: "c", UnixTS: 1},
-		"bad_parent_id": Record{UserID: tUser, RootID: tRoot, RecordID: tRecord, Parents: []string{"a,b"}},
+		"bad_parent_id": Record{UserID: tUser, RootID: tRoot, RecordID: tRecord, Parents: []string{"a,b"}, CommitmentHex: tCommit, RecordedAt: tTime},
+		"dup_parent":    Record{UserID: tUser, RootID: tRoot, RecordID: tRecord, Parents: []string{tOther, tOther}, CommitmentHex: tCommit, RecordedAt: tTime},
+		"short_commit":  Record{UserID: tUser, RootID: tRoot, RecordID: tRecord, CommitmentHex: "cc", RecordedAt: tTime},
+		"bad_time":      Delta{UserID: tUser, RootID: tRoot, DeltaID: tRecord, CreatedAt: "2026-11-14 05:12:03"},
+		"bad_sha":       RepoHead{UserID: tUser, EngineID: tOther, CommitSHA: "xyz", UnixTS: 1},
 	}
 	for name, m := range cases {
 		if _, err := m.Message(); err != ErrBadField {
 			t.Errorf("%s: got %v", name, err)
 		}
 	}
+}
+
+func FuzzVerify(f *testing.F) {
+	priv := ed25519.NewKeyFromSeed(rfc8032Seed)
+	pub := priv.Public().(ed25519.PublicKey)
+	f.Add([]byte("m"), must(Sign(priv, []byte("m"))))
+	f.Fuzz(func(t *testing.T, msg []byte, sig string) {
+		_ = Verify(pub, msg, sig) // must never panic
+		_ = Verify(pub[:len(msg)%33], msg, sig)
+	})
 }
