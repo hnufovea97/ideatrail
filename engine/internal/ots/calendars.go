@@ -124,3 +124,10 @@ func post(ctx context.Context, hc *http.Client, cal string, digest [32]byte) ([]
 
 // isLoopbackTestURL lets tests point at httptest servers; production URLs must be allowlisted.
 var isLoopbackTestURL = func(string) bool { return false }
+
+// AllowLoopbackForTesting lets other packages' tests use httptest calendars; returns a restore func.
+func AllowLoopbackForTesting() func() {
+	prev := isLoopbackTestURL
+	isLoopbackTestURL = func(u string) bool { return len(u) > 16 && u[:17] == "http://127.0.0.1:" }
+	return func() { isLoopbackTestURL = prev }
+}
