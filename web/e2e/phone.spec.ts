@@ -20,7 +20,7 @@ test("phone joins with the QR secret, registers its own passkey, PC moves on", a
   await phone.getByRole("button", { name: "이 기기 잠금으로 등록" }).click();
   await confirmPasskey(phone, "이 기기에서도 열려요 ✓");
   await expect(phone.getByText("홈 화면에 추가")).toBeVisible();
-  await expect(page.getByRole("img", { name: "휴대폰으로 찍을 QR 코드 (2분 유효)" })).toHaveCount(0); // PC left step 2 (step 3 screen: Task 11)
+  await expect(page.getByRole("heading", { name: "GitHub 보관" })).toBeVisible();
   await expectClean(phone, w);
   // The QR secret leaves neither device: only its MACs (and the join secret) reach the API.
   const qpsk = fromB64u(new URL(url!).hash.replace(/^#v1\./, ""));

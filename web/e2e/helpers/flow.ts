@@ -26,3 +26,12 @@ export async function passStepOne(page: Page, engine: FakeEngine) {
   await confirmPasskey(page, "휴대폰도 같이 등록");
   await engine.takeHandoff();
 }
+export async function skipPhone(page: Page) {
+  await page.getByRole("button", { name: "휴대폰이 지금 없어요" }).click();
+  await expect(page.getByRole("heading", { name: "GitHub 보관" })).toBeVisible();
+}
+
+export async function githubLater(page: Page) {
+  await page.getByRole("button", { name: "나중에", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "GitHub 보관" })).toHaveCount(0); // step 4 screen: Task 12
+}

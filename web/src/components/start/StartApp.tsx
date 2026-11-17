@@ -5,6 +5,7 @@ import { prfSupport, type CapabilityEnv } from "../../lib/capability";
 import { clearFragment, engineKeysMatch, parseStartLink } from "../../lib/fragment";
 import type { SignupContext } from "../../lib/signup/context";
 import { initialState, reduce, type StopReason } from "../../lib/signup/machine";
+import { GithubStep } from "./GithubStep";
 import { IntroStep } from "./IntroStep";
 import { PcStep } from "./PcStep";
 import { PhoneStep } from "./PhoneStep";
@@ -64,6 +65,8 @@ export default function StartApp() {
       return <PcStep {...props} />;
     case "phone":
       return <PhoneStep {...props} />;
+    case "github":
+      return <GithubStep {...props} />;
     default:
       return <Busy />;
   }
