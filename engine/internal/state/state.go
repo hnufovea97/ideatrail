@@ -107,6 +107,10 @@ func With(dir string, fn func(*State) error) error {
 	return write(dir, s)
 }
 
+// LockFile takes an exclusive cross-process lock on dir/name (e.g. "request.lock") and returns
+// the release function. Used to keep one engine request in flight at a time (spec §2).
+func LockFile(dir, name string) (func(), error) { return lock(filepath.Join(dir, name)) }
+
 // Read returns a snapshot under the lock (no write).
 func Read(dir string) (*State, error) {
 	var out *State
