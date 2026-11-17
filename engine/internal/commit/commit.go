@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -31,7 +32,40 @@ func Commit(nonce, content []byte) [32]byte {
 	return out
 }
 
+// ErrSizeMismatch means the stream did not contain exactly the declared number of bytes
+// (e.g. the file changed while it was being read).
+var ErrSizeMismatch = errors.New("content size changed while reading")
+
+// CommitStream is Commit for content read from r, which must yield exactly size bytes.
+func CommitStream(nonce []byte, size int64, r io.Reader) ([32]byte, error) {
+	h := sha256.New()
+	h.Write(tag)
+	var b4 [4]byte
+	binary.BigEndian.PutUint32(b4[:], uint32(len(nonce)))
+	h.Write(b4[:])
+	h.Write(nonce)
+	var b8 [8]byte
+	binary.BigEndian.PutUint64(b8[:], uint64(size))
+	h.Write(b8[:])
+	n, err := io.Copy(h, io.LimitReader(r, size+1))
+	var out [32]byte
+	if err != nil {
+		return out, err
+	}
+	if n != size {
+		return out, ErrSizeMismatch
+	}
+	copy(out[:], h.Sum(nil))
+	return out, nil
+}
+
 var manifestTag = []byte("ideatrail/manifest-v1\x00")
+
+// HashedEntry is a manifest entry whose file SHA-256 was computed by streaming.
+type HashedEntry struct {
+	Path string
+	Sum  [32]byte
+}
 
 var (
 	ErrInvalidPath   = errors.New("invalid_path")
@@ -62,13 +96,22 @@ func NormalizePath(p string) (string, error) {
 // Manifest는 경로를 정규화하고 UTF-8 바이트순으로 정렬해 (경로, 파일 지문) 목록을 만든다.
 // 정규화 뒤 같은 경로가 둘이면 ErrDuplicatePath. 파일 내용 바이트는 바꾸지 않는다.
 func Manifest(entries []Entry) ([]byte, error) {
-	es := make([]Entry, 0, len(entries))
+	hs := make([]HashedEntry, 0, len(entries))
+	for _, e := range entries {
+		hs = append(hs, HashedEntry{Path: e.Path, Sum: sha256.Sum256(e.Content)})
+	}
+	return ManifestHashed(hs)
+}
+
+// ManifestHashed builds the manifest from precomputed file hashes (same rules as Manifest).
+func ManifestHashed(entries []HashedEntry) ([]byte, error) {
+	es := make([]HashedEntry, 0, len(entries))
 	for _, e := range entries {
 		p, err := NormalizePath(e.Path)
 		if err != nil {
 			return nil, err
 		}
-		es = append(es, Entry{Path: p, Content: e.Content})
+		es = append(es, HashedEntry{Path: p, Sum: e.Sum})
 	}
 	sort.Slice(es, func(i, j int) bool { return es[i].Path < es[j].Path })
 	for i := 1; i < len(es); i++ {
@@ -85,8 +128,7 @@ func Manifest(entries []Entry) ([]byte, error) {
 		binary.BigEndian.PutUint32(b4[:], uint32(len(p)))
 		out = append(out, b4[:]...)
 		out = append(out, p...)
-		s := sha256.Sum256(e.Content)
-		out = append(out, s[:]...)
+		out = append(out, e.Sum[:]...)
 	}
 	return out, nil
 }

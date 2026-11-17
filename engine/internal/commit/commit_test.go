@@ -1,6 +1,7 @@
 package commit
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -93,5 +94,20 @@ func TestManifestVectors(t *testing.T) {
 		if hex.EncodeToString(got[:]) != v.CommitmentHex {
 			t.Errorf("%s: got %x want %s", v.Name, got, v.CommitmentHex)
 		}
+	}
+}
+
+func TestCommitStreamMatchesCommit(t *testing.T) {
+	nonce := []byte("0123456789abcdef0123456789abcdef")
+	content := bytes.Repeat([]byte("abc"), 10000)
+	got, err := CommitStream(nonce, int64(len(content)), bytes.NewReader(content))
+	if err != nil || got != Commit(nonce, content) {
+		t.Fatalf("%v", err)
+	}
+	if _, err := CommitStream(nonce, int64(len(content))+1, bytes.NewReader(content)); !errors.Is(err, ErrSizeMismatch) {
+		t.Fatal("short stream accepted")
+	}
+	if _, err := CommitStream(nonce, int64(len(content))-1, bytes.NewReader(content)); !errors.Is(err, ErrSizeMismatch) {
+		t.Fatal("long stream accepted")
 	}
 }
