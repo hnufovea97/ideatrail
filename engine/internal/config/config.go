@@ -1,5 +1,6 @@
 // Package config holds build-time constants (set with -ldflags -X) and derived locations.
-// Release builds ignore environment overrides; only dev builds (version "dev") accept them.
+// Environment overrides exist only in builds tagged "devbuild"; release binaries do not contain
+// them at all (see config_dev.go / config_release.go).
 package config
 
 import (
@@ -18,8 +19,11 @@ var (
 	ReleasePub     = ""                     // base64url Ed25519 release key; empty = dev build (no self-check)
 )
 
-// Dev reports a development build (environment overrides allowed, self-check skipped).
-func Dev() bool { return Version == "dev" }
+// Dev reports a development build (tagged devbuild): overrides allowed, self-check skipped.
+func Dev() bool { return devBuild }
+
+// ReleaseReady: a release build without its release key must refuse to run.
+func ReleaseReady() bool { return devBuild || ReleasePub != "" }
 
 // API returns the API base (dev builds may override with IDEATRAIL_API_BASE).
 func API() string { return override("IDEATRAIL_API_BASE", APIBase) }
@@ -28,10 +32,8 @@ func API() string { return override("IDEATRAIL_API_BASE", APIBase) }
 func App() string { return override("IDEATRAIL_APP_BASE", AppBase) }
 
 func override(env, def string) string {
-	if Dev() {
-		if v := os.Getenv(env); v != "" {
-			return v
-		}
+	if v := envOverride(env); v != "" {
+		return v
 	}
 	return def
 }

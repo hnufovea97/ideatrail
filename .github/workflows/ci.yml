@@ -22,6 +22,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 24 }
       - run: pnpm install --frozen-lockfile
-      - run: cd engine && go test ./...
+      - run: cd engine && go test ./... && go test -tags devbuild ./internal/config ./internal/home
       - run: pnpm -r typecheck
       - run: pnpm -r test

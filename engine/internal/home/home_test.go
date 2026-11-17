@@ -64,10 +64,3 @@ func TestSymlinkIntoSyncedFolderIsDetected(t *testing.T) {
 		t.Fatal("symlink into synced folder not detected")
 	}
 }
-
-func TestDirOverride(t *testing.T) {
-	t.Setenv(EnvHome, "/tmp/x-ideatrail")
-	if d, _ := Dir(); d != "/tmp/x-ideatrail" {
-		t.Fatalf("got %s", d)
-	}
-}

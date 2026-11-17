@@ -10,14 +10,11 @@ import (
 	"runtime"
 )
 
-// EnvHome overrides the engine folder (tests, portable installs).
-const EnvHome = "IDEATRAIL_HOME"
-
 var ErrSyncedFolder = errors.New("engine folder is inside a synced folder")
 
 // Dir returns the engine folder path (not created).
 func Dir() (string, error) {
-	if d := os.Getenv(EnvHome); d != "" {
+	if d := devHome(); d != "" { // dev builds only (home_dev.go)
 		return filepath.Abs(d)
 	}
 	switch runtime.GOOS {

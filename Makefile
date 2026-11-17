@@ -1,6 +1,6 @@
 .PHONY: test
 test:
-	cd engine && go test ./...
+	cd engine && go test ./... && go test -tags devbuild ./internal/config ./internal/home
 	pnpm -r test
 
 .PHONY: vectors
