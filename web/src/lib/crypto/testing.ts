@@ -1,6 +1,7 @@
 // Test-only helpers with caller-chosen nonces, for reproducing Go vectors.
 // Never import this from application code: reusing a nonce under one key breaks XChaCha20-Poly1305.
 import { lockRaw } from "./aead-internal";
+export { recipientContext } from "./hpke-internal";
 import { ENVELOPE_KIND, envelopeAAD } from "./envelope";
 import { buildAAD, type AAD } from "./format";
 import { relockKind } from "./relock";

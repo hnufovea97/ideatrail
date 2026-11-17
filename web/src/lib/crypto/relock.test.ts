@@ -3,7 +3,7 @@ import sk from "../../../../spec/vectors/subkey.json";
 import xc from "../../../../spec/vectors/xchacha.json";
 import { xchacha20poly1305 } from "@noble/ciphers/chacha.js";
 import { subkey } from "./subkey";
-import { relock, unlock, PURPOSES } from "./relock";
+import { relock, unlock, PURPOSES, type Purpose } from "./relock";
 import { relockWithNonce } from "./testing";
 import { fromHex, toHex, utf8 } from "./bytes";
 
@@ -25,19 +25,19 @@ describe("xchacha §5", () => {
       const key = subkey(fromHex(xc.mk_hex), v.purpose);
       const a = { userId: v.user_id, rootId: v.root_id };
       expect(toHex(relockWithNonce(key, v.purpose, a, fromHex(v.plaintext_hex), fromHex(v.nonce_hex)))).toBe(v.sealed_hex);
-      expect(toHex(unlock(key, v.purpose, a, fromHex(v.sealed_hex)))).toBe(v.plaintext_hex);
+      expect(toHex(unlock(key, v.purpose as Purpose, a, fromHex(v.sealed_hex)))).toBe(v.plaintext_hex);
     });
   }
   it("moved blob fails (user_id, root_id, purpose)", () => {
-    const v = xc.ours[0];
+    const v = { ...xc.ours[0], purpose: xc.ours[0].purpose as Purpose };
     const key = subkey(fromHex(xc.mk_hex), v.purpose);
     const blob = fromHex(v.sealed_hex);
     expect(() => unlock(key, v.purpose, { userId: O, rootId: v.root_id }, blob)).toThrow("decrypt_failed");
     expect(() => unlock(key, v.purpose, { userId: v.user_id, rootId: O }, blob)).toThrow("decrypt_failed");
-    expect(() => unlock(key, xc.ours[1].purpose, { userId: v.user_id, rootId: v.root_id }, blob)).toThrow("decrypt_failed");
+    expect(() => unlock(key, xc.ours[1].purpose as Purpose, { userId: v.user_id, rootId: v.root_id }, blob)).toThrow("decrypt_failed");
   });
   it("truncated or wrong-magic blob fails", () => {
-    const v = xc.ours[0];
+    const v = { ...xc.ours[0], purpose: xc.ours[0].purpose as Purpose };
     const key = subkey(fromHex(xc.mk_hex), v.purpose);
     const a = { userId: v.user_id, rootId: v.root_id };
     const bad = fromHex(v.sealed_hex); bad[0] = 0x58;

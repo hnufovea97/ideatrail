@@ -1,5 +1,6 @@
 // Writes spec/vectors/hpke_browser.json only when GEN_BROWSER_SEALS=1 (make vectors).
 // Ephemeral keys are random, so the file changes on every run; Go opens it in TestBrowserSealsOpenInGo.
+/// <reference types="node" />
 import { it } from "vitest";
 import { writeFileSync } from "node:fs";
 import ours from "../../../../spec/vectors/hpke_ideatrail.json";
@@ -7,7 +8,9 @@ import { seal, sealAuth, KIND } from "./seal";
 import { fromHex, toHex, utf8 } from "./bytes";
 
 it.runIf(process.env.GEN_BROWSER_SEALS === "1")("generate hpke_browser.json", async () => {
-  const v7 = ours.vectors.find((v) => v.kind === 7)!;
+  const v7 = ours.vectors.find((v) => v.kind === 7);
+  if (!v7?.sender_priv_hex) throw new Error("hpke_ideatrail.json has no kind 7 vector; run the Go generator first");
+  const senderPriv = fromHex(v7.sender_priv_hex);
   const pkR = fromHex(v7.recipient_pub_hex);
   const cases = [
     { kind: KIND.engine_inbox, name: "engine_inbox", a: { userId: v7.user_id, rootId: v7.root_id, recordId: v7.record_id } },
@@ -18,7 +21,7 @@ it.runIf(process.env.GEN_BROWSER_SEALS === "1")("generate hpke_browser.json", as
   for (const c of cases) {
     const pt = utf8(`{"from":"browser","kind":"${c.name}"}`);
     const sealed = c.kind === KIND.engine_inbox
-      ? await sealAuth(c.kind, pkR, fromHex(v7.sender_priv_hex!), c.a, pt)
+      ? await sealAuth(c.kind, pkR, senderPriv, c.a, pt)
       : await seal(c.kind, pkR, c.a, pt);
     rows.push({ kind: c.kind, kind_name: c.name, user_id: c.a.userId, root_id: c.a.rootId ?? "", record_id: c.a.recordId ?? "",
       plaintext_hex: toHex(pt), sealed_hex: toHex(sealed) });

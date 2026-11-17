@@ -23,10 +23,17 @@ export function toB64u(b: Uint8Array): string {
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+/** Canonical base64url without padding; non-canonical trailing bits are rejected (matches Go Strict). */
 export function fromB64u(s: string): Uint8Array {
-  if (/[^A-Za-z0-9_-]/.test(s)) throw new Error("bad_b64u");
-  const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  if (/[^A-Za-z0-9_-]/.test(s) || s.length % 4 === 1) throw new Error("bad_b64u");
+  let out: Uint8Array;
+  try {
+    out = Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  } catch {
+    throw new Error("bad_b64u");
+  }
+  if (toB64u(out) !== s) throw new Error("bad_b64u");
+  return out;
 }
 
 /** Copy into a standalone ArrayBuffer (WebCrypto and @hpke APIs take ArrayBuffer). */

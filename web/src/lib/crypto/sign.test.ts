@@ -61,7 +61,17 @@ describe("sign §8", () => {
     expect(() => messageFor({ type: "repo_head", userId: "u", engineId: ID2, commitSha: "c", unixTs: 1n })).toThrow("bad_field");
   });
   it("empty fields become -", () => {
-    const m = new TextDecoder().decode(messageFor({ type: "repo_head", userId: ID, engineId: ID2, commitSha: "", unixTs: 1n }));
-    expect(m).toBe(`ideatrail-v1-repohead\n${ID}\n${ID2}\n-\n1`);
+    const m = new TextDecoder().decode(messageFor({ type: "approval", userId: ID, approvalId: ID2, kind: "", summarySealed: new Uint8Array(0), apprSeq: 1n }));
+    expect(m).toBe(`ideatrail-v1-approval\n${ID}\n${ID2}\n-\ne3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\n1`);
+  });
+  it("range and shape checks match Go", () => {
+    const rec = { type: "record" as const, userId: ID, rootId: ID, recordId: ID2, parents: [] as string[], commitmentHex: "ab".repeat(32), metaSealed: new Uint8Array(), bodySealed: new Uint8Array(), nonceSealed: new Uint8Array(), logSeq: 1n, recordedAt: "2026-11-14T05:12:03Z" };
+    expect(() => messageFor(rec)).not.toThrow();
+    expect(() => messageFor({ ...rec, logSeq: -1n })).toThrow("bad_field");
+    expect(() => messageFor({ ...rec, logSeq: 2n ** 64n })).toThrow("bad_field");
+    expect(() => messageFor({ ...rec, commitmentHex: "cc" })).toThrow("bad_field");
+    expect(() => messageFor({ ...rec, recordedAt: "2026-11-14 05:12:03" })).toThrow("bad_field");
+    expect(() => messageFor({ ...rec, parents: [ID, ID] })).toThrow("bad_field");
+    expect(() => messageFor({ type: "repo_head", userId: ID, engineId: ID2, commitSha: "xyz", unixTs: 1n })).toThrow("bad_field");
   });
 });
