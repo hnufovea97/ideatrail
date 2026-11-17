@@ -57,7 +57,10 @@ func TestHookGuardExit2WithFixedMessage(t *testing.T) {
 
 func TestHooksSilentOnBadInput(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	for _, h := range []string{"guard", "session-start", "stop", "unknown"} {
+	if code, _, e := call(t, "{{", "hook", "guard"); code != 2 || !strings.Contains(e, "열 수 없어요") {
+		t.Errorf("guard must fail closed: %d %q", code, e)
+	}
+	for _, h := range []string{"session-start", "stop", "unknown"} {
 		if code, out, e := call(t, "{{", "hook", h); code != 0 || out != "" || e != "" {
 			t.Errorf("%s: %d %q %q", h, code, out, e)
 		}

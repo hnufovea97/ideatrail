@@ -104,7 +104,7 @@ func runHook(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	switch args[0] {
 	case "guard":
-		if hooks.Guard(stdin, []string{paths.Engine, paths.Outbox}) == 2 {
+		if hooks.Guard(stdin, []string{paths.Engine, paths.Outbox, paths.Proofs}) == 2 {
 			fmt.Fprintln(stderr, hooks.GuardMessage)
 			return 2
 		}

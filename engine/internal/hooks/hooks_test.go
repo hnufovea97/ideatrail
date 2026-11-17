@@ -63,6 +63,8 @@ func TestGuardAllowsNormalWorkAndDocumentText(t *testing.T) {
 		{"Edit", map[string]any{"file_path": proj + "/a.md", "old_string": "x", "new_string": "IdeaTrail-outbox"}},
 		{"Grep", map[string]any{"pattern": "TODO"}},
 		{"Bash", map[string]any{"command": "go test ./..."}},
+		{"Bash", map[string]any{"command": "ls *.go && rm -f tmp/*.log"}},
+		{"Glob", map[string]any{"pattern": "src/**/*.ts"}},
 	}
 	for i, c := range ok {
 		if got := Guard(strings.NewReader(guardJSON(t, c.tool, c.in, proj)), []string{engine}); got != 0 {
@@ -82,9 +84,35 @@ func TestGuardBlocksSearchSweepingEngineFolder(t *testing.T) {
 	}
 }
 
-func TestGuardIgnoresGarbage(t *testing.T) {
-	if Guard(strings.NewReader("not json"), []string{"/x"}) != 0 {
-		t.Error("garbage should pass")
+func TestGuardFailsClosedOnUnreadableInput(t *testing.T) {
+	fakeHome(t)
+	if Guard(strings.NewReader("not json"), []string{"/x"}) != 2 {
+		t.Error("garbage must be blocked")
+	}
+	big := `{"tool_name":"Bash","tool_input":{"command":"` + strings.Repeat("a", maxGuardInput) + `"}}`
+	if Guard(strings.NewReader(big), []string{"/x"}) != 2 {
+		t.Error("oversized input must be blocked")
+	}
+}
+
+func TestGuardBlocksIndirectRoutes(t *testing.T) {
+	home := fakeHome(t)
+	engine := filepath.Join(home, "Library", "Application Support", "IdeaTrail")
+	protected := []string{engine, engine + "-outbox", filepath.Join(home, "ideatrail-증명")}
+	for i, cmd := range []string{
+		`cd ~/Library/Application\ Support && cat ideatrail/ideatrail-github.json`,
+		`cat ~/Library/App*/idea*/*.json`,
+		`cd ~/Library && ls -R`,
+		`cd ~ && cd Library`,
+		`grep -r token $HOME`,
+		`find ~ -name "*.json"`,
+		`cat idea*/ideatrail-github.json`,
+		`ls ~/ideatrail-증명`,
+		`cat %LOCALAPPDATA%\\IdeaTrail\\state.json`,
+	} {
+		if Guard(strings.NewReader(guardJSON(t, "Bash", map[string]any{"command": cmd}, home+"/Projects/app")), protected) != 2 {
+			t.Errorf("case %d not blocked: %s", i, cmd)
+		}
 	}
 }
 

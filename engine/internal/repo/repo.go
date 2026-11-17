@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	githubFile   = "github.json"
+	githubFile   = "ideatrail-github.json"
 	outboxLock   = "outbox.lock"
 	lockWait     = 3 * time.Minute
 	maxItemBytes = 16 << 20

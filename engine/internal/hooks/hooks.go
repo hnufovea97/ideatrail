@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -19,11 +18,12 @@ import (
 )
 
 const (
-	GuardMessage = "ideatrail 엔진 폴더는 열 수 없어요"
-	maxInput     = 1 << 20
-	markerTTL    = 7 * 24 * time.Hour
-	scanBudget   = 2 * time.Second
-	maxScanFiles = 20000
+	GuardMessage  = "ideatrail 엔진 폴더는 열 수 없어요"
+	maxInput      = 1 << 20
+	maxGuardInput = 64 << 20
+	markerTTL     = 7 * 24 * time.Hour
+	scanBudget    = 2 * time.Second
+	maxScanFiles  = 20000
 )
 
 var sessionRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
@@ -48,35 +48,35 @@ func readInput(r io.Reader) (*hookInput, bool) {
 	return &in, true
 }
 
-// Guard returns exit code 2 when a tool call names the engine's own files (best effort; the
-// content stays safe regardless because the engine holds no key that reads it).
+// Guard returns exit code 2 when a tool call could reach the engine's own files. Best effort, so it
+// errs toward blocking: anything unreadable is blocked, the whole Application Support / AppData
+// area is off limits, and so are commands aimed at the home or Library folder itself (which would
+// let a later relative path reach the engine folder).
 func Guard(r io.Reader, protected []string) int {
-	in, ok := readInput(r)
+	in, ok := readGuardInput(r)
 	if !ok {
-		return 0
+		return 2
 	}
 	home, _ := os.UserHomeDir()
 	targets := protectedForms(protected, home)
+	nhome := strings.TrimRight(normalize(home, home), "/")
+	var nprot []string
+	for _, p := range protected {
+		nprot = append(nprot, normalize(p, home))
+	}
 	var values []string
 	collect(in.ToolInput, &values)
 	for _, v := range values {
 		n := normalize(v, home)
-		for _, t := range targets {
-			if strings.Contains(n, t) {
+		if hits(n, targets) || sweepsHome(n, nhome, strings.TrimRight(normalize(in.Cwd, home), "/"), nprot) {
+			return 2
+		}
+		if in.Cwd != "" && !strings.HasPrefix(n, "/") { // relative to the session directory
+			if hits(normalize(filepath.Join(in.Cwd, v), home), targets) {
 				return 2
 			}
 		}
-		// relative paths resolved against the session directory
-		if in.Cwd != "" && !strings.HasPrefix(n, "/") {
-			abs := normalize(filepath.Join(in.Cwd, v), home)
-			for _, t := range targets {
-				if strings.Contains(abs, t) {
-					return 2
-				}
-			}
-		}
 	}
-	// a search with no path (or a path above the engine folder) would sweep the engine folder
 	if in.ToolName == "Grep" || in.ToolName == "Glob" {
 		base := in.Cwd
 		if p, ok := in.ToolInput["path"].(string); ok && p != "" {
@@ -84,12 +84,64 @@ func Guard(r io.Reader, protected []string) int {
 		}
 		nb := strings.TrimRight(normalize(base, home), "/") + "/"
 		for _, p := range protected {
-			if nb != "/" && strings.HasPrefix(normalize(p, home)+"/", nb) {
+			if nb == "/" || strings.HasPrefix(normalize(p, home)+"/", nb) {
 				return 2
 			}
 		}
 	}
 	return 0
+}
+
+// readGuardInput reads the whole hook input; too large or not JSON fails closed.
+func readGuardInput(r io.Reader) (*hookInput, bool) {
+	b, err := io.ReadAll(io.LimitReader(r, maxGuardInput+1))
+	if err != nil || len(b) > maxGuardInput {
+		return nil, false
+	}
+	var in hookInput
+	if json.Unmarshal(b, &in) != nil {
+		return nil, false
+	}
+	return &in, true
+}
+
+func hits(n string, targets []string) bool {
+	for _, t := range targets {
+		if strings.Contains(n, t) {
+			return true
+		}
+	}
+	return false
+}
+
+// sweepsHome reports a word that is exactly the home or ~/Library folder (cd ~, grep -r x ~/Library)
+// or a wildcard that could expand into an engine folder (~/Library/App*/idea*).
+func sweepsHome(n, nhome, ncwd string, nprot []string) bool {
+	if nhome == "" {
+		return false
+	}
+	for _, w := range strings.FieldsFunc(n, func(r rune) bool {
+		return r == ' ' || r == ';' || r == '&' || r == '|' || r == '(' || r == ')' || r == '='
+	}) {
+		w = strings.TrimRight(w, "/")
+		if w == nhome || w == nhome+"/library" {
+			return true
+		}
+		if !strings.HasPrefix(w, "/") {
+			if ncwd == "" {
+				continue
+			}
+			w = ncwd + "/" + w
+		}
+		if i := strings.IndexAny(w, "*?[{"); i >= 0 {
+			for _, p := range nprot {
+				if strings.HasPrefix(p, w[:i]) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func collect(v any, out *[]string) {
@@ -113,6 +165,7 @@ func collect(v any, out *[]string) {
 }
 
 var envRe = regexp.MustCompile(`(?i)(\$\{home\}|\$home|%userprofile%|\$env:userprofile)`)
+var tildeRe = regexp.MustCompile(`(^|[\s=:(])~[^/\s]*`)
 var localRe = regexp.MustCompile(`(?i)(%localappdata%|\$env:localappdata|\$\{localappdata\})`)
 
 // normalize lowercases, NFC-folds, strips quotes/escapes, unifies separators and expands home
@@ -127,7 +180,7 @@ func normalize(s, home string) string {
 		if local := os.Getenv("LOCALAPPDATA"); local != "" {
 			s = localRe.ReplaceAllString(s, strings.ReplaceAll(local, `\`, "/"))
 		}
-		s = regexp.MustCompile(`(^|[\s=:(])~[^/\s]*`).ReplaceAllString(s, "${1}"+h)
+		s = tildeRe.ReplaceAllString(s, "${1}"+h)
 	}
 	s = strings.ToLower(s)
 	for strings.Contains(s, "//") {
@@ -148,11 +201,7 @@ func protectedForms(protected []string, home string) []string {
 			}
 		}
 	}
-	out = append(out, "engine.key", "application support/ideatrail", "ideatrail-outbox")
-	if runtime.GOOS == "windows" {
-		out = append(out, "appdata/local/ideatrail")
-	}
-	return out
+	return append(out, "engine.key", "application support", "appdata", "ideatrail-outbox", "ideatrail-github", norm.NFC.String("ideatrail-증명"))
 }
 
 // SessionStart remembers when the session began (for the stop hook) and returns at most one
@@ -190,13 +239,11 @@ func Stop(r io.Reader, stateDir string) string {
 	if err != nil {
 		return "" // no baseline: say nothing
 	}
-	stopMarker := filepath.Join(dir, in.SessionID+".stop")
-	if _, err := os.Stat(stopMarker); err == nil {
+	f, err := os.OpenFile(filepath.Join(dir, in.SessionID+".stop"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil { // already asked (or cannot record that we asked): stay silent
 		return ""
 	}
-	if err := os.WriteFile(stopMarker, nil, 0o600); err != nil { // marker first: never ask twice
-		return ""
-	}
+	_ = f.Close()
 	start, err := strconv.ParseInt(strings.TrimSpace(string(startRaw)), 10, 64)
 	if err != nil {
 		return ""
