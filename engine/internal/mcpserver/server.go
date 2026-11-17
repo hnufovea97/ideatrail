@@ -224,10 +224,16 @@ func (e *Engine) ensurePaired(ctx context.Context) (string, bool) {
 	e.goSafe(func() {
 		wctx, cancel := context.WithTimeout(e.ctxBase(), 11*time.Minute)
 		defer cancel()
-		if pairing.Wait(wctx, e.Pairing, sess, 3*time.Second) == nil && e.ProjectDir != "" {
+		if pairing.Wait(wctx, e.Pairing, sess, 3*time.Second) != nil {
+			return
+		}
+		if e.ProjectDir != "" {
 			// signup step 5: offer this project folder for recording (the user picks on the dashboard)
 			_, _ = inbox.RequestImport(wctx, e.Inbox, "signup_select", []string{e.ProjectDir})
 		}
+		sctx, scancel := context.WithTimeout(e.ctxBase(), signupWatchFor)
+		defer scancel()
+		watchSignup(sctx, signupWatchEvery, e.tickOnce)
 	})
 	return msgPairingOpened, false
 }
