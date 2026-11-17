@@ -23,14 +23,25 @@ interface DueAnchor { record_id: string; user_id: string; calendars: string; com
 
 export const nextInterval = (attempts: number) => Math.min(MAX_INTERVAL_S, BASE_INTERVAL_S * 2 ** attempts);
 
+/** Outcome counts per run (status codes / error kinds only — no URLs, no bodies). */
+export type Tally = Record<string, number>;
+const note = (t: Tally | undefined, k: string) => { if (t) t[k] = (t[k] ?? 0) + 1; };
+
 /** GET with no redirects, a timeout, and at most RESPONSE_CAP bytes read. null = not available. */
-async function fetchCapped(fetcher: Fetcher, url: string): Promise<Uint8Array | null> {
+async function fetchCapped(fetcher: Fetcher, url: string, tally?: Tally): Promise<Uint8Array | null> {
   let res: Response;
   try {
-    res = await fetcher(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS), headers: { accept: "application/octet-stream" } });
-  } catch {
+    res = await fetcher(url, {
+      method: "GET",
+      redirect: "error",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: { accept: "application/vnd.opentimestamps.v1", "user-agent": "ideatrail-api (+https://github.com/hnufovea97)" },
+    });
+  } catch (e) {
+    note(tally, `error:${e instanceof Error ? e.name : "unknown"}`);
     return null;
   }
+  note(tally, `http:${res.status}`);
   if (res.status !== 200 || !res.body) {
     await res.body?.cancel();
     return null;
@@ -61,7 +72,7 @@ async function fetchCapped(fetcher: Fetcher, url: string): Promise<Uint8Array | 
 type Outcome = { kind: "confirmed"; receipt: Uint8Array; height: number } | { kind: "pending"; entries: CalendarEntry[]; attempts: number };
 
 /** Ask ONE calendar (the least-tried) for this anchor. The URL is built from the allowlisted host only. */
-async function checkAnchor(a: DueAnchor, fetcher: Fetcher): Promise<Outcome> {
+async function checkAnchor(a: DueAnchor, fetcher: Fetcher, tally?: Tally): Promise<Outcome> {
   let entries: CalendarEntry[];
   try {
     entries = JSON.parse(a.calendars) as CalendarEntry[];
@@ -84,7 +95,7 @@ async function checkAnchor(a: DueAnchor, fetcher: Fetcher): Promise<Outcome> {
   }
   const point = pendingPoints(tree).find((p) => calendarHost(p.uri) !== null);
   if (!point) return bump();
-  const body = await fetchCapped(fetcher, timestampUrl(calendarHost(point.uri)!, point.node.msg));
+  const body = await fetchCapped(fetcher, timestampUrl(calendarHost(point.uri)!, point.node.msg), tally);
   if (!body) return bump();
   try {
     mergeInto(point.node, parseTimestamp(body, point.node.msg));
@@ -95,12 +106,13 @@ async function checkAnchor(a: DueAnchor, fetcher: Fetcher): Promise<Outcome> {
     if (height !== null) return { kind: "confirmed", receipt: merged, height };
     entries[idx] = { ...entry, pending: toB64u(merged), attempts: entry.attempts + 1 };
     return { kind: "pending", entries, attempts: Math.min(...entries.map((e) => e.attempts)) };
-  } catch {
+  } catch (e) {
+    note(tally, `parse:${e instanceof Error ? e.message.slice(0, 40) : "unknown"}`);
     return bump();
   }
 }
 
-export interface CronReport { checked: number; confirmed: number; fetches: number; cleaned: number }
+export interface CronReport { checked: number; confirmed: number; fetches: number; cleaned: number; tally: Tally }
 
 /** 15-minute job: fetch Bitcoin confirmations for due receipts, then clean up expired rows. */
 export async function runCron(env: Bindings, fetcher: Fetcher = fetch): Promise<CronReport> {
@@ -113,12 +125,13 @@ export async function runCron(env: Bindings, fetcher: Fetcher = fetch): Promise<
 
   let fetches = 0;
   let confirmed = 0;
+  const tally: Tally = {};
   const counting: Fetcher = (url, init) => { fetches++; return fetcher(url, init); };
   for (const a of due) {
     if (fetches >= FETCH_BUDGET) break;
     let out: Outcome;
     try {
-      out = await checkAnchor(a, counting);
+      out = await checkAnchor(a, counting, tally);
     } catch {
       out = { kind: "pending", entries: [], attempts: GIVE_UP_ATTEMPTS };
     }
@@ -137,7 +150,7 @@ export async function runCron(env: Bindings, fetcher: Fetcher = fetch): Promise<
     }
   }
   const cleaned = await cleanup(db);
-  return { checked: due.length, confirmed, fetches, cleaned };
+  return { checked: due.length, confirmed, fetches, cleaned, tally };
 }
 
 /** Expired auth state, abandoned signups, old usage/audit rows — at most CLEANUP_BATCH rows per table per run. */
