@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/server";
 import { fromB64u, toB64u } from "@ideatrail/crypto/bytes";
 import { recoveryProofMessage } from "@ideatrail/crypto/message";
 import { verifyEd25519Raw } from "../auth/secrets";
@@ -15,13 +14,13 @@ import { consumeChallenge, saveChallenge, STEPUP_SECONDS } from "../auth/challen
 import { newSession, requireSession } from "../auth/session";
 import { actionOf } from "../auth/stepup";
 import { authenticationOptions, registrationOptions, verifyAssertion, verifyRegistration, webauthnFailed } from "../auth/webauthn";
+import { zAuthenticationResponse, zRegistrationResponse } from "../auth/webauthn-schema";
 import { guard, runBatch } from "../db/change";
 import { nowIso, toBytes } from "../db/values";
 
 const RELOCK_ACCOUNT_PRIV = 0x81;
 const ENVELOPE_KIND = 0x80;
 
-const zResponse = z.custom<RegistrationResponseJSON>((v) => typeof v === "object" && v !== null && "response" in v);
 
 /** Exactly one way in: new signup (pairing), new device (device add), or recovery. */
 const zRegisterOptions = z.union([
@@ -32,20 +31,27 @@ const zRegisterOptions = z.union([
 
 const zRegisterVerify = z.object({
   challenge_id: zId,
-  response: zResponse,
+  response: zRegistrationResponse,
   account: z.object({ account_pubkey: zB64u(32), wrapped_account_privkey: zSealed(RELOCK_ACCOUNT_PRIV) }).optional(),
   envelope: z.object({ envelope_id: zId, wrapped_master_key: zSealed(ENVELOPE_KIND), label: zB64u().optional() }),
 });
 
-const zAssertionResponse = z.custom<AuthenticationResponseJSON>((v) => typeof v === "object" && v !== null && "response" in v);
-const zLoginVerify = z.object({ challenge_id: zId, response: zAssertionResponse });
+const zLoginVerify = z.object({ challenge_id: zId, response: zAuthenticationResponse });
+const zKdfParams = z.object({ v: z.literal(1), vk: z.string() });
 const zStepupOptions = z.object({
   method: z.enum(["POST", "PUT", "DELETE"]),
   path: z.string().regex(/^\/v1\/[A-Za-z0-9_/-]{1,200}$/),
 });
 
-const signupConflict = new ApiError(409, "signup_conflict", "This link was already used");
+const linkUsed = (what: string) => new ApiError(409, "link_used", `This ${what} was already used`);
 const credentialExists = () => new ApiError(409, "credential_exists", "This passkey is already registered");
+
+/** Map a UNIQUE/PK failure to the right 409 (credential vs client-chosen envelope id). */
+function uniqueConflict(err: unknown): never {
+  if (err instanceof Error && /passkey_credentials/.test(err.message)) throw credentialExists();
+  if (err instanceof Error && /key_envelopes/.test(err.message)) throw new ApiError(409, "envelope_id_taken", "Envelope id already used; generate a new one");
+  throw err;
+}
 
 async function existingCredentials(db: D1Database, userId: string) {
   const { results } = await db.prepare("SELECT credential_id FROM passkey_credentials WHERE user_id = ?").bind(userId).all<{ credential_id: string }>();
@@ -64,38 +70,44 @@ export function webauthnRoutes(getLimiter: (env: Bindings) => Limiter) {
         .bind(body.pairing_session_id).first<{ user_id: string | null; expires_at: string }>();
       if (!session) throw new ApiError(404, "pairing_not_found", "Signup link not found");
       if (session.expires_at <= nowIso()) throw new ApiError(410, "pairing_expired", "Signup link expired; start again from Claude Code");
-      if (session.user_id) throw signupConflict;
+      if (session.user_id) throw linkUsed("signup link");
       const userId = newId();
       const options = await registrationOptions(c.env, userId);
       const challengeId = await saveChallenge(db, "register", options.challenge, { pairing_session_id: body.pairing_session_id, pending_user_id: userId });
       return c.json({ challenge_id: challengeId, user_id: userId, options });
     }
     if ("device_add_session_id" in body) {
-      const row = await db.prepare("SELECT user_id, join_secret_hash, sealed_mk, used_at FROM device_add_sessions WHERE session_id = ?")
-        .bind(body.device_add_session_id).first<{ user_id: string; join_secret_hash: string | null; sealed_mk: unknown; used_at: string | null }>();
+      const row = await db.prepare("SELECT user_id, join_secret_hash, sealed_mk, used_at, expires_at FROM device_add_sessions WHERE session_id = ?")
+        .bind(body.device_add_session_id).first<{ user_id: string; join_secret_hash: string | null; sealed_mk: unknown; used_at: string | null; expires_at: string }>();
       if (!row) throw new ApiError(404, "device_add_not_found", "Device link not found");
       await checkJoinSecret(row, body.join_secret);
+      if (row.expires_at <= nowIso()) throw new ApiError(410, "device_add_expired", "Device link expired; show a new QR code");
       if (row.sealed_mk === null) throw new ApiError(409, "not_ready", "Waiting for the other device");
-      if (row.used_at) throw new ApiError(409, "device_add_used", "This link was already used");
+      if (row.used_at) throw linkUsed("device link");
       const options = await registrationOptions(c.env, row.user_id, await existingCredentials(db, row.user_id));
       const challengeId = await saveChallenge(db, "register", options.challenge, { user_id: row.user_id, device_add_session_id: body.device_add_session_id });
       return c.json({ challenge_id: challengeId, user_id: row.user_id, options });
     }
     // Recovery: the caller must prove RK by signing the recovery challenge with the RK-derived key.
-    const ch = await consumeChallenge(db, body.recovery_challenge_id, ["recovery"]);
-    const env = await db.prepare("SELECT kdf_params FROM key_envelopes WHERE envelope_id = ? AND user_id = ? AND method = 'recovery'")
-      .bind(ch.recovery_envelope_id, ch.user_id).first<{ kdf_params: string }>();
-    const vk = env ? (JSON.parse(env.kdf_params) as { vk?: string }).vk : undefined;
-    if (!vk || !(await verifyEd25519Raw(fromB64u(vk), recoveryProofMessage(ch.challenge), body.proof))) {
+    // Check the proof against a read-only lookup first, so a bad proof cannot burn the real caller's challenge.
+    const pending = await db.prepare(
+      `SELECT c.challenge, c.user_id, k.kdf_params FROM webauthn_challenges c
+         JOIN key_envelopes k ON k.envelope_id = c.recovery_envelope_id AND k.user_id = c.user_id AND k.method = 'recovery'
+       WHERE c.challenge_id = ? AND c.purpose = 'recovery' AND c.used_at IS NULL AND c.expires_at > ?`,
+    ).bind(body.recovery_challenge_id, nowIso()).first<{ challenge: string; user_id: string; kdf_params: string }>();
+    if (!pending) throw new ApiError(400, "challenge_invalid", "Challenge expired or already used");
+    if (!(await recoveryProofOk(pending.kdf_params, pending.challenge, body.proof))) {
       throw new ApiError(403, "recovery_proof_failed", "Recovery key check failed");
     }
-    const userId = ch.user_id!;
+    const ch = await consumeChallenge(db, body.recovery_challenge_id, ["recovery"]);
+    if (ch.user_id !== pending.user_id || !ch.recovery_envelope_id) throw new ApiError(400, "challenge_invalid", "Challenge expired or already used");
+    const userId = pending.user_id;
     const options = await registrationOptions(c.env, userId, await existingCredentials(db, userId));
     const challengeId = await saveChallenge(db, "register", options.challenge, { user_id: userId, recovery_envelope_id: ch.recovery_envelope_id });
     return c.json({ challenge_id: challengeId, user_id: userId, options });
   });
 
-  r.post("/register/verify", async (c) => {
+  r.post("/register/verify", ipLimit("register_verify", getLimiter), async (c) => {
     const body = await readJson(c, zRegisterVerify);
     const db = c.env.DB;
     const ch = await consumeChallenge(db, body.challenge_id, ["register"]);
@@ -121,14 +133,18 @@ export function webauthnRoutes(getLimiter: (env: Bindings) => Limiter) {
       if (body.account) throw new ApiError(400, "invalid_input", "account");
       userId = ch.user_id;
       modeStmts = [
-        db.prepare("UPDATE device_add_sessions SET used_at = ? WHERE session_id = ? AND user_id = ? AND used_at IS NULL AND sealed_mk IS NOT NULL")
+        db.prepare("UPDATE device_add_sessions SET used_at = ?1 WHERE session_id = ?2 AND user_id = ?3 AND used_at IS NULL AND sealed_mk IS NOT NULL AND expires_at > ?1")
           .bind(now, ch.device_add_session_id, userId),
         guard(db),
       ];
     } else if (ch.recovery_envelope_id && ch.user_id) {
       if (body.account) throw new ApiError(400, "invalid_input", "account");
       userId = ch.user_id;
-      modeStmts = [db.prepare("UPDATE key_envelopes SET last_used_at = ? WHERE envelope_id = ?").bind(now, ch.recovery_envelope_id)];
+      // Recovery means a device may be lost: sign out every existing session for this account.
+      modeStmts = [
+        db.prepare("UPDATE key_envelopes SET last_used_at = ? WHERE envelope_id = ?").bind(now, ch.recovery_envelope_id),
+        db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId),
+      ];
     } else {
       throw new ApiError(400, "challenge_invalid", "Challenge expired or already used");
     }
@@ -137,12 +153,13 @@ export function webauthnRoutes(getLimiter: (env: Bindings) => Limiter) {
     await runBatch(db, [
       ...modeStmts,
       db.prepare("INSERT INTO passkey_credentials (credential_id, user_id, public_key, sign_count, transports, aaguid, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(credentialId, userId, info.credential.publicKey, info.credential.counter, JSON.stringify(info.credential.transports ?? []), info.aaguid, now),
+        .bind(credentialId, userId, info.credential.publicKey, info.credential.counter, JSON.stringify(info.transports), info.aaguid, now),
       db.prepare("INSERT INTO key_envelopes (envelope_id, user_id, method, credential_id, wrapped_master_key, label, created_at) VALUES (?, ?, 'passkey', ?, ?, ?, ?)")
         .bind(body.envelope.envelope_id, userId, credentialId, body.envelope.wrapped_master_key, body.envelope.label ?? null, now),
       ...session.stmts,
-    ], signupConflict).catch((err: unknown) => {
-      if (err instanceof Error && /UNIQUE|PRIMARY KEY/.test(err.message)) throw credentialExists();
+    ], linkUsed(ch.pairing_session_id ? "signup link" : ch.device_add_session_id ? "device link" : "recovery request")).catch((err: unknown) => {
+      if (err instanceof ApiError) throw err;
+      if (err instanceof Error && /UNIQUE|PRIMARY KEY/.test(err.message)) uniqueConflict(err);
       throw err;
     });
     session.commit();
@@ -175,12 +192,12 @@ export function webauthnRoutes(getLimiter: (env: Bindings) => Limiter) {
   });
 
   /** A 2-minute challenge bound to one protected action ("METHOD /path") for this user. */
-  r.post("/stepup/options", requireSession, async (c) => {
+  r.post("/stepup/options", ipLimit("stepup_options", getLimiter), requireSession, async (c) => {
     const { method, path } = await readJson(c, zStepupOptions);
     const userId = c.get("userId")!;
     const { results } = await c.env.DB.prepare("SELECT credential_id, transports FROM passkey_credentials WHERE user_id = ?")
       .bind(userId).all<{ credential_id: string; transports: string | null }>();
-    const options = await authenticationOptions(c.env, results.map((r) => ({ id: r.credential_id, transports: r.transports ? JSON.parse(r.transports) : undefined })));
+    const options = await authenticationOptions(c.env, results.map((r) => ({ id: r.credential_id, transports: r.transports })));
     const challengeId = await saveChallenge(c.env.DB, "stepup", options.challenge, { user_id: userId, action: actionOf(method, path) }, STEPUP_SECONDS);
     return c.json({ challenge_id: challengeId, options });
   });
@@ -188,3 +205,13 @@ export function webauthnRoutes(getLimiter: (env: Bindings) => Limiter) {
   return r;
 }
 
+
+async function recoveryProofOk(kdfParams: string, challenge: string, proof: Uint8Array): Promise<boolean> {
+  let vk: Uint8Array;
+  try {
+    vk = fromB64u(zKdfParams.parse(JSON.parse(kdfParams)).vk);
+  } catch {
+    return false;
+  }
+  return verifyEd25519Raw(vk, recoveryProofMessage(challenge), proof);
+}

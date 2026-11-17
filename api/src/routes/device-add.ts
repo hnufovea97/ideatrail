@@ -91,6 +91,7 @@ export function deviceAddRoutes(getLimiter: (env: Bindings) => Limiter) {
     const row = await load(c.env.DB, c.req.param("id"));
     if (!row) throw notFound();
     await checkJoinSecret(row, c.req.header("x-it-join-secret"));
+    if (row.expires_at <= nowIso()) throw expired();
     if (row.sealed_mk === null || !row.key_mac) throw new ApiError(404, "not_ready", "Waiting for the other device");
     if (row.used_at) throw new ApiError(409, "device_add_used", "This link was already used");
     return c.json({ user_id: row.user_id, sealed_mk: toB64u(toBytes(row.sealed_mk)), mac: row.key_mac });

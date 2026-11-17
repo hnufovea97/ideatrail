@@ -1,16 +1,12 @@
-import {
-  generateAuthenticationOptions,
-  generateRegistrationOptions,
-  verifyAuthenticationResponse,
-  verifyRegistrationResponse,
-  type AuthenticationResponseJSON,
-  type RegistrationResponseJSON,
-  type VerifiedRegistrationResponse,
-} from "@simplewebauthn/server";
+import type { AuthenticationResponseJSON, RegistrationResponseJSON, VerifiedRegistrationResponse } from "@simplewebauthn/server";
 import { toBytes, nowIso } from "../db/values";
-import { decodeAttestationObject, isoBase64URL } from "@simplewebauthn/server/helpers";
+import { cleanTransports, parseTransports } from "./webauthn-schema";
 import { ApiError } from "../http/errors";
 import type { Bindings } from "../env";
+
+// SimpleWebAuthn (+ CBOR/ASN.1) is loaded only by passkey routes, not on every cold start.
+const lib = () => import("@simplewebauthn/server");
+const helpers = () => import("@simplewebauthn/server/helpers");
 
 /** EdDSA and ES256 only: cheap to verify inside the free plan's 10ms CPU budget. */
 export const ALGORITHMS = [-8, -7];
@@ -18,7 +14,8 @@ const TIMEOUT_MS = 5 * 60 * 1000;
 
 export const webauthnFailed = () => new ApiError(400, "webauthn_failed", "Passkey check failed");
 
-export function registrationOptions(env: Bindings, userId: string, exclude: string[] = []) {
+export async function registrationOptions(env: Bindings, userId: string, exclude: string[] = []) {
+  const { generateRegistrationOptions } = await lib();
   return generateRegistrationOptions({
     rpName: env.RP_NAME,
     rpID: env.RP_ID,
@@ -34,7 +31,8 @@ export function registrationOptions(env: Bindings, userId: string, exclude: stri
 }
 
 /** Only "none" attestation is accepted; anything else is refused before any expensive parsing. */
-function assertNoneAttestation(response: RegistrationResponseJSON) {
+async function assertNoneAttestation(response: RegistrationResponseJSON) {
+  const { decodeAttestationObject, isoBase64URL } = await helpers();
   try {
     const att = decodeAttestationObject(isoBase64URL.toBuffer(response.response.attestationObject));
     if (att.get("fmt") !== "none") throw new Error();
@@ -44,7 +42,8 @@ function assertNoneAttestation(response: RegistrationResponseJSON) {
 }
 
 export async function verifyRegistration(env: Bindings, response: RegistrationResponseJSON, challenge: string) {
-  assertNoneAttestation(response);
+  await assertNoneAttestation(response);
+  const { verifyRegistrationResponse } = await lib();
   let result: VerifiedRegistrationResponse;
   try {
     result = await verifyRegistrationResponse({
@@ -59,19 +58,19 @@ export async function verifyRegistration(env: Bindings, response: RegistrationRe
     throw webauthnFailed();
   }
   if (!result.verified || !result.registrationInfo?.userVerified) throw webauthnFailed();
-  return result.registrationInfo;
+  const info = result.registrationInfo;
+  return { ...info, transports: cleanTransports(info.credential.transports) };
 }
 
-export function authenticationOptions(env: Bindings, allow: { id: string; transports?: string[] }[] = []) {
+export async function authenticationOptions(env: Bindings, allow: { id: string; transports: string | null }[] = []) {
+  const { generateAuthenticationOptions } = await lib();
   return generateAuthenticationOptions({
     rpID: env.RP_ID,
     userVerification: "required",
     timeout: TIMEOUT_MS,
-    allowCredentials: allow.map((a) => ({ id: a.id, transports: a.transports as AuthenticatorTransportFuture[] | undefined })),
+    allowCredentials: allow.map((a) => ({ id: a.id, transports: parseTransports(a.transports) })),
   });
 }
-
-type AuthenticatorTransportFuture = "ble" | "cable" | "hybrid" | "internal" | "nfc" | "smart-card" | "usb";
 
 interface CredentialRow { credential_id: string; user_id: string; public_key: unknown; sign_count: number; transports: string | null }
 
@@ -83,8 +82,9 @@ interface CredentialRow { credential_id: string; user_id: string; public_key: un
  */
 export async function verifyAssertion(env: Bindings, response: AuthenticationResponseJSON, challenge: string, userId?: string) {
   const cred = await env.DB.prepare("SELECT credential_id, user_id, public_key, sign_count, transports FROM passkey_credentials WHERE credential_id = ?")
-    .bind(typeof response?.id === "string" ? response.id : "").first<CredentialRow>();
+    .bind(response.id).first<CredentialRow>();
   if (!cred || (userId && cred.user_id !== userId)) throw webauthnFailed();
+  const { verifyAuthenticationResponse } = await lib();
   let newCounter: number;
   try {
     const v = await verifyAuthenticationResponse({
@@ -97,7 +97,7 @@ export async function verifyAssertion(env: Bindings, response: AuthenticationRes
         id: cred.credential_id,
         publicKey: Uint8Array.from(toBytes(cred.public_key)),
         counter: cred.sign_count,
-        transports: cred.transports ? (JSON.parse(cred.transports) as AuthenticatorTransportFuture[]) : undefined,
+        transports: parseTransports(cred.transports),
       },
     });
     if (!v.verified || !v.authenticationInfo.userVerified) throw new Error();

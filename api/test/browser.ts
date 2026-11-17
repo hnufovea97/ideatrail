@@ -17,7 +17,7 @@ export function fakeLimiter(max = 10): Limiter & { calls: Map<string, number> } 
 
 /** A browser: sends Origin + JSON, keeps the session cookie between calls. */
 export function browser(opts: { limiter?: Limiter; origin?: string } = {}) {
-  const app = createApp({ limiter: () => opts.limiter ?? fakeLimiter(1000) });
+  const app = createApp({ limiter: () => opts.limiter ?? fakeLimiter(1000), testRoutes: true });
   let cookie = "";
   async function call(method: string, path: string, body?: unknown, extra: Record<string, string> = {}) {
     const headers: Record<string, string> = { origin: opts.origin ?? APP_ORIGIN, "cf-connecting-ip": "203.0.113.7", ...extra };

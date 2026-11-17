@@ -70,6 +70,21 @@ describe("recovery (§11)", () => {
     expect((await json(await r.b!.call("GET", "/v1/account"))).user_id).toBe(userId);
   });
 
+  it("recovery signs out every other session of the account", async () => {
+    const { b, rk } = await withRecovery();
+    expect((await b.call("GET", "/v1/account")).status).toBe(200);
+    expect((await recover(rk)).status).toBe(200);
+    expect((await b.call("GET", "/v1/account")).status).toBe(401);
+  });
+
+  it("a bad proof does not burn the challenge", async () => {
+    const { rk } = await withRecovery();
+    const b = browser();
+    const f = await json(await b.call("POST", "/v1/recovery/envelope", { lookup_id: recoveryLookupId(rk) }));
+    expect((await b.call("POST", "/v1/webauthn/register/options", { recovery_challenge_id: f.recovery_challenge_id, proof: toB64u(new Uint8Array(64)) })).status).toBe(403);
+    expect((await b.call("POST", "/v1/webauthn/register/options", { recovery_challenge_id: f.recovery_challenge_id, proof: recoveryProof(rk, f.challenge as string) })).status).toBe(200);
+  });
+
   it("lookup_id without RK (bad proof) cannot attach a passkey", async () => {
     const { rk } = await withRecovery();
     const r = await recover(rk, browser(), toB64u(new Uint8Array(64)));

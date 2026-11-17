@@ -3,18 +3,19 @@ import type { AppEnv, Bindings } from "./env";
 import { notFound, onError } from "./http/errors";
 import { appCors, limitBody, safeLogger, securityHeaders } from "./http/middleware";
 import { bindingLimiter, type Limiter } from "./http/rate-limit";
-import { requireConfirmed } from "./auth/session";
+import { requireConfirmed, requireSession } from "./auth/session";
 import { webauthnRoutes } from "./routes/webauthn";
 import { pairingRoutes } from "./routes/pairing";
 import { deviceAddRoutes } from "./routes/device-add";
 import { envelopeRoutes, recoveryRoutes } from "./routes/recovery";
 import { accountRoutes, logoutHandlers } from "./routes/account";
 import { requireStepup } from "./auth/stepup";
-import { requireSession } from "./auth/session";
 
 export interface AppDeps {
   /** Rate limiter factory; tests inject a fake. */
   limiter?: (env: Bindings) => Limiter;
+  /** Register /v1/__test/* helper routes. Only tests set this; the deployed entry never does. */
+  testRoutes?: boolean;
 }
 
 export function createApp(deps: AppDeps = {}) {
@@ -32,22 +33,18 @@ export function createApp(deps: AppDeps = {}) {
   app.route("/v1/recovery", recoveryRoutes(limiter));
   app.post("/v1/logout", ...logoutHandlers);
 
-  testRoutes(app);
+  if (deps.testRoutes) testRoutes(app);
   return app;
 }
 
-/** Routes that exist only when TEST_ROUTES=1 (vitest config). */
+/** Helper routes for tests only (see AppDeps.testRoutes). */
 function testRoutes(app: Hono<AppEnv>) {
-  app.all("/v1/__test/throw", (c) => {
-    if (c.env.TEST_ROUTES !== "1") return notFound(c);
+  app.all("/v1/__test/throw", () => {
     throw new Error("boom-detail");
   });
-  app.post("/v1/__test/echo", async (c) => {
-    if (c.env.TEST_ROUTES !== "1") return notFound(c);
-    return c.json({ size: (await c.req.arrayBuffer()).byteLength });
-  });
-  app.post("/v1/__test/stepup", async (c, next) => (c.env.TEST_ROUTES === "1" ? requireSession(c, next) : notFound(c)), requireStepup, (c) => c.json({ ok: true }));
-  app.get("/v1/__test/confirmed-only", async (c, next) => (c.env.TEST_ROUTES === "1" ? requireConfirmed(c, next) : notFound(c)), (c) => c.json({ ok: true }));
+  app.post("/v1/__test/echo", async (c) => c.json({ size: (await c.req.arrayBuffer()).byteLength }));
+  app.post("/v1/__test/stepup", requireSession, requireStepup, (c) => c.json({ ok: true }));
+  app.get("/v1/__test/confirmed-only", requireConfirmed, (c) => c.json({ ok: true }));
 }
 
 const app = createApp();

@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import { z } from "zod";
-import type { AuthenticationResponseJSON } from "@simplewebauthn/server";
+import { zAuthenticationResponse } from "./webauthn-schema";
 import { ApiError } from "../http/errors";
 import { zId } from "../http/validate";
 import { guard, runBatch } from "../db/change";
@@ -9,7 +9,7 @@ import { consumeChallenge } from "./challenges";
 import { verifyAssertion } from "./webauthn";
 
 const zAssertion = z.object({
-  assertion: z.object({ challenge_id: zId, response: z.custom<AuthenticationResponseJSON>((v) => typeof v === "object" && v !== null) }),
+  assertion: z.object({ challenge_id: zId, response: zAuthenticationResponse }),
 });
 
 const stepupRequired = () => new ApiError(401, "stepup_required", "Confirm with your passkey");

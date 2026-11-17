@@ -100,6 +100,26 @@ describe("signup (2.5)", () => {
     }
   });
 
+  it("malformed or oversized passkey responses are rejected before any crypto", async () => {
+    const s = await start();
+    const good = await s.auth.register(s.options);
+    for (const response of [{}, { ...good, response: {} }, { ...good, type: "other" }, { ...good, response: { ...good.response, clientDataJSON: "A".repeat(5000) } }]) {
+      const r = await s.b.call("POST", "/v1/webauthn/register/verify", { challenge_id: s.challenge_id, response, ...accountPayload() });
+      expect(r.status).toBe(400);
+      expect(((await r.json()) as { error: { code: string } }).error.code).toBe("invalid_input");
+    }
+  });
+
+  it("a reused envelope id is reported as such, not as a passkey conflict", async () => {
+    const first = await start();
+    const payload = accountPayload();
+    expect((await first.b.call("POST", "/v1/webauthn/register/verify", { challenge_id: first.challenge_id, response: await first.auth.register(first.options), ...payload })).status).toBe(200);
+    const second = await start();
+    const r = await second.b.call("POST", "/v1/webauthn/register/verify", { challenge_id: second.challenge_id, response: await second.auth.register(second.options), ...accountPayload(), envelope: payload.envelope });
+    expect(r.status).toBe(409);
+    expect(((await r.json()) as { error: { code: string } }).error.code).toBe("envelope_id_taken");
+  });
+
   it("a pairing session already bound to an account cannot start another signup", async () => {
     const { b, pairing } = await signUp();
     const r = await b.call("POST", "/v1/webauthn/register/options", { pairing_session_id: pairing.sessionId });

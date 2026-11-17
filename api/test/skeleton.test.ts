@@ -1,7 +1,9 @@
-import { exports } from "cloudflare:workers";
+import { env, exports } from "cloudflare:workers";
+import { createApp } from "../src/index";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const call = (path: string, init?: RequestInit) => exports.default.fetch(new Request(`https://api.test${path}`, init));
+const testApp = createApp({ testRoutes: true });
+const call = (path: string, init?: RequestInit) => testApp.request(`https://api.test${path}`, init, env);
 
 describe("skeleton (2.1)", () => {
   afterEach(() => vi.restoreAllMocks());
@@ -49,6 +51,10 @@ describe("skeleton (2.1)", () => {
     const r = await call("/v1/__test/throw");
     expect(r.status).toBe(500);
     expect(JSON.stringify(await r.json())).not.toContain("boom-detail");
+  });
+
+  it("the deployed entry has no test routes", async () => {
+    expect((await exports.default.fetch(new Request("https://api.test/v1/__test/throw"))).status).toBe(404);
   });
 
   it("security headers are set", async () => {

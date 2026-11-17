@@ -3,7 +3,7 @@
   "name": "ideatrail-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
   "d1_databases": [{ "binding": "DB", "database_name": "ideatrail", "database_id": "local", "migrations_dir": "migrations" }],
   "ratelimits": [{ "name": "IP_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
   "vars": { "RP_ID": "localhost", "RP_NAME": "Ideatrail", "APP_ORIGIN": "http://localhost:4321" }

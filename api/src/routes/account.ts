@@ -1,7 +1,8 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { toB64u } from "@ideatrail/crypto/bytes";
 import type { AppEnv } from "../env";
 import { browserWrite } from "../http/browser";
+import { ApiError } from "../http/errors";
 import { endSession, requireSession } from "../auth/session";
 import { nowIso, toBytes } from "../db/values";
 
@@ -27,7 +28,8 @@ export function accountRoutes() {
       db.prepare("SELECT envelope_id, method, label, created_at, last_used_at FROM key_envelopes WHERE user_id = ? ORDER BY created_at").bind(userId),
       db.prepare("SELECT credential_id, aaguid, created_at, last_used_at FROM passkey_credentials WHERE user_id = ? ORDER BY created_at").bind(userId),
     ]);
-    const u = user.results[0] as Record<string, unknown>;
+    const u = user.results[0] as Record<string, unknown> | undefined;
+    if (!u) throw new ApiError(401, "session_required", "Sign in again");
     return c.json({
       user_id: u.user_id,
       account_pubkey: b64(u.account_pubkey),
@@ -49,8 +51,11 @@ export function accountRoutes() {
   return r;
 }
 
-/** POST /v1/logout — registered on its own path so its middleware does not cover other /v1 routes. */
-export const logoutHandlers = [browserWrite, requireSession, async (c: import("hono").Context<AppEnv>) => {
+/**
+ * POST /v1/logout — on its own path so its middleware does not cover other /v1 routes.
+ * No session required: a stale or expired cookie can always be cleared.
+ */
+export const logoutHandlers = [browserWrite, async (c: Context<AppEnv>) => {
   await endSession(c);
   return c.json({ signed_out: true });
 }] as const;

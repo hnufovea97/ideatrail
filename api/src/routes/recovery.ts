@@ -40,7 +40,10 @@ export function envelopeRoutes() {
       db.prepare("INSERT INTO key_envelopes (envelope_id, user_id, method, wrapped_master_key, kdf_params, lookup_hash, label, created_at) VALUES (?, ?, 'recovery', ?, ?, ?, ?, ?)")
         .bind(body.envelope_id, userId, body.wrapped_master_key, kdf, toHex(body.lookup_hash), body.label ?? null, nowIso()),
       db.prepare("UPDATE users SET recovery_key_status = 'created' WHERE user_id = ?").bind(userId),
-    ]);
+    ]).catch((err: unknown) => {
+      if (err instanceof Error && /UNIQUE|PRIMARY KEY/.test(err.message)) throw new ApiError(409, "envelope_conflict", "Generate a new recovery key and try again");
+      throw err;
+    });
     return c.json({ envelope_id: body.envelope_id });
   });
   return r;

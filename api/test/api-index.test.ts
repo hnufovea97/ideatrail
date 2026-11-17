@@ -49,6 +49,7 @@ const PUBLIC = new Set([
   "POST /v1/webauthn/register/options", "POST /v1/webauthn/register/verify",
   "POST /v1/webauthn/login/options", "POST /v1/webauthn/login/verify",
   "POST /v1/recovery/envelope", "POST /v1/device-add/:id/join", "GET /v1/device-add/:id/key",
+  "POST /v1/logout", // clears any cookie, even an expired one
 ]);
 
 describe("route × auth matrix", () => {
@@ -72,7 +73,7 @@ describe("route × auth matrix", () => {
     const app = createApp({ limiter: () => fakeLimiter(1e6) });
     for (const r of PUBLIC) {
       const [method, path] = r.split(" ");
-      if (method === "POST" && path === "/v1/webauthn/login/options") continue; // issues a challenge by design
+      if (r === "POST /v1/webauthn/login/options" || r === "POST /v1/logout") continue; // succeed by design
       const res = await app.request(`https://api.test${sample(path)}`, {
         method, headers: { origin: "http://localhost:4321", "content-type": "application/json" }, body: method === "GET" ? undefined : "{}",
       }, env);

@@ -87,6 +87,14 @@ describe("device add (2.7)", () => {
     expect((await browser().call("POST", `/v1/device-add/${d2}/join`, { t_pub: toB64u(rand(32)), mac: toHex(rand(32)) })).status).toBe(410);
   });
 
+  it("after 2 minutes the key cannot be fetched and the device cannot register", async () => {
+    const { d, phone, secret } = await linkReady();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 121 * 1000);
+    expect((await phone.app.request(`https://api.test/v1/device-add/${d}/key`, { headers: { "x-it-join-secret": secret } }, env)).status).toBe(410);
+    expect((await registerPhone(phone, d, secret)).status).toBe(410);
+  });
+
   it("another account cannot upload the key or read the join data", async () => {
     const pc = await confirmedUser();
     const d = (await json(await pc.b.call("POST", "/v1/device-add", {}))).session_id as string;
