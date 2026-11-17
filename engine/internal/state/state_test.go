@@ -136,4 +136,3 @@ func TestRememberMsgID(t *testing.T) {
 		t.Fatalf("len %d", len(s.SeenMsgIDs))
 	}
 }
-
