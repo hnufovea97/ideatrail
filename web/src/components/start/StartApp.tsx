@@ -4,8 +4,11 @@ import { ApiFailure, createApi, type PairingInfo } from "../../lib/api";
 import { prfSupport, type CapabilityEnv } from "../../lib/capability";
 import { clearFragment, engineKeysMatch, parseStartLink } from "../../lib/fragment";
 import type { SignupContext } from "../../lib/signup/context";
-import { initialState, reduce, type StopReason } from "../../lib/signup/machine";
+import { COPY } from "../../lib/copy";
+import { initialState, reduce, stepNumber, type StopReason } from "../../lib/signup/machine";
+import { Screen } from "../ui/Screen";
 import { IntroStep } from "./IntroStep";
+import { PcStep } from "./PcStep";
 import { StoppedScreen } from "./StoppedScreen";
 
 const PROTECT_STEPS = new Set(["phone", "github", "recovery", "folders"]);
@@ -58,6 +61,10 @@ export default function StartApp() {
   switch (state.step) {
     case "intro":
       return <IntroStep {...props} />;
+    case "pc":
+      return <PcStep {...props} />;
+    case "phone": // placeholder until Task 10 adds PhoneStep: shows where step 1 lands
+      return <Screen step={stepNumber(state.step)} title={COPY.phone.title} why={COPY.phone.why} done={state.done} />;
     default:
       return <Busy />;
   }
