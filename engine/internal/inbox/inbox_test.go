@@ -217,4 +217,45 @@ func TestRequestLimitsAndDangerousFolders(t *testing.T) {
 	if _, err := RequestImport(context.Background(), e.d, "import", []string{e.folder}); !errors.Is(err, ErrTooMany) {
 		t.Fatalf("got %v", err)
 	}
+	// unanswered requests expire and stop holding the limit
+	e.d.Now = func() time.Time { return time.Now().Add(8 * 24 * time.Hour) }
+	if _, err := RequestImport(context.Background(), e.d, "import", []string{e.folder}); err != nil {
+		t.Fatalf("expired requests still block: %v", err)
+	}
+	st, _ := state.Read(e.d.StateDir)
+	if open := openApprovals(st, e.d.now()); open != 1 {
+		t.Fatalf("open=%d", open)
+	}
+	// closed requests are forgotten after approvalKeep
+	e.d.Now = func() time.Time { return time.Now().Add(60 * 24 * time.Hour) }
+	_ = state.With(e.d.StateDir, func(s *state.State) error { prune(s, e.d.now()); return nil })
+	st, _ = state.Read(e.d.StateDir)
+	if len(st.Approvals) != 0 {
+		t.Fatalf("kept %d old approvals", len(st.Approvals))
+	}
+}
+
+func TestRefusedRequestIsClosedAndOthersStillSendInOrder(t *testing.T) {
+	e := newEnv(t)
+	var order []string
+	e.srv.Handle("POST", "/v1/approvals", func(w http.ResponseWriter, r *http.Request, body []byte, _ string) {
+		var b map[string]any
+		_ = json.Unmarshal(body, &b)
+		e.mu.Lock()
+		order = append(order, b["appr_seq"].(string))
+		e.mu.Unlock()
+		testsrv.JSON(w, 400, map[string]any{"error": "bad_request"})
+	})
+	if _, err := RequestImport(context.Background(), e.d, "import", []string{e.folder}); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := state.Read(e.d.StateDir)
+	for _, a := range st.Approvals {
+		if !a.Done || a.Body != "" {
+			t.Fatalf("refused request still open: %+v", a)
+		}
+	}
+	if len(order) != 1 || order[0] != "1" {
+		t.Fatalf("order %v", order)
+	}
 }

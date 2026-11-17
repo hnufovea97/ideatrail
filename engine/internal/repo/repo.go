@@ -6,8 +6,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -164,10 +166,18 @@ func PushOutbox(ctx context.Context, d Deps) (int, error) {
 	}
 	pushed := 0
 	var head string
+	defer func() { // report what reached GitHub even if a later item failed
+		if head != "" {
+			_ = reportHead(ctx, d, head)
+		}
+	}()
 	for _, name := range names {
 		it, files, err := readItem(filepath.Join(d.OutboxDir, name))
 		if err != nil {
-			return pushed, err
+			if qerr := quarantine(d.OutboxDir, name); qerr != nil {
+				return pushed, qerr
+			}
+			continue
 		}
 		message, exists := "ideatrail: record "+it.RecordID, "records/"+it.RecordID+".it1"
 		if it.Kind == "update" {
@@ -185,9 +195,6 @@ func PushOutbox(ctx context.Context, d Deps) (int, error) {
 		if it.Kind == "update" {
 			_ = d.API.Do(ctx, "POST", "/v1/anchors/"+it.RecordID+"/synced", map[string]string{"target": "repo"}, nil)
 		}
-	}
-	if head != "" {
-		_ = reportHead(ctx, d, head)
 	}
 	return pushed, nil
 }
@@ -227,42 +234,82 @@ func queued(dir string) ([]string, error) {
 	return out, nil
 }
 
+var recordIDRe = regexp.MustCompile(`^[0-9a-hjkmnp-tv-z]{26}$`)
+
+// allowedPaths are the only repo paths an item for this record may write (spec §12).
+func allowedPaths(id string) map[string]bool {
+	return map[string]bool{"records/" + id + ".it1": true, "proofs/" + id + "/bundle.json": true, "proofs/" + id + "/original.it1": true}
+}
+
+// readItem reads one queue file (no symlinks, size-capped) and checks every field: the record id
+// shape, the kind, and that each path is one of this record's own files.
 func readItem(path string) (*item, map[string][]byte, error) {
-	fi, err := os.Stat(path)
-	if err != nil || fi.Size() > maxItemBytes {
-		return nil, nil, errors.New("queue item unreadable")
+	bad := errors.New("queue item unreadable")
+	fi, err := os.Lstat(path)
+	if err != nil || !fi.Mode().IsRegular() || fi.Size() > maxItemBytes {
+		return nil, nil, bad
 	}
-	raw, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, bad
+	}
+	defer f.Close()
+	raw, err := io.ReadAll(io.LimitReader(f, maxItemBytes+1))
+	if err != nil || len(raw) > maxItemBytes {
+		return nil, nil, bad
 	}
 	var it item
-	if json.Unmarshal(raw, &it) != nil || it.RecordID == "" || len(it.Files) == 0 {
-		return nil, nil, errors.New("queue item unreadable")
+	if json.Unmarshal(raw, &it) != nil || !recordIDRe.MatchString(it.RecordID) || len(it.Files) == 0 {
+		return nil, nil, bad
 	}
+	switch it.Kind {
+	case "":
+		it.Kind = "record"
+	case "record", "update":
+	default:
+		return nil, nil, bad
+	}
+	ok := allowedPaths(it.RecordID)
 	files := map[string][]byte{}
 	for p, b64 := range it.Files {
-		if !strings.HasPrefix(p, "records/") && !strings.HasPrefix(p, "proofs/") || strings.Contains(p, "..") {
+		if !ok[p] {
 			return nil, nil, errors.New("queue item has an unexpected path")
 		}
 		b, err := ic.UnB64(b64)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, bad
 		}
 		files[p] = b
-	}
-	if it.Kind == "" {
-		it.Kind = "record"
 	}
 	return &it, files, nil
 }
 
-func writeOwnerOnly(path string, b []byte) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+// quarantine moves a queue file that can never be pushed out of the way (to bad/), so one broken
+// local file does not stop every later record. Remote refusals still stop the queue.
+func quarantine(dir, name string) error {
+	bd := filepath.Join(dir, "bad")
+	if err := os.MkdirAll(bd, 0o700); err != nil {
 		return err
 	}
-	if err := os.Chmod(tmp, 0o600); err != nil {
+	return os.Rename(filepath.Join(dir, name), filepath.Join(bd, name))
+}
+
+func writeOwnerOnly(path string, b []byte) error {
+	tmp := path + ".tmp"
+	_ = os.Remove(tmp) // a leftover temp file may have looser permissions
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(b); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
 		return err
 	}
 	return os.Rename(tmp, path)

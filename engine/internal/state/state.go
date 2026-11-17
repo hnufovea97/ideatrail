@@ -70,6 +70,7 @@ type Approval struct {
 	Folders   []string `json:"folders"` // resolved real paths the engine asked about
 	CreatedAt string   `json:"created_at"`
 	Done      bool     `json:"done,omitempty"`
+	Seq       uint64   `json:"seq,omitempty"`  // appr_seq, so pending requests are sent in order
 	Body      string   `json:"body,omitempty"` // signed request body, kept until the server accepts it
 }
 

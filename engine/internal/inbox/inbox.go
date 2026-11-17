@@ -10,6 +10,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"time"
 
@@ -26,6 +27,7 @@ const (
 	MaxOpen      = 3
 	approvalTTL  = 7 * 24 * time.Hour
 	connectTTL   = 10 * time.Minute
+	approvalKeep = 30 * 24 * time.Hour // closed requests are forgotten after this
 	maxListFiles = 5000
 )
 
@@ -63,25 +65,21 @@ func RequestImport(ctx context.Context, d Deps, kind string, folders []string) (
 	if st.UserID == "" || st.AccountPub == "" {
 		return "", ErrNotPaired
 	}
-	open := 0
-	for _, a := range st.Approvals {
-		if !a.Done {
-			open++
-		}
-	}
-	if open >= MaxOpen {
+	if openApprovals(st, d.now()) >= MaxOpen {
 		return "", ErrTooMany
 	}
 	var real []string
 	var summary []map[string]any
+	seen := map[string]bool{}
 	for _, f := range folders {
 		if err := pathguard.ValidateFolder(f, d.StateDir); err != nil {
 			return "", ErrBadFolder
 		}
 		r, _ := filepath.EvalSymlinks(f)
-		if _, taken := st.Folders[r]; taken {
+		if _, taken := st.Folders[r]; taken || seen[r] {
 			continue
 		}
+		seen[r] = true
 		real = append(real, r)
 		summary = append(summary, map[string]any{"path": r, "name": filepath.Base(r), "files": countFiles(r)})
 	}
@@ -111,6 +109,10 @@ func RequestImport(ctx context.Context, d Deps, kind string, folders []string) (
 	}
 	var body []byte
 	err = state.With(d.StateDir, func(s *state.State) error {
+		prune(s, d.now())
+		if openApprovals(s, d.now()) >= MaxOpen { // re-check under the lock
+			return ErrTooMany
+		}
 		seq, err := s.ApprSeq.Next()
 		if err != nil {
 			return err
@@ -131,7 +133,7 @@ func RequestImport(ctx context.Context, d Deps, kind string, folders []string) (
 		if s.Approvals == nil {
 			s.Approvals = map[string]state.Approval{}
 		}
-		s.Approvals[approvalID] = state.Approval{Kind: kind, Folders: real, CreatedAt: ic.FormatTime(d.now()), Body: string(body)}
+		s.Approvals[approvalID] = state.Approval{Kind: kind, Folders: real, CreatedAt: ic.FormatTime(d.now()), Body: string(body), Seq: seq}
 		return nil
 	})
 	if err != nil {
@@ -141,25 +143,66 @@ func RequestImport(ctx context.Context, d Deps, kind string, folders []string) (
 	return approvalID, nil
 }
 
-// SendPending (re)sends approval requests the server has not accepted yet (same appr_seq).
+// SendPending (re)sends approval requests the server has not accepted yet (same appr_seq), in
+// appr_seq order. A transient failure stops the round (order kept); a permanent refusal closes
+// that request so it cannot hold the open-request limit forever.
 func SendPending(ctx context.Context, d Deps) {
 	st, err := state.Read(d.StateDir)
 	if err != nil {
 		return
 	}
+	type pend struct {
+		id string
+		a  state.Approval
+	}
+	var list []pend
 	for id, a := range st.Approvals {
-		if a.Body == "" || a.Done {
-			continue
+		if a.Body != "" && !a.Done && !expired(a, d.now()) {
+			list = append(list, pend{id, a})
 		}
-		if err := d.API.Do(ctx, "POST", "/v1/approvals", json.RawMessage(a.Body), nil); err != nil {
-			continue
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].a.Seq < list[j].a.Seq })
+	for _, p := range list {
+		err := d.API.Do(ctx, "POST", "/v1/approvals", json.RawMessage(p.a.Body), nil)
+		var apiErr *api.Error
+		permanent := errors.As(err, &apiErr) && !apiErr.Retryable()
+		if err != nil && !permanent {
+			return
 		}
 		_ = state.With(d.StateDir, func(s *state.State) error {
-			x := s.Approvals[id]
+			x, ok := s.Approvals[p.id]
+			if !ok {
+				return nil
+			}
 			x.Body = ""
-			s.Approvals[id] = x
+			x.Done = x.Done || permanent
+			s.Approvals[p.id] = x
 			return nil
 		})
+	}
+}
+
+// openApprovals counts requests still waiting for an answer.
+func openApprovals(s *state.State, now time.Time) int {
+	n := 0
+	for _, a := range s.Approvals {
+		if !a.Done && !expired(a, now) {
+			n++
+		}
+	}
+	return n
+}
+
+// prune closes expired requests and forgets closed ones after approvalKeep.
+func prune(s *state.State, now time.Time) {
+	for id, a := range s.Approvals {
+		if !a.Done && expired(a, now) {
+			a.Done, a.Body = true, ""
+			s.Approvals[id] = a
+		}
+		if t, err := time.Parse(time.RFC3339, a.CreatedAt); a.Done && (err != nil || now.Sub(t) > approvalKeep) {
+			delete(s.Approvals, id)
+		}
 	}
 }
 
@@ -208,30 +251,40 @@ func Process(ctx context.Context, d Deps) ([]Event, error) {
 	if err := d.API.Do(ctx, "GET", "/v1/inbox", nil, &out); err != nil {
 		return nil, err
 	}
+	_ = state.With(d.StateDir, func(s *state.State) error { prune(s, d.now()); return nil })
 	var events []Event
 	for _, m := range out.Messages {
-		if ev, ok := handle(d, st, akPub, m); ok {
+		ev, ok, retry := handle(d, akPub, m)
+		if ok {
 			events = append(events, ev)
 		}
-		if validID(m.MsgID) {
+		if validID(m.MsgID) && !retry { // keep it for next time if our own state could not be saved
 			_ = d.API.Do(ctx, "DELETE", "/v1/inbox/"+m.MsgID, nil, nil)
 		}
 	}
 	return events, nil
 }
 
-func handle(d Deps, st *state.State, pub kem.PublicKey, m message) (Event, bool) {
+// handle returns the event, whether there is one, and whether the message should be kept for a
+// retry (a local failure, not a problem with the message).
+func handle(d Deps, pub kem.PublicKey, m message) (Event, bool, bool) {
 	if !validID(m.MsgID) {
-		return Event{}, false
+		return Event{}, false, false
+	}
+	st, err := state.Read(d.StateDir) // fresh: approvals may have been added since the inbox call
+	if err != nil {
+		return Event{}, false, true
 	}
 	sealed, err := ic.UnB64(m.Sealed)
 	if err != nil {
-		return Event{}, false
+		return Event{}, false, false
 	}
-	// The approval id is part of the AAD; try "-" and each of our own open approvals.
+	// The approval id is part of the AAD; try "" and each of our own open approvals.
 	candidates := []string{""}
-	for id := range st.Approvals {
-		candidates = append(candidates, id)
+	for id, a := range st.Approvals {
+		if !a.Done && !expired(a, d.now()) {
+			candidates = append(candidates, id)
+		}
 	}
 	var p payload
 	var boundTo string
@@ -242,17 +295,17 @@ func handle(d Deps, st *state.State, pub kem.PublicKey, m message) (Event, bool)
 			continue
 		}
 		if json.Unmarshal(pt, &p) != nil {
-			return Event{}, false
+			return Event{}, false, false
 		}
 		boundTo, opened = root, true
 		break
 	}
 	if !opened || p.V != 1 {
-		return Event{}, false
+		return Event{}, false, false
 	}
 	issued, err := time.Parse(time.RFC3339, p.IssuedAt)
 	if err != nil || d.now().Sub(issued) > approvalTTL || issued.After(d.now().Add(5*time.Minute)) {
-		return Event{}, false
+		return Event{}, false, false
 	}
 	var ev Event
 	ok := false
@@ -305,10 +358,13 @@ func handle(d Deps, st *state.State, pub kem.PublicKey, m message) (Event, bool)
 		}
 		return nil
 	})
-	if err != nil {
-		return Event{}, false
+	if errors.Is(err, errReplay) {
+		return Event{}, false, false
 	}
-	return ev, ok
+	if err != nil {
+		return Event{}, false, true
+	}
+	return ev, ok, false
 }
 
 var errReplay = errors.New("replayed message")

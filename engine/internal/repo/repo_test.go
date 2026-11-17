@@ -177,14 +177,30 @@ func TestPushInOrderUpdatesAfterRecordsAndDedupes(t *testing.T) {
 	}
 }
 
-func TestQueueItemWithUnexpectedPathIsRefused(t *testing.T) {
+func TestBadQueueItemsAreSetAsideAndOthersStillPush(t *testing.T) {
 	e := newEnv(t)
 	_ = Connect(context.Background(), e.d)
+	good := "01jcm3v8q7s2kx4f9d6b5n0tqy"
+	other := "01jcm3v8q7s2kx4f9d6b5n0tqz"
 	e.queue(t, 1, "01jcm3v8q7s2kx4f9d6b5n0tqx", false, map[string]string{".github/workflows/x.yml": "evil"})
-	if _, err := PushOutbox(context.Background(), e.d); err == nil {
-		t.Fatal("unexpected path accepted")
+	e.queue(t, 2, good, false, map[string]string{"records/" + other + ".it1": "overwrite another record"})
+	e.queue(t, 3, "../../etc?x=1#", false, map[string]string{"records/x.it1": "A"})
+	e.queue(t, 4, good, false, map[string]string{"records/" + good + ".it1": "A", "proofs/" + good + "/bundle.json": "{}"})
+	n, err := PushOutbox(context.Background(), e.d)
+	if err != nil || n != 1 {
+		t.Fatalf("pushed %d err %v", n, err)
 	}
-	if _, ok := e.gh.Files("steven/ideatrail-proofs")[".github/workflows/x.yml"]; ok {
-		t.Fatal("workflow file committed")
+	files := e.gh.Files("steven/ideatrail-proofs")
+	for _, p := range []string{".github/workflows/x.yml", "records/" + other + ".it1", "records/x.it1"} {
+		if _, ok := files[p]; ok {
+			t.Fatalf("%s committed", p)
+		}
+	}
+	if _, ok := files["records/"+good+".it1"]; !ok {
+		t.Fatal("good item not pushed")
+	}
+	bad, _ := os.ReadDir(filepath.Join(e.d.OutboxDir, "bad"))
+	if len(bad) != 3 {
+		t.Fatalf("want 3 set aside, got %d", len(bad))
 	}
 }
