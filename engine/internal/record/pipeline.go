@@ -214,8 +214,8 @@ func Record(ctx context.Context, d Deps, in Input) (*Result, error) {
 		if err != nil {
 			return err
 		}
-		local := bundle(recordID, commitHex, col.Manifest, receipts, recordedAt, d.Keys.EngineID, seq, sig, "")
-		delete(local, "nonce_sealed")
+		// local copy = GitHub bundle + plaintext nonce (nonce_sealed kept so a later repo update can be rebuilt)
+		local := bundle(recordID, commitHex, col.Manifest, receipts, recordedAt, d.Keys.EngineID, seq, sig, ic.B64(sealed.nonce))
 		local["nonce"] = hex.EncodeToString(col.Nonce)
 		localPath := filepath.Join(d.ProofDir, recordID, "bundle.json")
 		written = append(written, localPath)
@@ -346,10 +346,20 @@ func writeOutbox(dir string, seq uint64, recordID string, p *sealedParts, github
 	if p.original != nil {
 		files["proofs/"+recordID+"/original.it1"] = ic.B64(p.original)
 	}
-	name := strconv.FormatUint(seq, 10)
-	for len(name) < 20 {
-		name = "0" + name // lexical order = sequence order
+	path := filepath.Join(dir, OutboxName(seq, recordID, false))
+	return path, writeJSON(path, map[string]any{"v": 1, "kind": "record", "record_id": recordID, "log_seq": strconv.FormatUint(seq, 10), "files": files})
+}
+
+// OutboxName orders queue items by log_seq; a record's bundle update ("-1") always sorts after the
+// record itself ("-0"), and writing the same update name again coalesces repeated updates.
+func OutboxName(seq uint64, recordID string, update bool) string {
+	n := strconv.FormatUint(seq, 10)
+	for len(n) < 20 {
+		n = "0" + n
 	}
-	path := filepath.Join(dir, name+"-"+recordID+".json")
-	return path, writeJSON(path, map[string]any{"v": 1, "record_id": recordID, "log_seq": strconv.FormatUint(seq, 10), "files": files})
+	suffix := "-0.json"
+	if update {
+		suffix = "-1.json"
+	}
+	return n + "-" + recordID + suffix
 }

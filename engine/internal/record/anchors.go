@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -95,5 +96,31 @@ func applyConfirmed(d Deps, recordID, receiptB64 string, height uint64) (bool, e
 	b["ots_complete"] = receiptB64
 	b["block_height"] = tree.BitcoinHeight()
 	b["local_synced_at"] = time.Now().UTC().Format("2006-01-02T15:04:05Z")
-	return true, writeJSON(path, b)
+	if err := writeJSON(path, b); err != nil {
+		return false, err
+	}
+	return true, queueRepoUpdate(d, recordID, b)
+}
+
+// queueRepoUpdate puts the confirmed bundle (GitHub form: no plaintext nonce, no local fields) in
+// the GitHub queue, ordered after the record's own commit.
+func queueRepoUpdate(d Deps, recordID string, local map[string]any) error {
+	gh := map[string]any{}
+	for k, v := range local {
+		if k != "nonce" && k != "local_synced_at" {
+			gh[k] = v
+		}
+	}
+	seq, err := strconv.ParseUint(fmt.Sprint(local["log_seq"]), 10, 64)
+	if err != nil {
+		return err
+	}
+	raw, err := json.Marshal(gh)
+	if err != nil {
+		return err
+	}
+	return writeJSON(filepath.Join(d.OutboxDir, OutboxName(seq, recordID, true)), map[string]any{
+		"v": 1, "kind": "update", "record_id": recordID, "log_seq": strconv.FormatUint(seq, 10),
+		"files": map[string]string{"proofs/" + recordID + "/bundle.json": ic.B64(raw)},
+	})
 }
