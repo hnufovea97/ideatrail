@@ -4,6 +4,9 @@ export interface Bindings {
   RP_ID: string;
   RP_NAME: string;
   APP_ORIGIN: string;
+  /** GitHub App (vars) and its secret (wrangler secret) — used only to revoke tokens. */
+  GITHUB_APP_CLIENT_ID?: string;
+  GITHUB_APP_CLIENT_SECRET?: string;
 }
 
 export type AppEnv = {

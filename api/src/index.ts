@@ -12,6 +12,9 @@ import { recordRoutes } from "./routes/records";
 import { deltaRoutes } from "./routes/deltas";
 import { approvalRoutes, inboxRoutes } from "./routes/approvals";
 import { syncRoutes } from "./routes/sync";
+import { rootRoutes, prefsRoutes, eventRoutes, visibilityRoutes } from "./routes/roots";
+import { engineRoutes, deleteAccountHandlers } from "./routes/engines";
+import type { Fetcher } from "./github";
 import { anchorRoutes, importAllowanceRoutes, repoHeadRoutes, storageLinkRoutes } from "./routes/anchors";
 import { accountRoutes, logoutHandlers } from "./routes/account";
 import { requireStepup } from "./auth/stepup";
@@ -19,6 +22,8 @@ import { requireStepup } from "./auth/stepup";
 export interface AppDeps {
   /** Rate limiter factory; tests inject a fake. */
   limiter?: (env: Bindings) => Limiter;
+  /** Outbound fetch for GitHub token revocation; tests inject a fake GitHub. */
+  fetcher?: Fetcher;
   /** Register /v1/__test/* helper routes. Only tests set this; the deployed entry never does. */
   testRoutes?: boolean;
 }
@@ -45,6 +50,12 @@ export function createApp(deps: AppDeps = {}) {
   app.route("/v1/approvals", approvalRoutes());
   app.route("/v1/inbox", inboxRoutes());
   app.route("/v1/sync", syncRoutes());
+  app.route("/v1/roots", rootRoutes());
+  app.route("/v1/visibility", visibilityRoutes());
+  app.route("/v1/prefs", prefsRoutes());
+  app.route("/v1/events", eventRoutes());
+  app.route("/v1/engines", engineRoutes(deps.fetcher));
+  app.delete("/v1/account", ...deleteAccountHandlers(deps.fetcher));
   app.post("/v1/logout", ...logoutHandlers);
 
   if (deps.testRoutes) testRoutes(app);

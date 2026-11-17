@@ -9,6 +9,8 @@ export default defineConfig({
       miniflare: {
         bindings: {
           TEST_MIGRATIONS: await readD1Migrations(path.join(import.meta.dirname, "migrations")),
+          GITHUB_APP_CLIENT_ID: "Iv23test",
+          GITHUB_APP_CLIENT_SECRET: "test-secret",
         },
       },
     })),
