@@ -187,6 +187,9 @@ importers:
       '@cloudflare/workers-types':
         specifier: 5.20261103.1
         version: 5.20261103.1
+      '@noble/curves':
+        specifier: 2.4.0
+        version: 2.4.0
       typescript:
         specifier: 7.0.2
         version: 7.0.2
