@@ -33,5 +33,20 @@ export async function skipPhone(page: Page) {
 
 export async function githubLater(page: Page) {
   await page.getByRole("button", { name: "나중에", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "GitHub 보관" })).toHaveCount(0); // step 4 screen: Task 12
+  await expect(page.getByRole("heading", { name: /복구 키/ })).toBeVisible();
+}
+/** Make and save a recovery key via the password-manager path; returns what the screen showed. */
+export async function saveRecoveryKey(page: Page): Promise<string> {
+  await page.getByLabel("비밀번호 관리자에 저장").check();
+  await page.getByRole("button", { name: "지금 만들기" }).click();
+  const display = (await page.getByTestId("recovery-key").innerText()).trim();
+  const prepared = page.waitForResponse((r) => r.url().endsWith("/v1/webauthn/stepup/options"));
+  await page.getByRole("button", { name: "다 적었어요" }).click();
+  await prepared;
+  await page.getByLabel("앞 4자리").fill(display.slice(0, 4));
+  const saved = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().endsWith("/v1/envelopes"));
+  await page.getByRole("button", { name: "확인하고 저장" }).click();
+  expect((await saved).status()).toBe(200);
+  await expect(page.getByRole("heading", { name: /복구 키/ })).toHaveCount(0); // step 5 screen: Task 13
+  return display;
 }

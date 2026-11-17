@@ -9,6 +9,7 @@ import { GithubStep } from "./GithubStep";
 import { IntroStep } from "./IntroStep";
 import { PcStep } from "./PcStep";
 import { PhoneStep } from "./PhoneStep";
+import { RecoveryStep } from "./RecoveryStep";
 import { StoppedScreen } from "./StoppedScreen";
 
 const PROTECT_STEPS = new Set(["phone", "github", "recovery", "folders"]);
@@ -67,6 +68,8 @@ export default function StartApp() {
       return <PhoneStep {...props} />;
     case "github":
       return <GithubStep {...props} />;
+    case "recovery":
+      return <RecoveryStep {...props} />;
     default:
       return <Busy />;
   }

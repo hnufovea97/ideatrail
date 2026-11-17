@@ -12,7 +12,8 @@ test("[GitHub에 보관하기] → engine inbox gets connect_github → signed s
   const msgs = await engine.readInbox();
   expect(msgs.map((m) => m.body.type)).toEqual(["connect_github"]);
   await engine.putStorageLink();
-  await expect(page.getByRole("heading", { name: "GitHub 보관" })).toHaveCount(0); // step 4 screen and its checklist: Task 12
+  await expect(page.getByRole("heading", { name: /복구 키/ })).toBeVisible();
+  await expect(page.getByRole("list", { name: "필요한 것 5가지" }).getByRole("listitem").nth(2)).toContainText("끝냄");
   await expectClean(page, w);
 });
 
