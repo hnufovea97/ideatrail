@@ -4,5 +4,5 @@
     "resolveJsonModule": true, "lib": ["ES2024"], "skipLibCheck": true,
     "types": ["@cloudflare/workers-types", "@cloudflare/vitest-plugin/types"]
   },
-  "include": ["src", "test", "vitest.config.ts", "env.d.ts"]
+  "include": ["src", "test", "vitest.config.ts", "env.d.ts", "raw.d.ts"]
 }
