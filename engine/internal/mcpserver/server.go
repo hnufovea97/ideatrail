@@ -6,6 +6,7 @@ package mcpserver
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -227,10 +228,10 @@ func (e *Engine) ensurePaired(ctx context.Context) (string, bool) {
 		if pairing.Wait(wctx, e.Pairing, sess, 3*time.Second) != nil {
 			return
 		}
-		if e.ProjectDir != "" {
-			// signup step 5: offer this project folder for recording (the user picks on the dashboard)
-			_, _ = inbox.RequestImport(wctx, e.Inbox, "signup_select", []string{e.ProjectDir})
-		}
+		// signup step 5: this project (current) + up to 4 idea-looking siblings, all off but the first.
+		// Posted even when empty, so the browser does not wait for a list that never comes.
+		home, _ := os.UserHomeDir()
+		_, _ = inbox.RequestImport(wctx, e.Inbox, "signup_select", signupFolders(e.ProjectDir, e.StateDir, home))
 		sctx, scancel := context.WithTimeout(e.ctxBase(), signupWatchFor)
 		defer scancel()
 		watchSignup(sctx, signupWatchEvery, e.tickOnce)

@@ -25,6 +25,7 @@ import (
 
 const (
 	MaxOpen      = 3
+	MaxFolders   = 5 // per approval request; signup: the project + up to MaxFolders-1 suggestions
 	approvalTTL  = 7 * 24 * time.Hour
 	connectTTL   = 10 * time.Minute
 	approvalKeep = 30 * 24 * time.Hour // closed requests are forgotten after this
@@ -68,22 +69,38 @@ func RequestImport(ctx context.Context, d Deps, kind string, folders []string) (
 	if openApprovals(st, d.now()) >= MaxOpen {
 		return "", ErrTooMany
 	}
+	// signup_select lists are chosen by the engine itself (the project first, then suggestions):
+	// unsafe entries are left out instead of failing, the project stays even if already recorded
+	// (marked current), and an empty list is still posted so the browser's step 5 never waits for
+	// nothing (spec §15 M4).
+	signup := kind == "signup_select"
 	var real []string
-	var summary []map[string]any
+	summary := []map[string]any{}
 	seen := map[string]bool{}
-	for _, f := range folders {
+	current := ""
+	for i, f := range folders {
 		if err := pathguard.ValidateFolder(f, d.StateDir); err != nil {
+			if signup {
+				continue
+			}
 			return "", ErrBadFolder
 		}
 		r, _ := filepath.EvalSymlinks(f)
-		if _, taken := st.Folders[r]; taken || seen[r] {
+		if signup && i == 0 {
+			current = r
+		}
+		if _, taken := st.Folders[r]; taken && r != current || seen[r] {
 			continue
 		}
 		seen[r] = true
 		real = append(real, r)
-		summary = append(summary, map[string]any{"path": r, "name": filepath.Base(r), "files": countFiles(r)})
+		item := map[string]any{"path": r, "name": filepath.Base(r), "files": countFiles(r)}
+		if signup {
+			item["current"] = r == current
+		}
+		summary = append(summary, item)
 	}
-	if len(real) == 0 || len(real) > 5 {
+	if len(real) == 0 && !signup || len(real) > MaxFolders {
 		return "", ErrBadFolder
 	}
 	plain, err := json.Marshal(map[string]any{"v": 1, "folders": summary})

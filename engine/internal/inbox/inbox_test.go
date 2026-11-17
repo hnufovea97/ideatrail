@@ -259,3 +259,115 @@ func TestRefusedRequestIsClosedAndOthersStillSendInOrder(t *testing.T) {
 		t.Fatalf("order %v", order)
 	}
 }
+
+func TestSignupSummaryMarksTheCurrentProject(t *testing.T) {
+	e := newEnv(t)
+	other := filepath.Join(filepath.Dir(e.folder), "가계부 앱")
+	_ = os.MkdirAll(other, 0o700)
+	_ = os.WriteFile(filepath.Join(other, "plan.md"), []byte("x"), 0o600)
+	id, err := RequestImport(context.Background(), e.d, "signup_select", []string{e.folder, other})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.mu.Lock()
+	body := e.approvals[len(e.approvals)-1]
+	e.mu.Unlock()
+	sealed, _ := ic.UnB64(body["summary"].(string))
+	pt, err := ic.Open(ic.KindFolderSuggestions, e.akPriv, ic.AAD{UserID: testUser, RootID: id, Version: "0"}, sealed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s struct {
+		Folders []struct {
+			Path    string `json:"path"`
+			Current bool   `json:"current"`
+		} `json:"folders"`
+	}
+	_ = json.Unmarshal(pt, &s)
+	if len(s.Folders) != 2 || !s.Folders[0].Current || s.Folders[1].Current {
+		t.Fatalf("summary %+v", s.Folders)
+	}
+}
+
+// openSignupSummary opens the newest posted signup_select summary as the browser would.
+func (e *env) openSignupSummary(t *testing.T, id string) []map[string]any {
+	t.Helper()
+	e.mu.Lock()
+	body := e.approvals[len(e.approvals)-1]
+	e.mu.Unlock()
+	sealed, _ := ic.UnB64(body["summary"].(string))
+	pt, err := ic.Open(ic.KindFolderSuggestions, e.akPriv, ic.AAD{UserID: testUser, RootID: id, Version: "0"}, sealed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s struct {
+		Folders []map[string]any `json:"folders"`
+	}
+	if err := json.Unmarshal(pt, &s); err != nil {
+		t.Fatal(err)
+	}
+	return s.Folders
+}
+
+// Re-pairing on a machine that already records this project: the browser must still get a list
+// (with the project marked current), never wait for one that is not coming.
+func TestSignupKeepsAnAlreadyRegisteredProject(t *testing.T) {
+	e := newEnv(t)
+	_ = state.With(e.d.StateDir, func(s *state.State) error {
+		s.Folders = map[string]string{e.folder: "01jcm3v8q7s2kx4f9d6b5n0tqy"}
+		return nil
+	})
+	id, err := RequestImport(context.Background(), e.d, "signup_select", []string{e.folder})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fs := e.openSignupSummary(t, id)
+	if len(fs) != 1 || fs[0]["path"] != e.folder || fs[0]["current"] != true {
+		t.Fatalf("summary %+v", fs)
+	}
+	e.send(t, id, map[string]any{"type": "select_folders", "approval_id": id, "folders": []string{e.folder}}, e.akPriv)
+	if ev := e.process(t); len(ev) != 1 || ev[0].Folders != 0 {
+		t.Fatalf("events %+v (an already registered folder is not registered again)", ev)
+	}
+	// AI-asked imports still drop registered folders and refuse an empty list
+	if _, err := RequestImport(context.Background(), e.d, "import", []string{e.folder}); !errors.Is(err, ErrBadFolder) {
+		t.Fatalf("import of a registered folder: %v", err)
+	}
+}
+
+// Nothing safe to offer (no project folder, or the project is the home folder): post an empty
+// signup list so the browser can finish step 5 instead of timing out.
+func TestSignupWithNothingToOfferStillPostsAnEmptyList(t *testing.T) {
+	e := newEnv(t)
+	fakeHome, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("HOME", fakeHome)
+	id, err := RequestImport(context.Background(), e.d, "signup_select", []string{fakeHome})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fs := e.openSignupSummary(t, id); fs == nil || len(fs) != 0 {
+		t.Fatalf("summary %#v, want an empty list (not null: the browser requires an array)", fs)
+	}
+	if _, err := RequestImport(context.Background(), e.d, "signup_select", nil); err != nil {
+		t.Fatalf("no project folder: %v", err)
+	}
+	if _, err := RequestImport(context.Background(), e.d, "import", []string{fakeHome}); !errors.Is(err, ErrBadFolder) {
+		t.Fatalf("AI-asked import of home: %v", err)
+	}
+}
+
+func TestSignupListAtMostFive(t *testing.T) {
+	e := newEnv(t)
+	var fs []string
+	for i := 0; i < 6; i++ {
+		d := filepath.Join(filepath.Dir(e.folder), "idea"+string(rune('a'+i)))
+		_ = os.MkdirAll(d, 0o700)
+		fs = append(fs, d)
+	}
+	if _, err := RequestImport(context.Background(), e.d, "signup_select", fs); !errors.Is(err, ErrBadFolder) {
+		t.Fatalf("six folders: %v", err)
+	}
+	if _, err := RequestImport(context.Background(), e.d, "signup_select", fs[:MaxFolders]); err != nil {
+		t.Fatalf("five folders: %v", err)
+	}
+}
