@@ -26,7 +26,7 @@ export const appCors: MiddlewareHandler<AppEnv> = (c, next) =>
   cors({
     origin: (origin) => (origin === c.env.APP_ORIGIN ? origin : null),
     credentials: true,
-    allowHeaders: ["content-type"],
+    allowHeaders: ["content-type", "x-it-join-secret"],
     allowMethods: ["GET", "POST", "PUT", "DELETE"],
     maxAge: 600,
   })(c, next);
