@@ -125,3 +125,15 @@ describe("Cron: resilience (M2b review)", () => {
     expect(await one("SELECT status FROM anchors WHERE record_id = ?", rec.record_id)).toEqual({ status: "pending" });
   });
 });
+
+describe("Cron: options the Workers runtime accepts", () => {
+  it("never asks fetch to follow redirects, and uses an option Workers supports", async () => {
+    const { rec } = await dueRecord();
+    await env.DB.prepare("UPDATE anchors SET next_check_at = '2000-01-01T00:00:00Z' WHERE record_id = ?").bind(rec.record_id).run();
+    const seen: (string | undefined)[] = [];
+    await runCron(env, async (_url, init) => { seen.push(init.redirect); return new Response(null, { status: 302, headers: { location: "https://evil.example" } }); });
+    expect(seen.length).toBeGreaterThan(0);
+    expect(new Set(seen)).toEqual(new Set(["manual"])); // "error" throws TypeError in Workers (found on staging)
+    expect(await one("SELECT status FROM anchors WHERE record_id = ?", rec.record_id)).toEqual({ status: "pending" });
+  });
+});

@@ -21,7 +21,7 @@ export async function revokeGithubToken(env: Bindings, token: string, fetcher: F
         "x-github-api-version": "2022-11-28",
       },
       body: JSON.stringify({ access_token: token }),
-      redirect: "error",
+      redirect: "manual", // Workers rejects "error"; manual = never follow
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     return res.status === 204 || res.status === 404; // 404: already gone

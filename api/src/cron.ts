@@ -33,7 +33,7 @@ async function fetchCapped(fetcher: Fetcher, url: string, tally?: Tally): Promis
   try {
     res = await fetcher(url, {
       method: "GET",
-      redirect: "error",
+      redirect: "manual", // Workers rejects "error"; manual = never follow, a 3xx is just "not 200"
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers: { accept: "application/vnd.opentimestamps.v1", "user-agent": "ideatrail-api (+https://github.com/hnufovea97)" },
     });
