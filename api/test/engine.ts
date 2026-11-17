@@ -4,6 +4,7 @@ import { newId } from "@ideatrail/crypto/ids";
 import { sign, messageFor } from "@ideatrail/crypto/sign";
 import { inSeconds, nowIso } from "../src/db/values";
 import { seedUser } from "./helpers";
+import { createApp } from "../src/index";
 
 export interface TestEngine { engineId: string; seed: Uint8Array; signPub: Uint8Array; kemPub: Uint8Array }
 export interface SeededEngine extends TestEngine { userId: string }
@@ -46,5 +47,21 @@ export function signedInit(e: TestEngine, method: string, path: string, body: st
       "x-it-ts": unixTs.toString(),
       "x-it-sig": sign(e.seed, msg),
     },
+  };
+}
+
+/** A signed-request client for one engine; keeps its own req_seq. */
+export function engineClient(e: TestEngine, start = 1n) {
+  let seq = start;
+  const app = createApp({ limiter: () => ({ allow: async () => true }) });
+  const send = async (method: string, path: string, body?: unknown) => {
+    const text = body === undefined ? "" : JSON.stringify(body);
+    return app.request(`https://api.test${path}`, signedInit(e, method, path, text, seq++), env);
+  };
+  return {
+    post: (path: string, body: unknown) => send("POST", path, body),
+    put: (path: string, body: unknown) => send("PUT", path, body),
+    get: (path: string) => send("GET", path),
+    del: (path: string) => send("DELETE", path),
   };
 }

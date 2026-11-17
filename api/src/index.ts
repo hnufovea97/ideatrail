@@ -8,6 +8,7 @@ import { webauthnRoutes } from "./routes/webauthn";
 import { pairingRoutes } from "./routes/pairing";
 import { deviceAddRoutes } from "./routes/device-add";
 import { envelopeRoutes, recoveryRoutes } from "./routes/recovery";
+import { recordRoutes } from "./routes/records";
 import { accountRoutes, logoutHandlers } from "./routes/account";
 import { requireStepup } from "./auth/stepup";
 
@@ -31,6 +32,7 @@ export function createApp(deps: AppDeps = {}) {
   app.route("/v1/device-add", deviceAddRoutes(limiter));
   app.route("/v1/envelopes", envelopeRoutes());
   app.route("/v1/recovery", recoveryRoutes(limiter));
+  app.route("/v1/records", recordRoutes());
   app.post("/v1/logout", ...logoutHandlers);
 
   if (deps.testRoutes) testRoutes(app);

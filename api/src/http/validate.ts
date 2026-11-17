@@ -40,3 +40,19 @@ export const zSealed = (kindByte: number) =>
 
 /** Lowercase hex of an exact byte length. */
 export const zHex = (bytes: number) => z.string().regex(new RegExp(`^[0-9a-f]{${bytes * 2}}$`)).transform((s) => fromHex(s));
+
+/** zSealed with a byte ceiling (per-field caps — M2b review). */
+export const zSealedMax = (kindByte: number, maxBytes: number) => zSealed(kindByte).refine((b) => b.length <= maxBytes, "sealed blob too large");
+
+/** base64url bytes with a ceiling. */
+export const zB64uMax = (maxBytes: number) => zB64u().refine((b) => b.length <= maxBytes, "too large");
+
+/** Lowercase hex kept as text (e.g. commitments stored as TEXT). */
+export const zHexText = (bytes: number) => z.string().regex(new RegExp(`^[0-9a-f]{${bytes * 2}}$`));
+
+/** RFC 3339 UTC seconds with Z (spec §2). */
+export const zTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+
+const MAX_SEQ = 2n ** 63n - 1n;
+/** A sequence number as a decimal string, 1..2^63-1 (spec §2, server cap). */
+export const zSeq = z.string().regex(/^[1-9][0-9]{0,18}$/).refine((s) => BigInt(s) <= MAX_SEQ, "sequence too large");
