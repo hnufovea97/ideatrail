@@ -1,0 +1,33 @@
+{
+  "alphabet": "0123456789abcdefghjkmnpqrstvwxyz",
+  "vectors": [
+    {
+      "hex": "00",
+      "base32": "00"
+    },
+    {
+      "hex": "01",
+      "base32": "04"
+    },
+    {
+      "hex": "80",
+      "base32": "g0"
+    },
+    {
+      "hex": "9d78ad9b6be3e8687b2e090316afa7c1",
+      "base32": "knwav6vbwfm6gyse141hdbx7r4"
+    },
+    {
+      "hex": "7820a4ef4f09469c00be7537071791e2",
+      "base32": "f0ga9vtf1539r05yemvge5whw8"
+    },
+    {
+      "hex": "e4b53ade334f1ddd07f3caf32c0ad2b75a0fb9a6eedd8017849c82430a4f39fa",
+      "base32": "wjtknqhk9wext1zksbsjr2pjpxd0zed6xver05w4kj1462jf77x0"
+    },
+    {
+      "hex": "c2aacc2f7f",
+      "base32": "rancrbvz"
+    }
+  ]
+}
