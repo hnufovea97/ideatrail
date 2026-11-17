@@ -226,6 +226,7 @@ func Record(ctx context.Context, d Deps, in Input) (*Result, error) {
 			s.Roots = map[string]state.Root{}
 		}
 		root.LastRecordID = recordID
+		root.LastRecordAt = recordedAt
 		if in.Milestone != "" && in.Milestone != "none" {
 			root.Stage = in.Milestone
 		}

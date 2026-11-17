@@ -61,6 +61,7 @@ type Root struct {
 	Stage        string   `json:"stage,omitempty"`
 	EmptySlots   []string `json:"empty_slots,omitempty"`
 	LastRecordID string   `json:"last_record_id,omitempty"`
+	LastRecordAt string   `json:"last_record_at,omitempty"`
 }
 
 // Approval is a request this engine made; inbox answers must match one of these (M3b review).
