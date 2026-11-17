@@ -1,4 +1,5 @@
 ---
 import Base from "../layouts/Base.astro";
+import ConnectApp from "../components/connect/ConnectApp";
 ---
-<Base title="이 기기에서도 열기"><main class="screen"><h1>이 기기에서도 열기</h1></main></Base>
+<Base title="이 기기에서도 열기"><ConnectApp client:only="preact" /></Base>
