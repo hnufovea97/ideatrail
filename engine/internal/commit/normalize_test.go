@@ -7,9 +7,9 @@ import (
 
 func TestNormalizePath(t *testing.T) {
 	ok := map[string]string{
-		"src\\a.go":                   "src/a.go",
-		"메모.md": "메모.md", // NFD 메모.md → NFC
-		"Read.MD":                     "Read.MD",        // 대소문자 그대로
+		"src\\a.go": "src/a.go",
+		"메모.md":   "메모.md",   // NFD 메모.md → NFC
+		"Read.MD":   "Read.MD", // 대소문자 그대로
 	}
 	for in, want := range ok {
 		got, err := NormalizePath(in)

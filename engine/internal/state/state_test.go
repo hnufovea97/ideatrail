@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestWithConcurrentGoroutines(t *testing.T) {
@@ -134,5 +135,21 @@ func TestRememberMsgID(t *testing.T) {
 	}
 	if len(s.SeenMsgIDs) != MaxSeenMsgIDs {
 		t.Fatalf("len %d", len(s.SeenMsgIDs))
+	}
+}
+
+func TestLockTimeout(t *testing.T) {
+	dir := t.TempDir()
+	old := LockTimeout
+	LockTimeout = 50 * time.Millisecond
+	defer func() { LockTimeout = old }()
+	held := make(chan struct{})
+	release := make(chan struct{})
+	go func() { _ = With(dir, func(*State) error { close(held); <-release; return nil }) }()
+	<-held
+	err := With(dir, func(*State) error { return nil })
+	close(release)
+	if !errors.Is(err, ErrLockTimeout) {
+		t.Fatalf("got %v", err)
 	}
 }

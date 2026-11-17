@@ -3,11 +3,22 @@
 package state
 
 import (
+	"errors"
 	"os"
 	"time"
 
 	"golang.org/x/sys/windows"
 )
+
+const noFollow = 0
+
+// LockTimeout bounds how long a caller waits for another engine process.
+var LockTimeout = 30 * time.Second
+
+var ErrLockTimeout = errors.New("state is locked by another engine process")
+
+// syncDir: MOVEFILE_WRITE_THROUGH already flushed the rename.
+func syncDir(string) error { return nil }
 
 func lock(path string) (func(), error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
@@ -16,9 +27,20 @@ func lock(path string) (func(), error) {
 	}
 	h := windows.Handle(f.Fd())
 	ol := new(windows.Overlapped)
-	if err := windows.LockFileEx(h, windows.LOCKFILE_EXCLUSIVE_LOCK, 0, 1, 0, ol); err != nil {
-		f.Close()
-		return nil, err
+	deadline := time.Now().Add(LockTimeout)
+	for {
+		err := windows.LockFileEx(h, windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, ol)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, windows.ERROR_LOCK_VIOLATION) || time.Now().After(deadline) {
+			f.Close()
+			if errors.Is(err, windows.ERROR_LOCK_VIOLATION) {
+				return nil, ErrLockTimeout
+			}
+			return nil, err
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 	return func() {
 		_ = windows.UnlockFileEx(h, 0, 1, 0, ol)

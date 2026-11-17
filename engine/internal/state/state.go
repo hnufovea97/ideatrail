@@ -67,10 +67,10 @@ type State struct {
 	AccountPub     string            `json:"account_pubkey,omitempty"` // b64u, pinned at pairing
 	RepoFullName   string            `json:"repo_full_name,omitempty"`
 	Roots          map[string]Root   `json:"roots,omitempty"`
-	Folders        map[string]string `json:"folders,omitempty"` // normalized absolute folder → root_id
+	Folders        map[string]string `json:"folders,omitempty"` // resolved absolute folder → root_id (registered only via approved inbox)
 	PendingUploads []string          `json:"pending_uploads,omitempty"`
+	Blocked        string            `json:"blocked,omitempty"` // fixed code while the server keeps refusing an upload
 	AnchorsCursor  Seq               `json:"anchors_cursor"`
-	APIBase        string            `json:"api_base,omitempty"`
 }
 
 // RememberMsgID records a processed inbox msg_id, keeping the newest MaxSeenMsgIDs.
@@ -143,7 +143,7 @@ func write(dir string, s *State) error {
 		return err
 	}
 	tmp := filepath.Join(dir, fileName+".tmp")
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|noFollow, 0o600)
 	if err != nil {
 		return fmt.Errorf("state write: %w", err)
 	}
@@ -158,5 +158,8 @@ func write(dir string, s *State) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
-	return replace(tmp, filepath.Join(dir, fileName))
+	if err := replace(tmp, filepath.Join(dir, fileName)); err != nil {
+		return err
+	}
+	return syncDir(dir)
 }
