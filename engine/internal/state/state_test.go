@@ -145,10 +145,15 @@ func TestLockTimeout(t *testing.T) {
 	defer func() { LockTimeout = old }()
 	held := make(chan struct{})
 	release := make(chan struct{})
-	go func() { _ = With(dir, func(*State) error { close(held); <-release; return nil }) }()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = With(dir, func(*State) error { close(held); <-release; return nil })
+	}()
 	<-held
 	err := With(dir, func(*State) error { return nil })
 	close(release)
+	<-done // let the holder finish writing before TempDir cleanup
 	if !errors.Is(err, ErrLockTimeout) {
 		t.Fatalf("got %v", err)
 	}
