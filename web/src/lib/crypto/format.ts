@@ -13,6 +13,22 @@ export function joinFields(sep: string, fields: string[]): string {
 
 export const orDash = (s?: string): string => (s ? s : "-");
 
+const ID_RE = /^[0-9a-hjkmnp-tv-z]{26}$/;
+
+/** "" or "-" → "-"; otherwise must be a 26-char Crockford id (spec §2). */
+export function idField(s?: string): string {
+  if (!s || s === "-") return "-";
+  if (!ID_RE.test(s)) throw new Error("bad_field");
+  return s;
+}
+
+/** "" or "-" → "-"; otherwise decimal digits only. */
+export function numField(s?: string): string {
+  if (!s || s === "-") return "-";
+  if (!/^[0-9]+$/.test(s)) throw new Error("bad_field");
+  return s;
+}
+
 export interface AAD {
   userId?: string;
   rootId?: string;
@@ -22,6 +38,6 @@ export interface AAD {
 
 /** AAD = join(0x1F, ["IT1", name, user_id, root_id, record_id, version, "1"]) — spec §4. */
 export const buildAAD = (name: string, a: AAD): Uint8Array =>
-  utf8(joinFields(SEP_AAD, ["IT1", name, orDash(a.userId), orDash(a.rootId), orDash(a.recordId), orDash(a.version), CRYPTO_VERSION]));
+  utf8(joinFields(SEP_AAD, ["IT1", name, idField(a.userId), idField(a.rootId), idField(a.recordId), numField(a.version), CRYPTO_VERSION]));
 
 export const hasMagic = (b: Uint8Array): boolean => b.length >= 3 && b[0] === MAGIC[0] && b[1] === MAGIC[1] && b[2] === MAGIC[2];
