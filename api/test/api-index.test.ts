@@ -35,11 +35,9 @@ describe("api-index ↔ routes (QA S4)", () => {
     expect(missing).toEqual([]);
   });
 
-  it("lists documented routes not built yet (M2b)", () => {
+  it("every documented route is built (M2b complete)", () => {
     const built = appRoutes();
-    const pending = [...indexRoutes(indexMd)].filter((r) => !built.has(r)).sort();
-    console.info(`api-index: ${built.size} built, ${pending.length} pending:\n  ${pending.join("\n  ")}`);
-    expect(pending.length).toBeGreaterThanOrEqual(0);
+    expect([...indexRoutes(indexMd)].filter((r) => !built.has(r)).sort()).toEqual([]);
   });
 });
 
