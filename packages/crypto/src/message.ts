@@ -60,3 +60,6 @@ function fields(s: Signable): string[] {
 
 /** Bytes to sign: join(0x0A, fields), empty fields as "-". */
 export const messageFor = (s: Signable): Uint8Array => utf8(joinFields(SEP_SIGN, fields(s).map((f) => orDash(f))));
+
+/** Bytes the recovery verify key signs to prove possession of the recovery key (M2a, spec §11). */
+export const recoveryProofMessage = (challenge: string): Uint8Array => utf8("ideatrail/v1/recovery-proof\n" + challenge);

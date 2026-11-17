@@ -325,6 +325,9 @@ func envelopeVectors() (any, error) {
 		return nil, err
 	}
 	lookupID := hx(hkdf32(rk, []byte("ideatrail/v1/recovery-lookup"), ""))[:32]
+	verifyKey := ed25519.NewKeyFromSeed(hkdf32(rk, []byte("ideatrail/v1/recovery-verify"), ""))
+	const proofChallenge = "dGVzdC1jaGFsbGVuZ2U"
+	proofSig := ed25519.Sign(verifyKey, []byte("ideatrail/v1/recovery-proof\n"+proofChallenge))
 	lh := sha256.Sum256([]byte(lookupID))
 	disp := EncodeBase32(rk)
 	groups := make([]string, 0, 13)
@@ -338,6 +341,7 @@ func envelopeVectors() (any, error) {
 		"recovery": map[string]string{
 			"rk_hex": hx(rk), "rk_display": strings.Join(groups, "-"), "wrap_hex": hx(rwrap), "nonce_hex": hx(rnonce),
 			"envelope_hex": hx(renv), "lookup_id": lookupID, "lookup_hash": hx(lh[:]),
+			"verify_pub_hex": hx(verifyKey.Public().(ed25519.PublicKey)), "proof_challenge": proofChallenge, "proof_sig_hex": hx(proofSig),
 		},
 	}, nil
 }

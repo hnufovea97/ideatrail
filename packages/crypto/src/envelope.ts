@@ -1,7 +1,9 @@
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { hkdf } from "@noble/hashes/hkdf.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { freshNonce, lockRaw, unlockRaw } from "./aead-internal";
-import { toHex, utf8 } from "./bytes";
+import { toB64u, toHex, utf8 } from "./bytes";
+import { recoveryProofMessage } from "./message";
 import { CRYPTO_VERSION, idField, joinFields, SEP_AAD } from "./format";
 import { KEY_LEN } from "./subkey";
 
@@ -43,3 +45,15 @@ export const recoveryLookupId = (rk: Uint8Array): string =>
 
 /** The only value the server stores: hex(SHA-256(lookup_id)). */
 export const lookupHash = (lookupId: string): string => toHex(sha256(utf8(lookupId)));
+
+/**
+ * Ed25519 key derived from RK. Its public half is stored with the recovery envelope; signing the
+ * server's challenge proves the caller holds RK, not just lookup_id (M2a security review).
+ */
+export function recoveryVerifyKey(rk: Uint8Array): { seed: Uint8Array; publicKey: Uint8Array } {
+  const seed = hkdf(sha256, need32(rk), utf8("ideatrail/v1/recovery-verify"), new Uint8Array(0), KEY_LEN);
+  return { seed, publicKey: ed25519.getPublicKey(seed) };
+}
+
+export const recoveryProof = (rk: Uint8Array, challenge: string): string =>
+  toB64u(ed25519.sign(recoveryProofMessage(challenge), recoveryVerifyKey(rk).seed));

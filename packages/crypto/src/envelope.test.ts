@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import e from "../../../spec/vectors/envelope.json";
-import { PRF_SALT, prfWrapKey, recoveryWrapKey, wrapMasterKey, unwrapMasterKey, recoveryLookupId, lookupHash } from "./envelope";
+import { PRF_SALT, prfWrapKey, recoveryWrapKey, wrapMasterKey, unwrapMasterKey, recoveryLookupId, lookupHash, recoveryVerifyKey, recoveryProof } from "./envelope";
+import { fromB64u } from "./bytes";
 import { wrapMasterKeyWithNonce } from "./testing";
 import { formatRecoveryKey, parseRecoveryKey } from "./recovery";
 import { fromHex, toHex } from "./bytes";
@@ -48,6 +49,11 @@ describe("recovery key §11", () => {
     expect(toHex(unwrapMasterKey(recoveryWrapKey(rk, e.user_id), e.user_id, e.envelope_id, fromHex(r.envelope_hex)))).toBe(e.mk_hex);
     expect(recoveryLookupId(rk)).toBe(r.lookup_id);
     expect(lookupHash(r.lookup_id)).toBe(r.lookup_hash);
+  });
+  it("recovery verify key and proof match Go", () => {
+    const rk = fromHex(r.rk_hex);
+    expect(toHex(recoveryVerifyKey(rk).publicKey)).toBe(r.verify_pub_hex);
+    expect(toHex(fromB64u(recoveryProof(rk, r.proof_challenge)))).toBe(r.proof_sig_hex);
   });
   it("one wrong character cannot unwrap", () => {
     const first = r.rk_display[0] === "a" ? "b" : "a";

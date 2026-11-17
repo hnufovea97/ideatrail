@@ -12,8 +12,11 @@
     "lookup_hash": "74a03daf1d6817608b3f6e89d83e635eb69a45eebc13663b1c4c1f3944b23bf6",
     "lookup_id": "dd71772f28fc0a662210189e4582dc79",
     "nonce_hex": "4dc6aef26eaf1f6dd83230f81293b0705bbf1090ae5b4102",
+    "proof_challenge": "dGVzdC1jaGFsbGVuZ2U",
+    "proof_sig_hex": "295ca35bd1fbde3379d3604b454fdba45cb0bfa2f37c672b7b3ca29f61f458cb1e2c64c36c9bd48e7b4a656d6ffdba9bc94e05c632671f0085adb79cf05aa90b",
     "rk_display": "gbb6-pfqr-ca2k-26js-vex8-f74d-f031-hf0x-ab6t-6yv8-r96f-h7a8-p8d0",
     "rk_hex": "82d66b3ef86285311a59dbba879c8d780618bc1d52cda37b68c24cf89d48b21a",
+    "verify_pub_hex": "6356f7685617fef0cd8e3236c2a4b78fe40a234ad54d7394af10327ec2bc251a",
     "wrap_hex": "3b9e35092ff6f94ef55c1f506d19f71c6ed38d495d94c49bb83bf2b68f83a830"
   },
   "user_id": "01jcm3v8q7s2kx4f9d6b5n0tqw",
