@@ -1,0 +1,31 @@
+package mcpserver
+
+// Tool descriptions and schemas are the plugin draft §4 text (token budget: ≤1,500 with the skill).
+const (
+	recordDescription = "Record a meaningful change to an idea (plan decided, feature done, feedback applied). Not for typo fixes. The engine fingerprints, seals and anchors the files; you only describe."
+	statusDescription = "Show this project's idea: stage, empty routine slots, last record. Call before recording if unsure whether it is a new idea."
+	importDescription = "Ask to import existing notes from folders. Only shows a list; the user approves on the dashboard."
+)
+
+var recordSchema = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"paths":             map[string]any{"type": "array", "items": map[string]any{"type": "string", "maxLength": 1024}, "minItems": 1, "maxItems": 50, "description": "Files inside a registered project folder"},
+		"note":              map[string]any{"type": "string", "maxLength": 400, "description": "2-3 sentences: what changed and why"},
+		"milestone":         map[string]any{"type": "string", "enum": []string{"none", "idea", "plan_decided", "mvp_done", "feature_done", "paused"}, "default": "none"},
+		"milestone_certain": map[string]any{"type": "boolean", "default": false, "description": "true only if the user said it or a checklist/tag shows it"},
+		"routine": map[string]any{"type": "array", "maxItems": 7, "items": map[string]any{"type": "object", "additionalProperties": false,
+			"properties": map[string]any{"slot": map[string]any{"type": "string", "enum": []string{"problem", "audience", "not_doing", "decision_reason", "first_run", "feedback", "changed_by_feedback"}}, "estimated": map[string]any{"type": "boolean"}},
+			"required":   []string{"slot"}}, "description": "Only slots newly evidenced by these files"},
+		"tags": map[string]any{"type": "array", "items": map[string]any{"type": "string", "maxLength": 20}, "maxItems": 5, "description": "Only on the first record of a new idea"},
+	},
+	"required":             []string{"paths", "note"},
+	"additionalProperties": false,
+}
+
+var importSchema = map[string]any{
+	"type":                 "object",
+	"properties":           map[string]any{"folders": map[string]any{"type": "array", "items": map[string]any{"type": "string", "maxLength": 1024}, "minItems": 1, "maxItems": 5}},
+	"required":             []string{"folders"},
+	"additionalProperties": false,
+}
