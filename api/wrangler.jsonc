@@ -1,4 +1,5 @@
-// 로컬·시험용. 배포 값(도메인·D1 id·Cron)은 M2b에서 설정 초안 §1대로 채운다
+// 최상위 = 로컬·시험(vitest)용. "staging" = workers.dev 시험 배포(가입 받지 않음, CPU·Cron 측정용).
+// 정식 배포 값(도메인·RP_ID)은 도메인 구입(F-5) 뒤 설정 초안 §1대로 "production" 환경을 추가한다.
 {
   "name": "ideatrail-api",
   "main": "src/index.ts",
@@ -9,5 +10,19 @@
     { "name": "IP_LIMITER", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } },
     { "name": "WRITE_LIMITER", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } }
   ],
-  "vars": { "RP_ID": "localhost", "RP_NAME": "Ideatrail", "APP_ORIGIN": "http://localhost:4321" }
+  "vars": { "RP_ID": "localhost", "RP_NAME": "Ideatrail", "APP_ORIGIN": "http://localhost:4321" },
+  "env": {
+    "staging": {
+      "workers_dev": true,
+      "observability": { "enabled": true, "head_sampling_rate": 1 },
+      "triggers": { "crons": ["*/15 * * * *"] },
+      "d1_databases": [{ "binding": "DB", "database_name": "ideatrail-staging", "database_id": "e976c22f-b946-43db-99d3-10b57ba61433", "migrations_dir": "migrations" }],
+      "ratelimits": [
+        { "name": "IP_LIMITER", "namespace_id": "2001", "simple": { "limit": 10, "period": 60 } },
+        { "name": "WRITE_LIMITER", "namespace_id": "2002", "simple": { "limit": 60, "period": 60 } }
+      ],
+      // 시험 배포는 가입을 받지 않도록 존재하지 않는 출처로 둔다
+      "vars": { "RP_ID": "staging.invalid", "RP_NAME": "Ideatrail (staging)", "APP_ORIGIN": "https://staging.invalid" }
+    }
+  }
 }
