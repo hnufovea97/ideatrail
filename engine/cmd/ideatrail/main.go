@@ -78,11 +78,19 @@ func verifySelf(stderr io.Writer) (int, bool) {
 		return 0, true
 	}
 	exe, err := os.Executable()
-	if err != nil || selfcheck.Verify(config.ReleasePub, exe, runtime.GOOS, runtime.GOARCH, config.Version) != nil {
+	if err != nil || selfcheck.Verify(config.ReleasePub, exe, runtime.GOOS, releaseArch(), config.Version) != nil {
 		fmt.Fprintln(stderr, msgTampered)
 		return 1, false
 	}
 	return 0, true
+}
+
+// releaseArch names the signed artifact: the Mac file is one universal binary for both chips.
+func releaseArch() string {
+	if runtime.GOOS == "darwin" {
+		return "universal"
+	}
+	return runtime.GOARCH
 }
 
 // runHook never touches the network and never fails the user's tool call except guard's exit 2.

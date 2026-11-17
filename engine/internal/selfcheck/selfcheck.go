@@ -21,7 +21,7 @@ var ErrBadSignature = errors.New("engine file does not match its release signatu
 
 // Message is what the release key signs: label, target, version and the file hash — so a valid
 // signature for one platform or version cannot be moved to another artifact. Sign the bytes
-// AFTER lipo and codesign.
+// AFTER lipo and codesign. The Mac universal binary is signed as darwin/universal.
 func Message(goos, goarch, version string, fileSHA256 [32]byte) []byte {
 	return []byte("ideatrail-release-v1\n" + goos + "/" + goarch + "\n" + version + "\n" + string(fileSHA256[:]))
 }

@@ -8,3 +8,5 @@ dist/
 .env*
 *.local
 bin/
+!plugin/bin/
+plugin/engine/

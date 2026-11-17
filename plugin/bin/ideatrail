@@ -1,0 +1,11 @@
+#!/bin/sh
+# ideatrail plugin launcher: runs the bundled engine for this computer. No network, no downloads.
+set -eu
+dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+case "$(uname -s)" in
+Darwin) exec "$dir/engine/darwin/ideatrail" "$@" ;;
+*)
+	echo "ideatrail: 이 운영체제는 아직 지원하지 않아요." >&2
+	exit 1
+	;;
+esac
