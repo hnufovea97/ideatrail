@@ -47,6 +47,6 @@ export async function saveRecoveryKey(page: Page): Promise<string> {
   const saved = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().endsWith("/v1/envelopes"));
   await page.getByRole("button", { name: "확인하고 저장" }).click();
   expect((await saved).status()).toBe(200);
-  await expect(page.getByRole("heading", { name: /복구 키/ })).toHaveCount(0); // step 5 screen: Task 13
+  await expect(page.getByRole("heading", { name: "기록할 것 고르기" })).toBeVisible();
   return display;
 }

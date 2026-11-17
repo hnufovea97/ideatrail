@@ -1,12 +1,11 @@
 import { fromB64u } from "@ideatrail/crypto/bytes";
 import { bytesEqual } from "@ideatrail/crypto/mac";
 import type { PairingInfo } from "./api";
+import { cleanLabel } from "./text";
 
 const ID = /^[0-9a-hjkmnp-tv-z]{26}$/;
 const KEY_LEN = 32;
 const MAX_NAME = 64;
-// C0/C1 controls, zero-width and bidi override characters: the name must not disguise itself.
-const UNSAFE = /[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩﻿]/g;
 
 export interface PairingLink { sessionId: string; signFp: Uint8Array; kemFp: Uint8Array; psk: Uint8Array; computerName: string }
 
@@ -28,7 +27,7 @@ export function parseStartLink(search: string, hash: string): PairingLink | null
   if (!signFp || !kemFp || !psk || !rawName) return null;
   let name: string;
   try {
-    name = new TextDecoder("utf-8", { fatal: true }).decode(rawName).replace(UNSAFE, "").trim().slice(0, MAX_NAME);
+    name = cleanLabel(new TextDecoder("utf-8", { fatal: true }).decode(rawName), MAX_NAME);
   } catch {
     return null;
   }
