@@ -1,4 +1,5 @@
 ---
 import Base from "../layouts/Base.astro";
+import StartApp from "../components/start/StartApp";
 ---
-<Base title="시작하기"><main class="screen"><h1>시작하기</h1></main></Base>
+<Base title="시작하기"><StartApp client:only="preact" /></Base>
