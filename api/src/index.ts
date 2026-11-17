@@ -5,7 +5,9 @@ import { appCors, limitBody, safeLogger, securityHeaders } from "./http/middlewa
 import { bindingLimiter, type Limiter } from "./http/rate-limit";
 import { requireConfirmed } from "./auth/session";
 import { webauthnRoutes } from "./routes/webauthn";
-import { accountRoutes } from "./routes/account";
+import { accountRoutes, logoutHandlers } from "./routes/account";
+import { requireStepup } from "./auth/stepup";
+import { requireSession } from "./auth/session";
 
 export interface AppDeps {
   /** Rate limiter factory; tests inject a fake. */
@@ -21,6 +23,7 @@ export function createApp(deps: AppDeps = {}) {
 
   app.route("/v1/webauthn", webauthnRoutes(limiter));
   app.route("/v1/account", accountRoutes());
+  app.post("/v1/logout", ...logoutHandlers);
 
   testRoutes(app);
   return app;
@@ -36,6 +39,7 @@ function testRoutes(app: Hono<AppEnv>) {
     if (c.env.TEST_ROUTES !== "1") return notFound(c);
     return c.json({ size: (await c.req.arrayBuffer()).byteLength });
   });
+  app.post("/v1/__test/stepup", async (c, next) => (c.env.TEST_ROUTES === "1" ? requireSession(c, next) : notFound(c)), requireStepup, (c) => c.json({ ok: true }));
   app.get("/v1/__test/confirmed-only", async (c, next) => (c.env.TEST_ROUTES === "1" ? requireConfirmed(c, next) : notFound(c)), (c) => c.json({ ok: true }));
 }
 

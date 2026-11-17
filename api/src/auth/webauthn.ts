@@ -1,9 +1,13 @@
 import {
+  generateAuthenticationOptions,
   generateRegistrationOptions,
+  verifyAuthenticationResponse,
   verifyRegistrationResponse,
+  type AuthenticationResponseJSON,
   type RegistrationResponseJSON,
   type VerifiedRegistrationResponse,
 } from "@simplewebauthn/server";
+import { toBytes, nowIso } from "../db/values";
 import { decodeAttestationObject, isoBase64URL } from "@simplewebauthn/server/helpers";
 import { ApiError } from "../http/errors";
 import type { Bindings } from "../env";
@@ -55,4 +59,53 @@ export async function verifyRegistration(env: Bindings, response: RegistrationRe
   }
   if (!result.verified || !result.registrationInfo?.userVerified) throw webauthnFailed();
   return result.registrationInfo;
+}
+
+export function authenticationOptions(env: Bindings, allow: { id: string; transports?: string[] }[] = []) {
+  return generateAuthenticationOptions({
+    rpID: env.RP_ID,
+    userVerification: "required",
+    timeout: TIMEOUT_MS,
+    allowCredentials: allow.map((a) => ({ id: a.id, transports: a.transports as AuthenticatorTransportFuture[] | undefined })),
+  });
+}
+
+type AuthenticatorTransportFuture = "ble" | "cable" | "hybrid" | "internal" | "nfc" | "smart-card" | "usb";
+
+interface CredentialRow { credential_id: string; user_id: string; public_key: unknown; sign_count: number; transports: string | null }
+
+/**
+ * Verify a passkey assertion against a stored credential (optionally required to belong to `userId`).
+ * Returns the credential row plus the counter-update statement for the caller's batch. The update is
+ * conditional (`sign_count < new`, unless the authenticator reports 0 as synced passkeys do) so two
+ * racing uses of one response cannot both succeed.
+ */
+export async function verifyAssertion(env: Bindings, response: AuthenticationResponseJSON, challenge: string, userId?: string) {
+  const cred = await env.DB.prepare("SELECT credential_id, user_id, public_key, sign_count, transports FROM passkey_credentials WHERE credential_id = ?")
+    .bind(typeof response?.id === "string" ? response.id : "").first<CredentialRow>();
+  if (!cred || (userId && cred.user_id !== userId)) throw webauthnFailed();
+  let newCounter: number;
+  try {
+    const v = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge: challenge,
+      expectedOrigin: env.APP_ORIGIN,
+      expectedRPID: env.RP_ID,
+      requireUserVerification: true,
+      credential: {
+        id: cred.credential_id,
+        publicKey: Uint8Array.from(toBytes(cred.public_key)),
+        counter: cred.sign_count,
+        transports: cred.transports ? (JSON.parse(cred.transports) as AuthenticatorTransportFuture[]) : undefined,
+      },
+    });
+    if (!v.verified || !v.authenticationInfo.userVerified) throw new Error();
+    newCounter = v.authenticationInfo.newCounter;
+  } catch {
+    throw webauthnFailed();
+  }
+  const touch = env.DB.prepare(
+    "UPDATE passkey_credentials SET sign_count = ?1, last_used_at = ?2 WHERE credential_id = ?3 AND (?1 = 0 OR sign_count < ?1)",
+  ).bind(newCounter, nowIso(), cred.credential_id);
+  return { cred, touch };
 }
