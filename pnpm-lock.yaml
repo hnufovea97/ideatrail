@@ -171,6 +171,9 @@ importers:
       '@ideatrail/crypto':
         specifier: workspace:*
         version: link:../packages/crypto
+      '@noble/hashes':
+        specifier: 2.4.0
+        version: 2.4.0
       '@simplewebauthn/server':
         specifier: 14.0.3
         version: 14.0.3
