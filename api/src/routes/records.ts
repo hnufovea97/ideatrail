@@ -6,8 +6,8 @@ import { ApiError } from "../http/errors";
 import { readJson, zB64u, zB64uMax, zHexText, zId, zSealedMax, zSeq, zTime } from "../http/validate";
 import { requireEngine } from "../auth/engine-sig";
 import { CURSOR_SQL, guard, writeWithCursor } from "../db/change";
-import { checkEngineQuota, countEngineWrite } from "../db/quota";
-import { inSeconds, nowIso } from "../db/values";
+import { checkEngineQuota, countEngineWrite, engineSlowDown } from "../db/quota";
+import { inSeconds, nowIso, toBytes } from "../db/values";
 import { calendarHost, checkPendingReceipt } from "../ots/calendars";
 import { OtsError } from "../ots/tree";
 import { idConflict, isConstraintError, requireEngineAccount } from "./engine-common";
@@ -35,15 +35,18 @@ const zRecord = z.object({
 });
 type RecordBody = z.infer<typeof zRecord>;
 
-interface Existing { user_id: string; engine_id: string; engine_seq: number; commitment: string }
+interface Existing { user_id: string; engine_id: string; engine_seq: string; root_id: string; parent_ids: string; commitment: string; list_meta: unknown; body_hash: string; nonce_hash: string; engine_sig: string }
 
-/** Retried upload of the same record → 200 duplicate; any other clash → the same 409 (no oracle). */
+/** Retried upload of the SAME record (every field equal) → 200 duplicate; any other clash → the same 409 (no oracle). */
 async function duplicateOrConflict(db: D1Database, b: RecordBody, userId: string, engineId: string) {
-  const row = await db.prepare("SELECT user_id, engine_id, CAST(engine_seq AS TEXT) AS engine_seq, commitment FROM records WHERE record_id = ?")
-    .bind(b.record_id).first<Existing>();
-  if (row && row.user_id === userId && row.engine_id === engineId && String(row.engine_seq) === b.log_seq && row.commitment === b.commitment) {
-    return { duplicate: true as const };
-  }
+  const row = await db.prepare(
+    "SELECT user_id, engine_id, CAST(engine_seq AS TEXT) AS engine_seq, root_id, parent_ids, commitment, list_meta, body_hash, nonce_hash, engine_sig FROM records WHERE record_id = ?",
+  ).bind(b.record_id).first<Existing>();
+  const same = row && row.user_id === userId && row.engine_id === engineId && row.engine_seq === b.log_seq && row.root_id === b.root_id
+    && row.parent_ids === (b.parent_ids.length ? b.parent_ids.join(",") : "-") && row.commitment === b.commitment
+    && row.body_hash === b.body_hash && row.nonce_hash === b.nonce_hash && row.engine_sig === toB64u(b.engine_sig)
+    && sameBytes(toBytes(row.list_meta), b.list_meta);
+  if (same) return { duplicate: true as const };
   if (row) throw idConflict();
   return null;
 }
@@ -61,8 +64,10 @@ function checkReceipts(b: RecordBody) {
   }
 }
 
-/** Import allowance: one per record during signup import (separate from the hourly cap). */
-async function importStatements(db: D1Database, userId: string) {
+/** Import allowance: one per record during signup import (separate from the hourly cap; a paused engine still stops). */
+async function importStatements(db: D1Database, userId: string, engineId: string) {
+  const paused = await db.prepare("SELECT paused FROM engines WHERE engine_id = ?").bind(engineId).first<number>("paused");
+  if (paused) throw engineSlowDown();
   const row = await db.prepare("SELECT remaining FROM import_allowances WHERE user_id = ? AND expires_at > ?").bind(userId, nowIso()).first<number>("remaining");
   if (!row) throw new ApiError(429, "import_allowance_used", "Import allowance used up");
   return [
@@ -70,6 +75,8 @@ async function importStatements(db: D1Database, userId: string) {
     guard(db),
   ];
 }
+
+const sameBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((x, i) => x === b[i]);
 
 export function recordRoutes() {
   const r = new Hono<AppEnv>();
@@ -80,16 +87,16 @@ export function recordRoutes() {
     const db = c.env.DB;
     const userId = c.get("userId")!;
     const engineId = c.get("engineId")!;
-    checkReceipts(b);
-
     const dup = await duplicateOrConflict(db, b, userId, engineId);
     if (dup) return c.json({ record_id: b.record_id, ...dup });
+    checkReceipts(b); // CPU work only for new records
     const owner = await db.prepare("SELECT user_id FROM roots WHERE root_id = ?").bind(b.root_id).first<string>("user_id");
     if (owner && owner !== userId) throw idConflict();
-    const pending = await db.prepare("SELECT COUNT(*) AS n FROM anchors WHERE user_id = ? AND status = 'pending'").bind(userId).first<number>("n");
+    // receipts Cron gave up on (next_check_at NULL) don't count, so they can't lock the account
+    const pending = await db.prepare("SELECT COUNT(*) AS n FROM anchors WHERE user_id = ? AND status = 'pending' AND next_check_at IS NOT NULL").bind(userId).first<number>("n");
     if ((pending ?? 0) >= MAX_PENDING_ANCHORS) throw new ApiError(429, "too_many_pending", "Too many receipts still waiting for Bitcoin");
 
-    const quota = b.import ? await importStatements(db, userId) : (await checkEngineQuota(db, engineId, userId), countEngineWrite(db, engineId));
+    const quota = b.import ? await importStatements(db, userId, engineId) : (await checkEngineQuota(db, engineId, userId), countEngineWrite(db, engineId));
     const now = nowIso();
     const calendars = JSON.stringify(b.ots.map((o) => ({ calendar: o.calendar, pending: toB64u(o.pending), attempts: 0 })));
     try {

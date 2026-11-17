@@ -6,7 +6,7 @@ import { ApiError } from "../http/errors";
 import { requireConfirmed } from "../auth/session";
 import { toBytes } from "../db/values";
 
-export const SYNC_LIMIT = 200;
+export const SYNC_LIMIT = 100; // CPU: a full page of 16KB blobs must stay inside the 10ms budget (measure at deploy)
 
 /** Each synced table: response key, table, columns (BLOBs listed separately so they become base64url). */
 const TABLES = [

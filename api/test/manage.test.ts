@@ -28,6 +28,7 @@ async function setup() {
   const c = engineClient(e);
   const rec = recordBody({ log_seq: "1" });
   expect((await c.post("/v1/records", rec)).status).toBe(201);
+  expect((await c.put("/v1/storage-link", { enc_token: sealed(6), engine_sig: toB64u(new Uint8Array(64)), unix_ts: 1763370000 })).status).toBe(200);
   const call = async (method: string, path: string, body?: unknown) => {
     return app.request(`https://api.test${path}`, { method, headers: { origin: "http://localhost:4321", "content-type": "application/json", cookie: s.b.cookie, "cf-connecting-ip": "203.0.113.7" }, body: body === undefined ? undefined : JSON.stringify(body) }, env);
   };
@@ -109,6 +110,16 @@ describe("engine revoke / resume, account delete (2.10, 2.13, S6)", () => {
     expect(await one("SELECT engine_list_version FROM users WHERE user_id = ?", s.userId)).toEqual({ engine_list_version: 2 });
   });
 
+  it("GitHub is not called for an engine that never had a storage link", async () => {
+    const s = await setup();
+    const bare = await seedEngine({ userId: s.userId });
+    githubCalls.length = 0;
+    const path = `/v1/engines/${bare.engineId}/revoke`;
+    const r = await json(await s.call("POST", path, { engine_list: sealed(0x88), engine_list_version: 2, github_token: "any", assertion: await s.stepup("POST", path) }));
+    expect(r.github_revoked).toBeNull();
+    expect(githubCalls).toHaveLength(0);
+  });
+
   it("revoke with a stale engine_list_version → 409, nothing changes", async () => {
     const s = await setup();
     const path = `/v1/engines/${s.e.engineId}/revoke`;
@@ -119,10 +130,12 @@ describe("engine revoke / resume, account delete (2.10, 2.13, S6)", () => {
   it("a revoked engine cannot be resumed (no resurrection); a paused live one can", async () => {
     const s = await setup();
     await env.DB.prepare("UPDATE engines SET paused = 1 WHERE engine_id = ?").bind(s.e.engineId).run();
-    expect((await s.call("POST", `/v1/engines/${s.e.engineId}/resume`, {})).status).toBe(200);
+    expect((await s.call("POST", `/v1/engines/${s.e.engineId}/resume`, {})).status).toBe(401); // step-up required
+    const resume = `/v1/engines/${s.e.engineId}/resume`;
+    expect((await s.call("POST", resume, { assertion: await s.stepup("POST", resume) })).status).toBe(200);
     const path = `/v1/engines/${s.e.engineId}/revoke`;
     await s.call("POST", path, { engine_list: sealed(0x88), engine_list_version: 2, assertion: await s.stepup("POST", path) });
-    expect((await s.call("POST", `/v1/engines/${s.e.engineId}/resume`, {})).status).toBe(404);
+    expect((await s.call("POST", resume, { assertion: await s.stepup("POST", resume) })).status).toBe(404);
   });
 
   it("account delete leaves zero rows for that user in every table", async () => {

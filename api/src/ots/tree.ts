@@ -9,7 +9,8 @@ const MAX_DEPTH = 256; // real calendar+bitcoin paths exceed 64 ops; size cap bo
 const MAX_ARG = 4096;
 const MAX_NODES = 256;
 const MAX_ATTESTATIONS_PER_NODE = 8;
-const MAX_MSG = 4096; // append/prepend growth cap (every hop re-hashes or copies the message)
+const MAX_MSG = 1024; // calendar messages are ~32–100 bytes; caps append/prepend growth
+const MAX_HASHED_BYTES = 32 * 1024; // total sha256 input per parse — bounds CPU (free plan: 10ms)
 const MAX_URI = 1000;
 
 const OP_SHA256 = 0x08;
@@ -34,6 +35,7 @@ const bad = (why: string) => new OtsError(`ots: ${why}`);
 class Reader {
   i = 0;
   nodes = 0;
+  hashed = 0;
   constructor(readonly b: Uint8Array) {}
   byte(): number {
     if (this.i >= this.b.length) throw bad("truncated");
@@ -71,9 +73,23 @@ export function applyOp(op: Op, msg: Uint8Array): Uint8Array {
 function readAttestation(r: Reader): Attestation {
   const tag = r.bytes(8);
   const payload = new Reader(r.varbytes(MAX_URI + 8));
-  if (sameBytes(tag, TAG_PENDING)) return { kind: "pending", uri: new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(payload.varbytes(MAX_URI)) };
-  if (sameBytes(tag, TAG_BITCOIN)) return { kind: "bitcoin", height: payload.varuint() };
-  throw bad("unsupported attestation");
+  let att: Attestation;
+  if (sameBytes(tag, TAG_PENDING)) {
+    const raw = payload.varbytes(MAX_URI);
+    let uri: string;
+    try {
+      uri = new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(raw);
+    } catch {
+      throw bad("bad uri");
+    }
+    att = { kind: "pending", uri };
+  } else if (sameBytes(tag, TAG_BITCOIN)) {
+    att = { kind: "bitcoin", height: payload.varuint() };
+  } else {
+    throw bad("unsupported attestation");
+  }
+  if (payload.i !== payload.b.length) throw bad("trailing attestation bytes");
+  return att;
 }
 
 function readOp(r: Reader, tag: number): Op {
@@ -95,6 +111,7 @@ function readNode(r: Reader, msg: Uint8Array, depth: number): Timestamp {
       return;
     }
     const op = readOp(r, tag);
+    if (op.kind === "sha256" && (r.hashed += msg.length) > MAX_HASHED_BYTES) throw bad("too much hashing");
     const next = applyOp(op, msg);
     node.ops.push({ op, next: readNode(r, next, depth + 1) });
   };
@@ -151,12 +168,17 @@ function writeOp(op: Op): Uint8Array {
 
 /** Serialize in the reference order: attestations first, then ops; all but the last item behind 0xff. */
 export function serializeTimestamp(t: Timestamp): Uint8Array {
-  const items: Uint8Array[] = [
-    ...t.attestations.map(writeAttestation),
-    ...t.ops.map(({ op, next }) => concat(writeOp(op), serializeTimestamp(next))),
-  ];
-  if (items.length === 0) throw bad("empty node");
-  return concat(...items.map((it, i) => (i < items.length - 1 ? concat(Uint8Array.of(BRANCH), it) : it)));
+  const parts: Uint8Array[] = []; // collected once and joined once (no per-level copying)
+  const write = (n: Timestamp) => {
+    const count = n.attestations.length + n.ops.length;
+    if (count === 0) throw bad("empty node");
+    let i = 0;
+    const sep = () => { if (i++ < count - 1) parts.push(Uint8Array.of(BRANCH)); };
+    for (const a of n.attestations) { sep(); parts.push(writeAttestation(a)); }
+    for (const { op, next } of n.ops) { sep(); parts.push(writeOp(op)); write(next); }
+  };
+  write(t);
+  return concat(...parts);
 }
 
 export interface PendingPoint { uri: string; node: Timestamp }
@@ -173,7 +195,6 @@ export function pendingPoints(t: Timestamp): PendingPoint[] {
 }
 
 /** Lowest bitcoin height in the tree — an UNVERIFIED hint; the browser checks it against block headers (spec §8). */
-/** Highest-confidence bitcoin attestation in the tree, if any. */
 export function bitcoinHeight(t: Timestamp): number | null {
   let best: number | null = null;
   const walk = (n: Timestamp) => {

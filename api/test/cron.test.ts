@@ -104,3 +104,24 @@ describe("Cron: cleanup", () => {
     expect(await one("SELECT COUNT(*) AS n FROM sessions WHERE user_id = ?", live)).toEqual({ n: 0 });
   });
 });
+
+describe("Cron: resilience (M2b review)", () => {
+  it("a stream that dies mid-body or a corrupt row never aborts the run", async () => {
+    const a = await dueRecord();
+    const b = await dueRecord();
+    await env.DB.prepare("UPDATE anchors SET calendars = 'not json' WHERE record_id = ?").bind(b.rec.record_id).run();
+    for (const r of [a, b]) await env.DB.prepare("UPDATE anchors SET next_check_at = '2000-01-01T00:00:00Z' WHERE record_id = ?").bind(r.rec.record_id).run(); // first in line
+    const dying = async () => new Response(new ReadableStream({ pull(ctl) { ctl.error(new Error("reset")); } }), { status: 200 });
+    const report = await runCron(env, dying);
+    expect(report.checked).toBeGreaterThanOrEqual(2);
+    const rowA = await one("SELECT next_check_at FROM anchors WHERE record_id = ?", a.rec.record_id) as { next_check_at: string | null };
+    expect(rowA.next_check_at! > new Date().toISOString()).toBe(true); // progressed, will retry later
+    expect(await one("SELECT next_check_at FROM anchors WHERE record_id = ?", b.rec.record_id)).toEqual({ next_check_at: null }); // corrupt: stop checking
+  });
+
+  it("responses over 4KB are ignored", async () => {
+    const { rec } = await dueRecord();
+    await runCron(env, async () => new Response(new Uint8Array(5000), { status: 200 }));
+    expect(await one("SELECT status FROM anchors WHERE record_id = ?", rec.record_id)).toEqual({ status: "pending" });
+  });
+});

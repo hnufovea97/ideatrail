@@ -53,12 +53,14 @@ export function engineRoutes(fetcher?: Fetcher) {
         db.prepare("INSERT INTO audit_log (user_id, actor, action, target_id, at) VALUES (?, 'browser', 'engine.revoke', ?, ?)").bind(userId, engineId, now),
       ], listConflict());
     }
-    const githubRevoked = b.github_token ? await revokeGithubToken(c.env, b.github_token, fetcher) : null;
+    // Only for an engine that actually had a GitHub link (no arbitrary-token revocation oracle).
+    const hadLink = await db.prepare("SELECT 1 FROM storage_links WHERE engine_id = ? AND user_id = ?").bind(engineId, userId).first();
+    const githubRevoked = b.github_token && hadLink ? await revokeGithubToken(c.env, b.github_token, fetcher) : null;
     return c.json({ engine_id: engineId, revoked: true, github_revoked: githubRevoked });
   });
 
   /** Un-pause after the "is this engine yours?" check. Revoked engines stay revoked (no resurrection). */
-  r.post("/:id/resume", browserWrite, requireConfirmed, async (c) => {
+  r.post("/:id/resume", browserWrite, requireConfirmed, requireStepup, async (c) => {
     const userId = c.get("userId")!;
     await writeWithCursor(c.env.DB, userId, [
       c.env.DB.prepare(`UPDATE engines SET paused = 0, pause_reason = NULL, hourly_count = 0, day_count = 0, change_seq = ${CURSOR_SQL}

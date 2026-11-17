@@ -9,6 +9,8 @@ import { requireStepup } from "../auth/stepup";
 import { CURSOR_SQL, guard, writeWithCursor } from "../db/change";
 import { nowIso } from "../db/values";
 import { MAX_OPEN_DELTAS } from "./deltas";
+import { userWriteLimit, type Limiter } from "../http/rate-limit";
+import type { Bindings } from "../env";
 
 const RELOCK = { root_meta: 0x82, prefs: 0x83, recall_notes: 0x84, reminder_state: 0x85 } as const;
 const MAX_META = 16 * 1024;
@@ -22,9 +24,9 @@ const zMeta = z.object({
 });
 
 /** POST /v1/roots/:id/meta — the browser's merged list info replaces the deltas it folded in. */
-export function rootRoutes() {
+export function rootRoutes(getLimiter: (env: Bindings) => Limiter) {
   const r = new Hono<AppEnv>();
-  r.post("/:id/meta", browserWrite, requireConfirmed, async (c) => {
+  r.post("/:id/meta", browserWrite, requireConfirmed, userWriteLimit(getLimiter), async (c) => {
     const b = await readJson(c, zMeta);
     const db = c.env.DB;
     const userId = c.get("userId")!;
@@ -51,9 +53,9 @@ export function rootRoutes() {
 const zVisibility = z.object({ root_id: zId, visibility: z.enum(["private", "public"]), public_label: z.string().max(80).optional() });
 
 /** POST /v1/visibility — public/private switch (step-up). Public pages themselves arrive in M7. */
-export function visibilityRoutes() {
+export function visibilityRoutes(getLimiter: (env: Bindings) => Limiter) {
   const r = new Hono<AppEnv>();
-  r.post("/", browserWrite, requireConfirmed, requireStepup, async (c) => {
+  r.post("/", browserWrite, requireConfirmed, userWriteLimit(getLimiter), requireStepup, async (c) => {
     const b = await readJson(c, zVisibility);
     const userId = c.get("userId")!;
     await writeWithCursor(c.env.DB, userId, [
@@ -73,9 +75,9 @@ const zPrefs = z.object({
 }).refine((v) => v.view_prefs || v.recall_notes || v.reminder_state, "nothing to save");
 
 /** PUT /v1/prefs — relocked view settings, recall notes, reminder state (any subset). */
-export function prefsRoutes() {
+export function prefsRoutes(getLimiter: (env: Bindings) => Limiter) {
   const r = new Hono<AppEnv>();
-  r.put("/", browserWrite, requireConfirmed, async (c) => {
+  r.put("/", browserWrite, requireConfirmed, userWriteLimit(getLimiter), async (c) => {
     const b = await readJson(c, zPrefs);
     await c.env.DB.prepare(
       "UPDATE users SET view_prefs = COALESCE(?, view_prefs), recall_notes = COALESCE(?, recall_notes), reminder_state = COALESCE(?, reminder_state) WHERE user_id = ?",
@@ -88,9 +90,9 @@ export function prefsRoutes() {
 const EVENT_KINDS = ["signup", "connector_linked", "dashboard_opened", "first_confirmed", "bulk_first_done", "device_added"] as const;
 
 /** POST /v1/events — content-free usage events, at most one per kind per account per day. */
-export function eventRoutes() {
+export function eventRoutes(getLimiter: (env: Bindings) => Limiter) {
   const r = new Hono<AppEnv>();
-  r.post("/", browserWrite, requireSession, async (c) => {
+  r.post("/", browserWrite, requireSession, userWriteLimit(getLimiter), async (c) => {
     const { kind } = await readJson(c, z.object({ kind: z.enum(EVENT_KINDS) }));
     const userId = c.get("userId")!;
     const now = nowIso();

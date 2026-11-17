@@ -11,6 +11,8 @@ import { CURSOR_SQL, guard, runBatch, writeWithCursor } from "../db/change";
 import { checkEngineQuota, countEngineWrite } from "../db/quota";
 import { inSeconds, isoAt, nowIso } from "../db/values";
 import { requireEngineAccount } from "./engine-common";
+import { userWriteLimit, type Limiter } from "../http/rate-limit";
+import type { Bindings } from "../env";
 
 const PAGE = 200;
 const KIND_STORAGE_TOKEN = 6;
@@ -20,7 +22,7 @@ export const IMPORT_DAYS = 7;
 
 const zCursor = z.coerce.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
-export function anchorRoutes() {
+export function anchorRoutes(getLimiter: (env: Bindings) => Limiter) {
   const r = new Hono<AppEnv>();
 
   /** Confirmed receipts after `since` (an account change_seq), oldest first. */
@@ -36,7 +38,7 @@ export function anchorRoutes() {
   });
 
   /** Mark a receipt as copied locally (engine only) or into the GitHub repo. */
-  r.post("/:record_id/synced", engineOrSession, async (c) => {
+  r.post("/:record_id/synced", engineOrSession, userWriteLimit(getLimiter), async (c) => {
     const { target } = await readJson(c, z.object({ target: z.enum(["local", "repo"]) }));
     if (target === "local" && !isEngine(c)) throw new ApiError(403, "engine_only", "Only the engine keeps local copies");
     const recordId = zId.safeParse(c.req.param("record_id"));
@@ -91,9 +93,9 @@ const zRepoHead = z.object({
 });
 
 /** POST /v1/repo-heads — last seen commit (engine-signed or browser HMAC); keeps the newest 50 per account. */
-export function repoHeadRoutes() {
+export function repoHeadRoutes(getLimiter: (env: Bindings) => Limiter) {
   const r = new Hono<AppEnv>();
-  r.post("/", engineOrSession, async (c) => {
+  r.post("/", engineOrSession, userWriteLimit(getLimiter), async (c) => {
     const b = await readJson(c, zRepoHead);
     const db = c.env.DB;
     const userId = c.get("userId")!;

@@ -44,17 +44,17 @@ export function createApp(deps: AppDeps = {}) {
   app.route("/v1/recovery", recoveryRoutes(limiter));
   app.route("/v1/records", recordRoutes());
   app.route("/v1/deltas", deltaRoutes());
-  app.route("/v1/anchors", anchorRoutes());
+  app.route("/v1/anchors", anchorRoutes(limiter));
   app.route("/v1/storage-link", storageLinkRoutes());
-  app.route("/v1/repo-heads", repoHeadRoutes());
+  app.route("/v1/repo-heads", repoHeadRoutes(limiter));
   app.route("/v1/import-allowance", importAllowanceRoutes());
-  app.route("/v1/approvals", approvalRoutes());
-  app.route("/v1/inbox", inboxRoutes());
+  app.route("/v1/approvals", approvalRoutes(limiter));
+  app.route("/v1/inbox", inboxRoutes(limiter));
   app.route("/v1/sync", syncRoutes());
-  app.route("/v1/roots", rootRoutes());
-  app.route("/v1/visibility", visibilityRoutes());
-  app.route("/v1/prefs", prefsRoutes());
-  app.route("/v1/events", eventRoutes());
+  app.route("/v1/roots", rootRoutes(limiter));
+  app.route("/v1/visibility", visibilityRoutes(limiter));
+  app.route("/v1/prefs", prefsRoutes(limiter));
+  app.route("/v1/events", eventRoutes(limiter));
   app.route("/v1/engines", engineRoutes(deps.fetcher));
   app.delete("/v1/account", ...deleteAccountHandlers(deps.fetcher));
   app.post("/v1/logout", ...logoutHandlers);
@@ -77,6 +77,10 @@ const app = createApp();
 export default {
   fetch: app.fetch,
   scheduled(_controller, env, ctx) {
-    ctx.waitUntil(runCron(env).then((r) => console.log(JSON.stringify({ cron: r }))));
+    ctx.waitUntil(
+      runCron(env)
+        .then((r) => console.log(JSON.stringify({ cron: r })))
+        .catch((e: unknown) => console.log(JSON.stringify({ level: "error", cron: true, kind: e instanceof Error ? e.name : "unknown" }))),
+    );
   },
 } satisfies ExportedHandler<Bindings>;

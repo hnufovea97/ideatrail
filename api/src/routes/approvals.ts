@@ -12,6 +12,8 @@ import { CURSOR_SQL, guard, runBatch, writeWithCursor } from "../db/change";
 import { checkEngineQuota, countEngineWrite } from "../db/quota";
 import { inSeconds, nowIso, toBytes } from "../db/values";
 import { idConflict, isConstraintError, requireEngineAccount } from "./engine-common";
+import { userWriteLimit, type Limiter } from "../http/rate-limit";
+import type { Bindings } from "../env";
 
 export const APPROVAL_DAYS = 7;
 export const MAX_PENDING_APPROVALS = 20;
@@ -39,7 +41,7 @@ const zInboxPost = z.object({ engine_id: zId, msg_id: zId, sealed: zSealedMax(KI
 
 const notFound = () => new ApiError(404, "not_found", "Not found");
 
-export function approvalRoutes() {
+export function approvalRoutes(getLimiter: (env: Bindings) => Limiter) {
   const r = new Hono<AppEnv>();
 
   /** Engine asks the user to approve something (spec §2 appr_seq, kind 10/11 summary). */
@@ -49,9 +51,12 @@ export function approvalRoutes() {
     const userId = c.get("userId")!;
     const engineId = c.get("engineId")!;
     const same = async () => {
-      const row = await db.prepare("SELECT engine_id, CAST(engine_seq AS TEXT) AS seq FROM pending_approvals WHERE approval_id = ? AND user_id = ?")
-        .bind(b.approval_id, userId).first<{ engine_id: string; seq: string }>();
-      return row?.engine_id === engineId && row.seq === b.appr_seq;
+      const row = await db.prepare("SELECT engine_id, CAST(engine_seq AS TEXT) AS seq, kind, summary, engine_sig FROM pending_approvals WHERE approval_id = ? AND user_id = ?")
+        .bind(b.approval_id, userId).first<{ engine_id: string; seq: string; kind: string; summary: unknown; engine_sig: string }>();
+      if (!row) return false;
+      const stored = toBytes(row.summary);
+      return row.engine_id === engineId && row.seq === b.appr_seq && row.kind === b.kind && row.engine_sig === toB64u(b.engine_sig)
+        && stored.length === b.summary.length && stored.every((x, i) => x === b.summary[i]);
     };
     if (await same()) return c.json({ approval_id: b.approval_id, duplicate: true });
     const open = await db.prepare("SELECT COUNT(*) AS n FROM pending_approvals WHERE engine_id = ? AND status = 'pending' AND expires_at > ?")
@@ -61,10 +66,14 @@ export function approvalRoutes() {
     try {
       await writeWithCursor(db, userId, [
         ...countEngineWrite(db, engineId),
+        // engine liveness and the 20-waiting cap are part of the INSERT itself (no race past the pre-check)
         db.prepare(`INSERT INTO pending_approvals (approval_id, user_id, engine_id, kind, summary, engine_seq, engine_sig, created_at, expires_at, change_seq)
-                    VALUES (?, ?, ?, ?, ?, CAST(? AS INTEGER), ?, ?, ?, ${CURSOR_SQL})`)
-          .bind(b.approval_id, userId, engineId, b.kind, b.summary, b.appr_seq, toB64u(b.engine_sig), nowIso(), inSeconds(APPROVAL_DAYS * 86400), userId),
-      ]);
+                    SELECT ?1, ?2, engine_id, ?3, ?4, CAST(?5 AS INTEGER), ?6, ?7, ?8, ${CURSOR_SQL.replace("?", "?2")}
+                    FROM engines WHERE engine_id = ?9 AND user_id = ?2 AND revoked_at IS NULL
+                      AND (SELECT COUNT(*) FROM pending_approvals WHERE engine_id = ?9 AND status = 'pending' AND expires_at > ?7) < ?10`)
+          .bind(b.approval_id, userId, b.kind, b.summary, b.appr_seq, toB64u(b.engine_sig), nowIso(), inSeconds(APPROVAL_DAYS * 86400), engineId, MAX_PENDING_APPROVALS),
+        guard(db),
+      ], new ApiError(429, "too_many_approvals", "Answer the waiting requests first"));
     } catch (err) {
       if (!isConstraintError(err)) throw err;
       if (await same()) return c.json({ approval_id: b.approval_id, duplicate: true });
@@ -83,7 +92,7 @@ export function approvalRoutes() {
   });
 
   /** Approve or reject (step-up), and hand the engine its sealed answer in the same batch. */
-  r.post("/:id/decide", browserWrite, requireConfirmed, requireStepup, async (c) => {
+  r.post("/:id/decide", browserWrite, requireConfirmed, userWriteLimit(getLimiter), requireStepup, async (c) => {
     const b = await readJson(c, zDecide);
     const db = c.env.DB;
     const userId = c.get("userId")!;
@@ -110,11 +119,11 @@ export function approvalRoutes() {
   return r;
 }
 
-export function inboxRoutes() {
+export function inboxRoutes(getLimiter: (env: Bindings) => Limiter) {
   const r = new Hono<AppEnv>();
 
   /** Browser → engine message (HPKE Auth, kind 7) for one of this account's live engines. */
-  r.post("/", browserWrite, requireConfirmed, async (c) => {
+  r.post("/", browserWrite, requireConfirmed, userWriteLimit(getLimiter), async (c) => {
     const b = await readJson(c, zInboxPost);
     const db = c.env.DB;
     const userId = c.get("userId")!;

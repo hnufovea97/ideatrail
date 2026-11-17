@@ -114,3 +114,42 @@ describe("POST /v1/records (2.8)", () => {
     expect((await engineClient(e).post("/v1/records", recordBody({ log_seq: "1" }))).status).toBe(401);
   });
 });
+
+describe("records: hardening (M2b review)", () => {
+  it("a retry that differs in any field is a 409, not a duplicate", async () => {
+    const e = await seedEngine();
+    const c = engineClient(e);
+    const body = recordBody({ log_seq: "1" });
+    await c.post("/v1/records", body);
+    expect((await c.post("/v1/records", { ...body, body_hash: "0".repeat(64) })).status).toBe(409);
+  });
+
+  it("a pending receipt that already claims a bitcoin block, or has invalid UTF-8, is rejected (400, not 500)", async () => {
+    const { serializeTimestamp } = await import("../src/ots/tree");
+    const { fromHex } = await import("@ideatrail/crypto/bytes");
+    const fx = (await import("../../spec/vectors/ots/receipts.json")).default;
+    const digest = fromHex(fx.digest_hex);
+    const claims = serializeTimestamp({ msg: digest, attestations: [{ kind: "bitcoin", height: 1 }, { kind: "pending", uri: "https://alice.btc.calendar.opentimestamps.org" }], ops: [] });
+    const badUtf8 = Uint8Array.of(0x00, 0x83, 0xdf, 0xe3, 0x0d, 0x2e, 0xf9, 0x0c, 0x8e, 0x02, 0x01, 0xff);
+    const c = engineClient(await seedEngine());
+    for (const [i, pending] of [claims, badUtf8].entries()) {
+      const r = await c.post("/v1/records", recordBody({ log_seq: String(i + 1), ots: [{ calendar: "https://a.pool.opentimestamps.org", pending: toB64u(pending) }] }));
+      expect(r.status).toBe(400);
+    }
+  });
+
+  it("a paused engine cannot keep recording through the import allowance", async () => {
+    const e = await seedEngine();
+    await env.DB.prepare("INSERT INTO import_allowances (user_id, remaining, expires_at) VALUES (?, 5, ?)").bind(e.userId, inSeconds(3600)).run();
+    await env.DB.prepare("UPDATE engines SET paused = 1 WHERE engine_id = ?").bind(e.engineId).run();
+    expect((await engineClient(e).post("/v1/records", recordBody({ log_seq: "1", import: true }))).status).toBe(423);
+  });
+
+  it("receipts Cron gave up on do not count toward the pending cap", async () => {
+    const e = await seedEngine();
+    const c = engineClient(e);
+    await c.post("/v1/records", recordBody({ log_seq: "1" }));
+    await env.DB.prepare("UPDATE anchors SET next_check_at = NULL WHERE user_id = ?").bind(e.userId).run();
+    expect(await one("SELECT COUNT(*) AS n FROM anchors WHERE user_id = ? AND status = 'pending' AND next_check_at IS NOT NULL", e.userId)).toEqual({ n: 0 });
+  });
+});

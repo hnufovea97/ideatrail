@@ -8,6 +8,8 @@ import { bitcoinHeight, MAX_RECEIPT_BYTES, mergeInto, parseTimestamp, pendingPoi
 
 /** Free plan: 50 outbound subrequests per invocation; keep 2 spare. */
 export const FETCH_BUDGET = 48;
+/** Receipts handled per run: parsing is CPU work (free plan 10ms), so stay well below the fetch budget. */
+export const ANCHORS_PER_RUN = 16;
 const RESPONSE_CAP = 4096;
 const FETCH_TIMEOUT_MS = 10_000;
 const BASE_INTERVAL_S = 30 * 60;
@@ -36,15 +38,19 @@ async function fetchCapped(fetcher: Fetcher, url: string): Promise<Uint8Array | 
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.length;
-    if (size > RESPONSE_CAP) {
-      await reader.cancel();
-      return null;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > RESPONSE_CAP) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } catch {
+    return null; // reset or timed-out stream: treat as "not yet"
   }
   const out = new Uint8Array(size);
   let o = 0;
@@ -56,7 +62,13 @@ type Outcome = { kind: "confirmed"; receipt: Uint8Array; height: number } | { ki
 
 /** Ask ONE calendar (the least-tried) for this anchor. The URL is built from the allowlisted host only. */
 async function checkAnchor(a: DueAnchor, fetcher: Fetcher): Promise<Outcome> {
-  const entries = JSON.parse(a.calendars) as CalendarEntry[];
+  let entries: CalendarEntry[];
+  try {
+    entries = JSON.parse(a.calendars) as CalendarEntry[];
+    if (!Array.isArray(entries) || entries.length === 0) throw new Error();
+  } catch {
+    return { kind: "pending", entries: [], attempts: GIVE_UP_ATTEMPTS }; // corrupt row: stop checking it
+  }
   const idx = entries.reduce((best, e, i) => (e.attempts < entries[best].attempts ? i : best), 0);
   const entry = entries[idx];
   const commitment = fromHex(a.commitment);
@@ -78,6 +90,7 @@ async function checkAnchor(a: DueAnchor, fetcher: Fetcher): Promise<Outcome> {
     mergeInto(point.node, parseTimestamp(body, point.node.msg));
     const merged = serializeTimestamp(tree);
     if (merged.length > MAX_RECEIPT_BYTES) return bump();
+    parseTimestamp(merged, commitment); // must stay within every parser limit before it is stored
     const height = bitcoinHeight(tree);
     if (height !== null) return { kind: "confirmed", receipt: merged, height };
     entries[idx] = { ...entry, pending: toB64u(merged), attempts: entry.attempts + 1 };
@@ -96,28 +109,33 @@ export async function runCron(env: Bindings, fetcher: Fetcher = fetch): Promise<
   const { results: due } = await db.prepare(
     `SELECT a.record_id, a.user_id, a.calendars, r.commitment FROM anchors a JOIN records r ON r.record_id = a.record_id
       WHERE a.status = 'pending' AND a.next_check_at IS NOT NULL AND a.next_check_at <= ? ORDER BY a.next_check_at LIMIT ?`,
-  ).bind(now, FETCH_BUDGET).all<DueAnchor>();
+  ).bind(now, ANCHORS_PER_RUN).all<DueAnchor>();
 
   let fetches = 0;
   let confirmed = 0;
-  const writes: D1PreparedStatement[] = [];
   const counting: Fetcher = (url, init) => { fetches++; return fetcher(url, init); };
   for (const a of due) {
     if (fetches >= FETCH_BUDGET) break;
-    const out = await checkAnchor(a, counting);
+    let out: Outcome;
+    try {
+      out = await checkAnchor(a, counting);
+    } catch {
+      out = { kind: "pending", entries: [], attempts: GIVE_UP_ATTEMPTS };
+    }
+    // Saved per anchor, so progress survives if the run is cut short.
     if (out.kind === "confirmed") {
       confirmed++;
-      writes.push(
+      await db.batch([
         db.prepare("UPDATE users SET change_seq = change_seq + 1 WHERE user_id = ?").bind(a.user_id),
         db.prepare(`UPDATE anchors SET status = 'confirmed', complete_receipt = ?, block_height = ?, confirmed_at = ?, next_check_at = NULL, change_seq = ${CURSOR_SQL}
                     WHERE record_id = ? AND status = 'pending'`).bind(toB64u(out.receipt), out.height, now, a.user_id, a.record_id),
-      );
+      ]);
     } else {
       const next = out.attempts >= GIVE_UP_ATTEMPTS ? null : isoAt(Date.now() + nextInterval(out.attempts) * 1000);
-      writes.push(db.prepare("UPDATE anchors SET calendars = ?, next_check_at = ? WHERE record_id = ? AND status = 'pending'").bind(JSON.stringify(out.entries), next, a.record_id));
+      const calendars = out.entries.length ? JSON.stringify(out.entries) : a.calendars;
+      await db.prepare("UPDATE anchors SET calendars = ?, next_check_at = ? WHERE record_id = ? AND status = 'pending'").bind(calendars, next, a.record_id).run();
     }
   }
-  if (writes.length) await db.batch(writes);
   const cleaned = await cleanup(db);
   return { checked: due.length, confirmed, fetches, cleaned };
 }
@@ -136,6 +154,8 @@ async function cleanup(db: D1Database): Promise<number> {
     del("usage_events", "at < ?", ago(90 * DAY_S)),
     del("audit_log", "at < ?", ago(90 * DAY_S)),
     del("repo_heads", "reported_at < ?", ago(90 * DAY_S)),
+    del("engine_inbox", "created_at < ?", ago(30 * DAY_S)),
+    del("pending_approvals", "status <> 'pending' AND COALESCE(decided_at, expires_at) < ?", ago(30 * DAY_S)),
   ]);
   return results.reduce((n, r) => n + (r.meta.changes ?? 0), 0);
 }

@@ -12,12 +12,11 @@ import { requireEngineAccount } from "../routes/engine-common";
  */
 export const engineOrSession: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (c.req.header("x-it-engine") !== undefined) {
-    await requireEngine(c, async () => {
+    return requireEngine(c, async () => {
       await requireEngineAccount(c, next);
     });
-    return;
   }
-  await browserWrite(c, async () => {
+  return browserWrite(c, async () => {
     await requireConfirmed(c, next);
   });
 };

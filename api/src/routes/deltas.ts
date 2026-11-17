@@ -7,6 +7,7 @@ import { readJson, zB64u, zId, zSealedMax, zSeq, zTime } from "../http/validate"
 import { requireEngine } from "../auth/engine-sig";
 import { CURSOR_SQL, guard, writeWithCursor } from "../db/change";
 import { checkEngineQuota, countEngineWrite } from "../db/quota";
+import { toBytes } from "../db/values";
 import { idConflict, isConstraintError, requireEngineAccount } from "./engine-common";
 
 const KIND_DELTA = 4;
@@ -23,10 +24,12 @@ const zDelta = z.object({
 type DeltaBody = z.infer<typeof zDelta>;
 
 async function duplicate(db: D1Database, b: DeltaBody, userId: string, engineId: string) {
-  const row = await db.prepare("SELECT user_id, engine_id, CAST(seq AS TEXT) AS seq FROM meta_deltas WHERE delta_id = ?")
-    .bind(b.delta_id).first<{ user_id: string; engine_id: string; seq: string }>();
+  const row = await db.prepare("SELECT user_id, engine_id, CAST(seq AS TEXT) AS seq, root_id, sealed_delta, engine_sig, created_at FROM meta_deltas WHERE delta_id = ?")
+    .bind(b.delta_id).first<{ user_id: string; engine_id: string; seq: string; root_id: string; sealed_delta: unknown; engine_sig: string; created_at: string }>();
   if (!row) return false;
-  if (row.user_id === userId && row.engine_id === engineId && row.seq === b.log_seq) return true;
+  const stored = toBytes(row.sealed_delta);
+  if (row.user_id === userId && row.engine_id === engineId && row.seq === b.log_seq && row.root_id === b.root_id && row.engine_sig === toB64u(b.engine_sig)
+    && row.created_at === b.created_at && stored.length === b.sealed_delta.length && stored.every((x, i) => x === b.sealed_delta[i])) return true;
   throw idConflict();
 }
 
