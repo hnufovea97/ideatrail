@@ -1,4 +1,5 @@
-import { concat, fromHex, toB64u } from "@ideatrail/crypto/bytes";
+import { concat, fromHex, toB64u, toHex } from "@ideatrail/crypto/bytes";
+import { parseOtsFile, pendingPoints, serializeTimestamp, type Timestamp } from "../src/ots/tree";
 import { newId } from "@ideatrail/crypto/ids";
 import fx from "../../spec/vectors/ots/receipts.json";
 
@@ -21,4 +22,12 @@ export function recordBody(over: Partial<Record<string, unknown>> & { log_seq: s
     ots: [{ calendar: "https://a.pool.opentimestamps.org", pending: toB64u(fromHex(fx.pending_alice_hex)) }],
     ...over,
   };
+}
+
+/** What the alice calendar returns for the pending message: the node's subtree without its pending attestation. */
+export function aliceUpgrade(): { msgHex: string; bytes: Uint8Array } {
+  const file = parseOtsFile(fromHex(fx.direct_alice_ots_hex));
+  const point = pendingPoints(file.timestamp).find((p) => p.uri.includes("alice"))!;
+  const sub: Timestamp = { msg: point.node.msg, attestations: [], ops: point.node.ops };
+  return { msgHex: toHex(point.node.msg), bytes: serializeTimestamp(sub) };
 }

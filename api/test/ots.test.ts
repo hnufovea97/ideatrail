@@ -2,16 +2,9 @@ import { describe, expect, it } from "vitest";
 import { fromHex, toHex } from "@ideatrail/crypto/bytes";
 import fx from "../../spec/vectors/ots/receipts.json";
 import { bitcoinHeight, mergeInto, OtsError, parseOtsFile, parseTimestamp, pendingPoints, serializeTimestamp, type Timestamp } from "../src/ots/tree";
+import { aliceUpgrade } from "./fixtures";
 
 const digest = fromHex(fx.digest_hex);
-
-/** What the alice calendar returns for the pending message: the node's subtree without its pending attestation. */
-export function aliceUpgrade(): { msgHex: string; bytes: Uint8Array } {
-  const file = parseOtsFile(fromHex(fx.direct_alice_ots_hex));
-  const point = pendingPoints(file.timestamp).find((p) => p.uri.includes("alice"))!;
-  const sub: Timestamp = { msg: point.node.msg, attestations: [], ops: point.node.ops };
-  return { msgHex: toHex(point.node.msg), bytes: serializeTimestamp(sub) };
-}
 
 describe("OTS minimal parser (real M0 receipts)", () => {
   it("finds the single alice pending point in the pool's pending receipt", () => {

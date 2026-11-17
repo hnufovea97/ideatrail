@@ -15,6 +15,7 @@ import { syncRoutes } from "./routes/sync";
 import { rootRoutes, prefsRoutes, eventRoutes, visibilityRoutes } from "./routes/roots";
 import { engineRoutes, deleteAccountHandlers } from "./routes/engines";
 import type { Fetcher } from "./github";
+import { runCron } from "./cron";
 import { anchorRoutes, importAllowanceRoutes, repoHeadRoutes, storageLinkRoutes } from "./routes/anchors";
 import { accountRoutes, logoutHandlers } from "./routes/account";
 import { requireStepup } from "./auth/stepup";
@@ -73,4 +74,9 @@ function testRoutes(app: Hono<AppEnv>) {
 }
 
 const app = createApp();
-export default { fetch: app.fetch } satisfies ExportedHandler<Bindings>;
+export default {
+  fetch: app.fetch,
+  scheduled(_controller, env, ctx) {
+    ctx.waitUntil(runCron(env).then((r) => console.log(JSON.stringify({ cron: r }))));
+  },
+} satisfies ExportedHandler<Bindings>;
