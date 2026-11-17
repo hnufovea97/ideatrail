@@ -79,6 +79,10 @@ func (f *DeviceFlow) Login(ctx context.Context) (string, error) {
 		}
 		if err := postForm(ctx, f.TokenURL, url.Values{"client_id": {f.ClientID}, "device_code": {dc.DeviceCode},
 			"grant_type": {"urn:ietf:params:oauth:grant-type:device_code"}}, &tok); err != nil {
+			var he *Error
+			if errors.As(err, &he) && he.Status >= 400 && he.Status < 500 && he.Status != 429 {
+				return "", ErrDeviceRefused // a refusal will not change by asking again
+			}
 			continue // transient network problem: keep polling until the deadline
 		}
 		switch tok.Error {

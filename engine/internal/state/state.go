@@ -83,6 +83,7 @@ type State struct {
 	UserID         string              `json:"user_id,omitempty"`
 	AccountPub     string              `json:"account_pubkey,omitempty"` // b64u, pinned at pairing
 	RepoFullName   string              `json:"repo_full_name,omitempty"`
+	LinkPending    bool                `json:"storage_link_pending,omitempty"` // token saved but not yet uploaded for the dashboard
 	Roots          map[string]Root     `json:"roots,omitempty"`
 	Folders        map[string]string   `json:"folders,omitempty"` // resolved absolute folder → root_id (registered only via approved inbox)
 	PendingUploads []string            `json:"pending_uploads,omitempty"`

@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -77,6 +78,7 @@ func newEnv(t *testing.T, paired bool) *env {
 		Inbox:    inbox.Deps{API: c, Keys: k, StateDir: engine},
 		Pairing:  pairing.Deps{API: c, Keys: k, StateDir: engine, AppBase: "https://app.example", Open: func(l string) error { env.opened = append(env.opened, l); return nil }},
 		Computer: "pc"}
+	t.Cleanup(func() { env.e.Close(10 * time.Second) }) // background work must finish before TempDir cleanup
 	st, ct := mcp.NewInMemoryTransports()
 	ctx := context.Background()
 	if _, err := env.e.Server().Connect(ctx, st, nil); err != nil {

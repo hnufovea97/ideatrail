@@ -43,22 +43,28 @@ func SyncAnchors(ctx context.Context, d Deps) (int, error) {
 		if err := d.API.Do(ctx, "GET", "/v1/anchors/confirmed?since="+strconv.FormatUint(cursor, 10), nil, &page); err != nil {
 			return updated, err
 		}
+		var applyErr error
 		for _, a := range page.Anchors {
+			if idRe.MatchString(a.RecordID) {
+				ok, err := applyConfirmed(d, a.RecordID, a.CompleteReceipt, a.BlockHeight)
+				if err != nil { // local write failed: stop before this anchor so it comes back next time
+					applyErr = err
+					break
+				}
+				if ok {
+					updated++
+					_ = d.API.Do(ctx, "POST", "/v1/anchors/"+a.RecordID+"/synced", map[string]string{"target": "local"}, nil)
+				}
+			}
 			if a.ChangeSeq > cursor {
 				cursor = a.ChangeSeq
 			}
-			if !idRe.MatchString(a.RecordID) {
-				continue
-			}
-			ok, err := applyConfirmed(d, a.RecordID, a.CompleteReceipt, a.BlockHeight)
-			if err != nil || !ok {
-				continue
-			}
-			updated++
-			_ = d.API.Do(ctx, "POST", "/v1/anchors/"+a.RecordID+"/synced", map[string]string{"target": "local"}, nil)
 		}
 		if err := state.With(d.StateDir, func(s *state.State) error { s.AnchorsCursor = state.Seq(cursor); return nil }); err != nil {
 			return updated, err
+		}
+		if applyErr != nil {
+			return updated, applyErr
 		}
 		if page.NextCursor == nil {
 			break
@@ -96,10 +102,15 @@ func applyConfirmed(d Deps, recordID, receiptB64 string, height uint64) (bool, e
 	b["ots_complete"] = receiptB64
 	b["block_height"] = tree.BitcoinHeight()
 	b["local_synced_at"] = time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	// GitHub update first: once the local copy says "complete" this function never runs again
+	// for the record, so the queue item must already exist by then.
+	if err := queueRepoUpdate(d, recordID, b); err != nil {
+		return false, err
+	}
 	if err := writeJSON(path, b); err != nil {
 		return false, err
 	}
-	return true, queueRepoUpdate(d, recordID, b)
+	return true, nil
 }
 
 // queueRepoUpdate puts the confirmed bundle (GitHub form: no plaintext nonce, no local fields) in

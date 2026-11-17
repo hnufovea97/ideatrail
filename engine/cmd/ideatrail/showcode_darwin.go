@@ -25,5 +25,9 @@ func showCode(code string) error {
 		"-e", "on run argv",
 		"-e", `display dialog ("GitHub 연결 코드: " & item 1 of argv & return & return & "복사해 두었어요. 열린 GitHub 화면에 붙여 넣어 주세요.") buttons {"확인"} default button 1 with title "ideatrail" giving up after 600`,
 		"-e", "end run", code)
-	return dlg.Start() // don't block the engine while the dialog is open
+	if err := dlg.Start(); err != nil {
+		return err
+	}
+	go func() { _ = dlg.Wait() }() // reap it without blocking the engine while the dialog is open
+	return nil
 }

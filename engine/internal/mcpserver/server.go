@@ -8,6 +8,7 @@ import (
 	"errors"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -25,6 +26,7 @@ import (
 const (
 	backgroundBudget = 20 * time.Second
 	pairingCooldown  = 10 * time.Minute
+	closeWait        = 5 * time.Second
 )
 
 // Engine wires the packages together.
@@ -43,6 +45,39 @@ type Engine struct {
 	bg          sync.Mutex
 	pairMu      sync.Mutex
 	lastPairing time.Time
+	connecting  atomic.Bool
+	wg          sync.WaitGroup
+	baseOnce    sync.Once
+	base        context.Context
+	stop        context.CancelFunc
+}
+
+// ctxBase is cancelled by Close, so background work stops when the server does.
+func (e *Engine) ctxBase() context.Context {
+	e.baseOnce.Do(func() { e.base, e.stop = context.WithCancel(context.Background()) })
+	return e.base
+}
+
+// goSafe runs fn in a tracked goroutine; a panic there must not take the MCP server down.
+func (e *Engine) goSafe(fn func()) {
+	e.wg.Add(1)
+	go func() {
+		defer e.wg.Done()
+		defer func() { _ = recover() }()
+		fn()
+	}()
+}
+
+// Close cancels background work and waits for it (up to wait) so files are not left half-written.
+func (e *Engine) Close(wait time.Duration) {
+	e.ctxBase()
+	e.stop()
+	done := make(chan struct{})
+	go func() { e.wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(wait):
+	}
 }
 
 func tool(name, desc string, schema map[string]any, readOnly bool) *mcp.Tool {
@@ -61,7 +96,10 @@ func (e *Engine) Server() *mcp.Server {
 }
 
 // Run serves over stdio until the client disconnects.
-func (e *Engine) Run(ctx context.Context) error { return e.Server().Run(ctx, &mcp.StdioTransport{}) }
+func (e *Engine) Run(ctx context.Context) error {
+	defer e.Close(closeWait)
+	return e.Server().Run(ctx, &mcp.StdioTransport{})
+}
 
 type empty struct{}
 
@@ -153,7 +191,14 @@ func (e *Engine) importTool(ctx context.Context, in importIn) string {
 	if msg, ok := e.ensurePaired(ctx); !ok {
 		return msg
 	}
-	if _, err := inbox.RequestImport(ctx, e.Inbox, "import", in.Folders); err != nil {
+	folders := make([]string, 0, len(in.Folders))
+	for _, f := range in.Folders {
+		if !filepath.IsAbs(f) {
+			f = filepath.Join(e.ProjectDir, f)
+		}
+		folders = append(folders, f)
+	}
+	if _, err := inbox.RequestImport(ctx, e.Inbox, "import", folders); err != nil {
 		return importError(err)
 	}
 	return msgImportAsked
@@ -176,14 +221,14 @@ func (e *Engine) ensurePaired(ctx context.Context) (string, bool) {
 		return msgPairing, false
 	}
 	e.lastPairing = time.Now()
-	go func() {
-		wctx, cancel := context.WithTimeout(context.Background(), 11*time.Minute)
+	e.goSafe(func() {
+		wctx, cancel := context.WithTimeout(e.ctxBase(), 11*time.Minute)
 		defer cancel()
 		if pairing.Wait(wctx, e.Pairing, sess, 3*time.Second) == nil && e.ProjectDir != "" {
 			// signup step 5: offer this project folder for recording (the user picks on the dashboard)
 			_, _ = inbox.RequestImport(wctx, e.Inbox, "signup_select", []string{e.ProjectDir})
 		}
-	}()
+	})
 	return msgPairingOpened, false
 }
 
@@ -192,12 +237,12 @@ func (e *Engine) background() {
 	if !e.bg.TryLock() {
 		return
 	}
-	go func() {
+	e.goSafe(func() {
 		defer e.bg.Unlock()
-		ctx, cancel := context.WithTimeout(context.Background(), backgroundBudget)
+		ctx, cancel := context.WithTimeout(e.ctxBase(), backgroundBudget)
 		defer cancel()
 		e.Tick(ctx)
-	}()
+	})
 }
 
 // Tick is one round of background work (exported for tests and the session-start path).
@@ -205,22 +250,21 @@ func (e *Engine) Tick(ctx context.Context) {
 	inbox.SendPending(ctx, e.Inbox)
 	if events, err := inbox.Process(ctx, e.Inbox); err == nil {
 		for _, ev := range events {
-			if ev.Kind == "connect_github" {
-				go func() {
-					cctx, cancel := context.WithTimeout(context.Background(), 16*time.Minute)
+			if ev.Kind == "connect_github" && e.connecting.CompareAndSwap(false, true) { // one GitHub login at a time
+				e.goSafe(func() {
+					defer e.connecting.Store(false)
+					cctx, cancel := context.WithTimeout(e.ctxBase(), 16*time.Minute)
 					defer cancel()
-					if repo.Connect(cctx, e.Repo) == nil {
-						_, _ = repo.PushOutbox(cctx, e.Repo)
-					}
-				}()
+					_ = repo.Connect(cctx, e.Repo)
+					_, _ = repo.PushOutbox(cctx, e.Repo) // the token may be saved even if the link upload failed
+				})
 			}
 		}
 	}
 	record.Flush(ctx, e.Record)
 	_, _ = record.SyncAnchors(ctx, e.Record)
-	if _, err := repo.PushOutbox(ctx, e.Repo); err != nil && !errors.Is(err, repo.ErrNotConnected) {
-		return
-	}
+	_ = repo.RetryStorageLink(ctx, e.Repo)
+	_, _ = repo.PushOutbox(ctx, e.Repo)
 }
 
 func isOTS(err error) bool { return errors.Is(err, ots.ErrTooFewReceipts) }

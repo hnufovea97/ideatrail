@@ -102,10 +102,29 @@ func Connect(ctx context.Context, d Deps) error {
 	if err := writeOwnerOnly(filepath.Join(d.StateDir, githubFile), raw); err != nil {
 		return err
 	}
-	if err := state.With(d.StateDir, func(s *state.State) error { s.RepoFullName = r.FullName; return nil }); err != nil {
+	if err := state.With(d.StateDir, func(s *state.State) error {
+		s.RepoFullName, s.LinkPending = r.FullName, true
+		return nil
+	}); err != nil {
 		return err
 	}
-	return uploadStorageLink(ctx, d, st, token, r)
+	return RetryStorageLink(ctx, d)
+}
+
+// RetryStorageLink uploads the sealed storage link if an earlier upload did not finish.
+func RetryStorageLink(ctx context.Context, d Deps) error {
+	st, err := state.Read(d.StateDir)
+	if err != nil || !st.LinkPending {
+		return err
+	}
+	s, err := load(d)
+	if err != nil {
+		return err
+	}
+	if err := uploadStorageLink(ctx, d, st, s.Token, s.Repo); err != nil {
+		return err
+	}
+	return state.With(d.StateDir, func(s *state.State) error { s.LinkPending = false; return nil })
 }
 
 func uploadStorageLink(ctx context.Context, d Deps, st *state.State, token string, r gh.Repo) error {

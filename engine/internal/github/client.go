@@ -68,7 +68,10 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 	}
 	res, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("github request: %w", errors.Unwrap(err))
+		if inner := errors.Unwrap(err); inner != nil { // drop the URL wrapper, keep the cause
+			err = inner
+		}
+		return fmt.Errorf("github request: %w", err)
 	}
 	defer res.Body.Close()
 	b, err := io.ReadAll(io.LimitReader(res.Body, maxBody+1))
