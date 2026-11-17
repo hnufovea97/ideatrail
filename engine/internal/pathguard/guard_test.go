@@ -126,10 +126,10 @@ func TestValidateFolder(t *testing.T) {
 			t.Errorf("%s accepted", bad)
 		}
 	}
-	if h, err := os.UserHomeDir(); err == nil {
-		if err := ValidateFolder(h, f.engine); !errors.Is(err, ErrNotAllowed) {
-			t.Error("home accepted")
-		}
+	fakeHome, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("HOME", fakeHome)
+	if err := ValidateFolder(fakeHome, f.engine); !errors.Is(err, ErrNotAllowed) {
+		t.Error("home accepted")
 	}
 }
 
@@ -149,4 +149,50 @@ func TestMatchIgnore(t *testing.T) {
 			t.Errorf("%s vs %s: got %v", c.pat, c.rel, got)
 		}
 	}
+}
+
+func TestSecretFoldersCannotBeRegistered(t *testing.T) {
+	f := setup(t)
+	h, _ := filepath.EvalSymlinks(t.TempDir()) // fake home: never touch the real one
+	t.Setenv("HOME", h)
+	for _, p := range []string{filepath.Join(h, ".aws"), filepath.Join(h, ".ssh"), filepath.Join(f.folder, ".git")} {
+		_ = os.MkdirAll(p, 0o700)
+		if err := ValidateFolder(p, f.engine); !errors.Is(err, ErrNotAllowed) {
+			t.Errorf("%s accepted", p)
+		}
+	}
+}
+
+func TestSwappedFolderIsIgnored(t *testing.T) {
+	f := setup(t)
+	// registered folder replaced by a link to the engine folder's parent
+	_ = os.RemoveAll(f.folder)
+	if err := os.Symlink(filepath.Dir(f.engine), f.folder); err != nil {
+		t.Skip(err)
+	}
+	mustDeny(t, f.g, filepath.Join(f.folder, "engine", "engine.key"))
+	mustDeny(t, f.g, filepath.Join(f.folder, "outside", "secret.txt"))
+}
+
+func TestDenyFilesCatchHardLinkAliases(t *testing.T) {
+	f := setup(t)
+	f.g.DenyFiles = []string{filepath.Join(f.engine, "engine.key")}
+	if fi, _ := os.Stat(filepath.Join(f.engine, "engine.key")); !f.g.isDeniedFile(fi) {
+		t.Fatal("deny file not matched")
+	}
+}
+
+func TestMalformedIdeaignoreFailsClosed(t *testing.T) {
+	f := setup(t)
+	_ = os.WriteFile(filepath.Join(f.folder, ".ideaignore"), []byte("[unclosed\n"), 0o600)
+	mustDeny(t, f.g, filepath.Join(f.folder, "docs", "plan.md"))
+}
+
+func TestFIFODoesNotHang(t *testing.T) {
+	f := setup(t)
+	p := filepath.Join(f.folder, "pipe.md")
+	if err := mkfifo(p); err != nil {
+		t.Skip(err)
+	}
+	mustDeny(t, f.g, p)
 }

@@ -75,6 +75,10 @@ func Collect(g *pathguard.Guard, paths []string) (*Collected, error) {
 		if err != nil {
 			return nil, err
 		}
+		if total+o.Info.Size() > MaxRecordBytes { // checked before reading anything
+			o.File.Close()
+			return nil, ErrTooLarge
+		}
 		f, err := readOne(o, nonce, len(paths) == 1, c)
 		o.File.Close()
 		if err != nil {

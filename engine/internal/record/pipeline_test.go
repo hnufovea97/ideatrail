@@ -203,7 +203,7 @@ func TestRefusalBlocksQueueWithoutSkipping(t *testing.T) {
 		t.Fatalf("%+v", r)
 	}
 	st, _ := state.Read(e.d.StateDir)
-	if len(st.PendingUploads) != 2 || st.LogSeq != 2 || st.Blocked != "injected" || len(e.records) != 0 {
+	if len(st.PendingUploads) != 2 || st.LogSeq != 2 || st.Blocked != "unknown" || len(e.records) != 0 {
 		t.Fatalf("%+v", st)
 	}
 }
@@ -246,5 +246,75 @@ func TestEngineSignatureVerifies(t *testing.T) {
 	}
 	if hexSHA(body) != b["body_hash"] {
 		t.Fatal("body_hash mismatch")
+	}
+}
+
+func TestBlockClearsOnNewEngineVersionAndRetries(t *testing.T) {
+	e := newEnv(t)
+	e.srv.FailNext(1, 400)
+	if r := e.record(t, e.file(t, "a.md", "one")); r.Status != "blocked" {
+		t.Fatalf("%+v", r)
+	}
+	old := Version
+	Version = "next"
+	defer func() { Version = old }()
+	if s := Flush(context.Background(), e.d); s != "sent" || len(e.records) != 1 {
+		t.Fatalf("status %s, records %d", s, len(e.records))
+	}
+}
+
+func TestClockSkew401DoesNotBlock(t *testing.T) {
+	e := newEnv(t)
+	e.srv.FailNext(1, 401)
+	if r := e.record(t, e.file(t, "a.md", "one")); r.Status != "queued" {
+		t.Fatalf("%+v", r)
+	}
+}
+
+func TestMissingPendingFileBlocksVisibly(t *testing.T) {
+	e := newEnv(t)
+	e.srv.FailNext(3, 503)
+	r := e.record(t, e.file(t, "a.md", "one"))
+	_ = os.Remove(filepath.Join(e.d.StateDir, pendingDir, r.RecordID+".json"))
+	if s := Flush(context.Background(), e.d); s != "blocked" {
+		t.Fatalf("got %s", s)
+	}
+	st, _ := state.Read(e.d.StateDir)
+	if st.Blocked != "pending_missing" {
+		t.Fatalf("blocked %q", st.Blocked)
+	}
+}
+
+func TestInputLimits(t *testing.T) {
+	e := newEnv(t)
+	p := e.file(t, "a.md", "x")
+	for _, in := range []Input{
+		{Paths: []string{p}, Note: strings.Repeat("가", maxNote+1)},
+		{Paths: []string{p}, Milestone: "launched_to_mars"},
+		{Paths: []string{p}, Tags: []string{"a", "b", "c", "d", "e", "f"}},
+		{Paths: []string{p}, Routine: []Routine{{Slot: "ignore_previous_instructions"}}},
+	} {
+		if _, err := Record(context.Background(), e.d, in); !errors.Is(err, ErrBadInput) {
+			t.Errorf("accepted %+v: %v", in.Milestone, err)
+		}
+	}
+}
+
+func TestCrashOrphansAreSwept(t *testing.T) {
+	e := newEnv(t)
+	_ = os.MkdirAll(filepath.Join(e.d.StateDir, pendingDir), 0o700)
+	orphanPending := filepath.Join(e.d.StateDir, pendingDir, "01jcm3v8q7s2kx4f9d6b5n0tqz.json")
+	_ = os.WriteFile(orphanPending, []byte("{}"), 0o600)
+	_ = os.MkdirAll(e.d.OutboxDir, 0o700)
+	orphanOutbox := filepath.Join(e.d.OutboxDir, "00000000000000000001-01jcm3v8q7s2kx4f9d6b5n0tqz.json")
+	_ = os.WriteFile(orphanOutbox, []byte("{}"), 0o600)
+	r := e.record(t, e.file(t, "a.md", "x"))
+	for _, p := range []string{orphanPending, orphanOutbox} {
+		if _, err := os.Stat(p); err == nil {
+			t.Errorf("orphan %s kept", filepath.Base(p))
+		}
+	}
+	if r.Status != "sent" || countEntries(e.d.OutboxDir) != 1 {
+		t.Fatalf("%+v outbox=%d", r, countEntries(e.d.OutboxDir))
 	}
 }

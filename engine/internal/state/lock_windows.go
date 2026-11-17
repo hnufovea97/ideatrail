@@ -12,22 +12,20 @@ import (
 
 const noFollow = 0
 
-// LockTimeout bounds how long a caller waits for another engine process.
-var LockTimeout = 30 * time.Second
-
-var ErrLockTimeout = errors.New("state is locked by another engine process")
-
 // syncDir: MOVEFILE_WRITE_THROUGH already flushed the rename.
 func syncDir(string) error { return nil }
 
-func lock(path string) (func(), error) {
+func lock(path string, timeout time.Duration) (func(), error) {
+	if fi, err := os.Lstat(path); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("lock file is a link")
+	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
 	}
 	h := windows.Handle(f.Fd())
 	ol := new(windows.Overlapped)
-	deadline := time.Now().Add(LockTimeout)
+	deadline := time.Now().Add(timeout)
 	for {
 		err := windows.LockFileEx(h, windows.LOCKFILE_EXCLUSIVE_LOCK|windows.LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, ol)
 		if err == nil {

@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	ic "ideatrail/engine/internal/crypto"
@@ -25,7 +26,18 @@ const (
 	requestTimeout  = 30 * time.Second
 	maxAttempts     = 3
 	requestLock     = "request.lock"
+	// requestLockWait covers one full Do (3 attempts × 30s + backoff) held by another process.
+	requestLockWait = 3 * time.Minute
 )
+
+// knownCodes are server error codes the engine understands; anything else becomes "unknown" so
+// server-chosen text never reaches state, logs or the AI.
+var knownCodes = map[string]bool{
+	"bad_signature": true, "invalid_input": true, "id_conflict": true, "account_unconfirmed": true, "engine_paused": true,
+	"too_many_pending": true, "too_many_deltas": true, "too_many_approvals": true, "import_allowance_used": true,
+	"invalid_receipt": true, "root_not_found": true, "not_found": true, "not_ready": true, "payload_too_large": true,
+	"rate_limited": true, "conflict": true, "inbox_full": true, "anchor_not_found": true, "internal": true,
+}
 
 var ErrRequestTooLarge = errors.New("request body over 64KB")
 
@@ -38,8 +50,11 @@ type Error struct {
 
 func (e *Error) Error() string { return fmt.Sprintf("server %d %s", e.Status, e.Code) }
 
-// Retryable reports whether the same request may succeed later without changes.
-func (e *Error) Retryable() bool { return e.Status >= 500 || e.Status == 423 || e.Status == 429 }
+// Retryable reports whether the same request may succeed later without changes. 401 is included:
+// the usual cause is clock skew (±5 min), which fixes itself.
+func (e *Error) Retryable() bool {
+	return e.Status >= 500 || e.Status == 401 || e.Status == 423 || e.Status == 429
+}
 
 // Client signs requests with the engine key and keeps req_seq in the state file.
 type Client struct {
@@ -71,6 +86,21 @@ func New(base string, k *keys.Keys, stateDir string) (*Client, error) {
 	}, nil
 }
 
+func (c *Client) wait(ctx context.Context, d time.Duration) error {
+	if c.sleep != nil && ctx.Done() == nil {
+		c.sleep(d)
+		return nil
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
+}
+
 func isLoopback(h string) bool { return h == "127.0.0.1" || h == "localhost" || h == "::1" }
 
 // Do sends one signed request. One request per engine at a time: request.lock is held from taking
@@ -87,16 +117,20 @@ func (c *Client) Do(ctx context.Context, method, path string, body, out any) err
 	if len(raw) > MaxRequestBody {
 		return ErrRequestTooLarge
 	}
-	unlock, err := state.LockFile(c.stateDir, requestLock)
+	unlock, err := state.LockFile(c.stateDir, requestLock, requestLockWait)
 	if err != nil {
-		return err
+		return fmt.Errorf("request lock: %w", err)
 	}
 	defer unlock()
 
+	// POST retries are safe: the server dedupes records/deltas/approvals by id and the rest are
+	// idempotent; every attempt carries a fresh req_seq.
 	var last error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if attempt > 0 {
-			c.sleep(time.Duration(1<<attempt) * 250 * time.Millisecond)
+			if err := c.wait(ctx, time.Duration(1<<attempt)*250*time.Millisecond); err != nil {
+				return err
+			}
 		}
 		status, resp, err := c.send(ctx, method, path, raw)
 		if err != nil {
@@ -172,22 +206,12 @@ func errorCode(body []byte) string {
 			Code string `json:"code"`
 		} `json:"error"`
 	}
-	if json.Unmarshal(body, &e) != nil || len(e.Error.Code) > 64 {
+	if json.Unmarshal(body, &e) != nil || !knownCodes[e.Error.Code] {
 		return "unknown"
 	}
 	return e.Error.Code
 }
 
-func pathOnly(p string) string {
-	if i := bytes.IndexByte([]byte(p), '?'); i >= 0 {
-		return p[:i]
-	}
-	return p
-}
+func pathOnly(p string) string { before, _, _ := strings.Cut(p, "?"); return before }
 
-func queryOf(p string) string {
-	if i := bytes.IndexByte([]byte(p), '?'); i >= 0 {
-		return p[i+1:]
-	}
-	return ""
-}
+func queryOf(p string) string { _, after, _ := strings.Cut(p, "?"); return after }

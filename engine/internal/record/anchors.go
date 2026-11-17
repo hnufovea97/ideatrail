@@ -76,6 +76,9 @@ func applyConfirmed(d Deps, recordID, receiptB64 string, height uint64) (bool, e
 	if json.Unmarshal(raw, &b) != nil {
 		return false, nil
 	}
+	if done, _ := b["ots_complete"].(string); done != "" {
+		return false, nil // never replace a stored proof with whatever the server sends later
+	}
 	commitHex, _ := b["commitment"].(string)
 	commitment, err := hex.DecodeString(commitHex)
 	if err != nil || len(commitment) != 32 {

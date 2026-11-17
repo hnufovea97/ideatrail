@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -26,7 +27,38 @@ import (
 var (
 	ErrNotPaired     = errors.New("engine is not linked to an account yet")
 	ErrNotRegistered = errors.New("this folder is not registered with ideatrail")
+	ErrBadInput      = errors.New("record input out of range")
 )
+
+// Limits match the MCP tool schema (plugin draft §4).
+const (
+	maxNote     = 2000 // characters (schema says 400; leave room for non-Latin text)
+	maxTags     = 5
+	maxTagLen   = 20
+	maxRoutines = 7
+)
+
+var (
+	milestones   = map[string]bool{"": true, "none": true, "idea": true, "plan_decided": true, "mvp_done": true, "feature_done": true, "paused": true}
+	routineSlots = map[string]bool{"problem": true, "audience": true, "not_doing": true, "decision_reason": true, "first_run": true, "feedback": true, "changed_by_feedback": true}
+)
+
+func (in Input) validate() error {
+	if len([]rune(in.Note)) > maxNote || !milestones[in.Milestone] || len(in.Tags) > maxTags || len(in.Routine) > maxRoutines {
+		return ErrBadInput
+	}
+	for _, t := range in.Tags {
+		if len([]rune(t)) > maxTagLen || t == "" {
+			return ErrBadInput
+		}
+	}
+	for _, r := range in.Routine {
+		if !routineSlots[r.Slot] {
+			return ErrBadInput
+		}
+	}
+	return nil
+}
 
 const maxMetaPlain = 4000 // sealed list_meta must stay under the server's 8KB cap
 
@@ -76,7 +108,10 @@ func (d *Deps) now() time.Time {
 
 // guard builds the path guard from registered folders; engine and queue folders are never readable.
 func (d *Deps) guard(st *state.State) *pathguard.Guard {
-	g := &pathguard.Guard{Deny: []string{d.StateDir, d.ProofDir, d.OutboxDir}}
+	g := &pathguard.Guard{
+		Deny:      []string{d.StateDir, d.ProofDir, d.OutboxDir},
+		DenyFiles: []string{filepath.Join(d.StateDir, "engine.key"), filepath.Join(d.StateDir, "state.json")},
+	}
 	for p, root := range st.Folders {
 		g.Folders = append(g.Folders, pathguard.Folder{Path: p, RootID: root})
 	}
@@ -86,6 +121,9 @@ func (d *Deps) guard(st *state.State) *pathguard.Guard {
 
 // Record fingerprints, anchors, seals, stores locally, queues for GitHub and uploads one record.
 func Record(ctx context.Context, d Deps, in Input) (*Result, error) {
+	if err := in.validate(); err != nil {
+		return nil, err
+	}
 	st, err := state.Read(d.StateDir)
 	if err != nil {
 		return nil, err
@@ -93,6 +131,7 @@ func Record(ctx context.Context, d Deps, in Input) (*Result, error) {
 	if st.UserID == "" || st.AccountPub == "" {
 		return nil, ErrNotPaired
 	}
+	sweepOrphans(d, st)
 	ak, err := accountKey(st.AccountPub)
 	if err != nil {
 		return nil, err
@@ -128,7 +167,16 @@ func Record(ctx context.Context, d Deps, in Input) (*Result, error) {
 		res.Warning = "proof_dir_synced"
 	}
 	// One locked step: number, sign, then write pending body + GitHub queue + local copy, then
-	// save state. Nothing is sent before all of it is on disk (crash-safe, spec §2).
+	// save state. Nothing is sent before all of it is on disk (crash-safe, spec §2). If the step
+	// fails, the files it wrote are removed so no orphan reuses the (unconsumed) log_seq later.
+	var written []string
+	defer func() {
+		if err != nil {
+			for _, p := range written {
+				_ = os.Remove(p)
+			}
+		}
+	}()
 	err = state.With(d.StateDir, func(s *state.State) error {
 		if s.AccountPub != st.AccountPub {
 			return errors.New("account changed")
@@ -152,17 +200,26 @@ func Record(ctx context.Context, d Deps, in Input) (*Result, error) {
 		if err != nil {
 			return err
 		}
-		body := uploadBody(recordID, col, parents, commitHex, recordedAt, seq, sig, sealed, receipts)
-		if err := writeJSON(filepath.Join(d.StateDir, pendingDir, recordID+".json"), pendingFile{Kind: "record", Path: "/v1/records", Body: body}); err != nil {
+		body, err := json.Marshal(uploadBody(recordID, col, parents, commitHex, recordedAt, seq, sig, sealed, receipts))
+		if err != nil {
 			return err
 		}
-		if err := writeOutbox(d.OutboxDir, seq, recordID, col, sealed, bundle(recordID, commitHex, col.Manifest, receipts, recordedAt, d.Keys.EngineID, seq, sig, ic.B64(sealed.nonce))); err != nil {
+		pendingPath := filepath.Join(d.StateDir, pendingDir, recordID+".json")
+		written = append(written, pendingPath)
+		if err := writeJSON(pendingPath, pendingFile{Kind: "record", Path: "/v1/records", Body: body}); err != nil {
+			return err
+		}
+		outboxPath, err := writeOutbox(d.OutboxDir, seq, recordID, sealed, bundle(recordID, commitHex, col.Manifest, receipts, recordedAt, d.Keys.EngineID, seq, sig, ic.B64(sealed.nonce)))
+		written = append(written, outboxPath)
+		if err != nil {
 			return err
 		}
 		local := bundle(recordID, commitHex, col.Manifest, receipts, recordedAt, d.Keys.EngineID, seq, sig, "")
 		delete(local, "nonce_sealed")
 		local["nonce"] = hex.EncodeToString(col.Nonce)
-		if err := writeJSON(filepath.Join(d.ProofDir, recordID, "bundle.json"), local); err != nil {
+		localPath := filepath.Join(d.ProofDir, recordID, "bundle.json")
+		written = append(written, localPath)
+		if err := writeJSON(localPath, local); err != nil {
 			return err
 		}
 		if s.Roots == nil {
@@ -277,10 +334,10 @@ func bundle(recordID, commitHex string, manifest bool, receipts []ots.Receipt, r
 }
 
 // writeOutbox queues the GitHub commit for this record (pushed by M3b; spec §9-7, §12).
-func writeOutbox(dir string, seq uint64, recordID string, col *Collected, p *sealedParts, githubBundle map[string]any) error {
+func writeOutbox(dir string, seq uint64, recordID string, p *sealedParts, githubBundle map[string]any) (string, error) {
 	b, err := json.Marshal(githubBundle)
 	if err != nil {
-		return err
+		return "", err
 	}
 	files := map[string]string{
 		"records/" + recordID + ".it1":        ic.B64(p.body),
@@ -293,5 +350,6 @@ func writeOutbox(dir string, seq uint64, recordID string, col *Collected, p *sea
 	for len(name) < 20 {
 		name = "0" + name // lexical order = sequence order
 	}
-	return writeJSON(filepath.Join(dir, name+"-"+recordID+".json"), map[string]any{"v": 1, "record_id": recordID, "log_seq": strconv.FormatUint(seq, 10), "files": files})
+	path := filepath.Join(dir, name+"-"+recordID+".json")
+	return path, writeJSON(path, map[string]any{"v": 1, "record_id": recordID, "log_seq": strconv.FormatUint(seq, 10), "files": files})
 }

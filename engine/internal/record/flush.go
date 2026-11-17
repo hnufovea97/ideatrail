@@ -12,9 +12,18 @@ import (
 )
 
 type pendingFile struct {
-	Kind string         `json:"kind"` // "record" | "delta"
-	Path string         `json:"path"`
-	Body map[string]any `json:"body"`
+	Kind string          `json:"kind"` // "record" | "delta"
+	Path string          `json:"path"`
+	Body json.RawMessage `json:"body"` // sent byte-for-byte as first signed (no float64 round trip)
+}
+
+// Version is the engine build version; a new version clears a previous block and retries.
+var Version = "dev"
+
+func block(d Deps, code, id string) string {
+	_ = state.With(d.StateDir, func(s *state.State) error { s.Blocked, s.BlockedVersion = code, Version; return nil })
+	_ = journalLine(d.StateDir, map[string]string{"id": id, "status": "blocked:" + code})
+	return "blocked"
 }
 
 // Flush uploads queued records/deltas in order. Network errors, 5xx, 423 and 429 leave the queue
@@ -26,26 +35,29 @@ func Flush(ctx context.Context, d Deps) string {
 		return "queued"
 	}
 	if st.Blocked != "" {
-		return "blocked"
+		if st.BlockedVersion == Version {
+			return "blocked"
+		}
+		_ = state.With(d.StateDir, func(s *state.State) error { s.Blocked, s.BlockedVersion = "", ""; return nil })
 	}
 	for _, id := range st.PendingUploads {
 		p := filepath.Join(d.StateDir, pendingDir, id+".json")
 		raw, err := os.ReadFile(p)
 		if err != nil {
-			return "queued"
+			return block(d, "pending_missing", id)
 		}
 		var pf pendingFile
-		if json.Unmarshal(raw, &pf) != nil {
-			return "queued"
+		if json.Unmarshal(raw, &pf) != nil || (pf.Path != "/v1/records" && pf.Path != "/v1/deltas") {
+			return block(d, "pending_corrupt", id)
 		}
 		err = d.API.Do(ctx, "POST", pf.Path, pf.Body, nil)
 		var apiErr *api.Error
 		switch {
 		case err == nil:
 		case errors.As(err, &apiErr) && !apiErr.Retryable():
-			_ = state.With(d.StateDir, func(s *state.State) error { s.Blocked = apiErr.Code; return nil })
-			_ = journalLine(d.StateDir, map[string]string{"record_id": id, "status": "blocked:" + apiErr.Code})
-			return "blocked"
+			// Includes 409: with log_seq persisted before any send, a conflict means local state
+			// diverged from the server — stop and surface it rather than guess (decided in M3a review).
+			return block(d, apiErr.Code, id)
 		default:
 			return "queued"
 		}

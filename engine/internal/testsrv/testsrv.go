@@ -25,7 +25,7 @@ type Server struct {
 	lastSeq  map[string]uint64
 	seenSeqs []uint64
 	routes   map[string]handler
-	// FailNext makes the next n signed requests answer this status before handling.
+	// failLeft signed requests are answered with failStatus before handling (see FailNext).
 	failStatus int
 	failLeft   int
 }
@@ -49,10 +49,14 @@ func (s *Server) AddEngine(id string, pub ed25519.PublicKey) {
 }
 
 func (s *Server) Handle(method, path string, fn func(w http.ResponseWriter, r *http.Request, body []byte, engineID string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.routes[method+" "+path] = handler{fn: fn}
 }
 
 func (s *Server) HandlePublic(method, path string, fn func(w http.ResponseWriter, r *http.Request, body []byte, engineID string)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.routes[method+" "+path] = handler{public: true, fn: fn}
 }
 
@@ -81,15 +85,21 @@ func Fail(w http.ResponseWriter, status int, code string) {
 }
 
 func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
 	h, ok := s.routes[r.Method+" "+r.URL.Path]
 	if !ok {
 		h, ok = s.matchPattern(r)
 	}
+	s.mu.Unlock()
 	if !ok {
 		Fail(w, 404, "not_found")
 		return
 	}
-	body, _ := io.ReadAll(io.LimitReader(r.Body, 64*1024+1))
+	body, err := io.ReadAll(io.LimitReader(r.Body, 64*1024+1))
+	if err != nil {
+		Fail(w, 400, "invalid_input")
+		return
+	}
 	if h.public {
 		h.fn(w, r, body, "")
 		return
@@ -111,14 +121,26 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 	h.fn(w, r, body, engineID)
 }
 
-// matchPattern supports one trailing ":id"-style segment, e.g. "GET /v1/pairing/:id/blob".
+// matchPattern supports ":id"-style segments, e.g. "GET /v1/pairing/:id/blob". Among matching
+// patterns the one with the most literal segments wins (deterministic). Caller holds s.mu.
 func (s *Server) matchPattern(r *http.Request) (handler, bool) {
+	var best handler
+	bestKey, bestScore := "", -1
 	for key, h := range s.routes {
-		if matches(key, r.Method+" "+r.URL.Path) {
-			return h, true
+		if !matches(key, r.Method+" "+r.URL.Path) {
+			continue
+		}
+		score := 0
+		for _, p := range splitAll(key) {
+			if len(p) == 0 || p[0] != ':' {
+				score++
+			}
+		}
+		if score > bestScore || score == bestScore && key < bestKey {
+			best, bestKey, bestScore = h, key, score
 		}
 	}
-	return handler{}, false
+	return best, bestScore >= 0
 }
 
 func matches(pattern, actual string) bool {

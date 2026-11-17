@@ -4,7 +4,6 @@
 package pairing
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -47,6 +46,12 @@ type Session struct {
 // ID is safe to show (the server already knows it); the link and psk are not.
 func (s *Session) ID() string { return s.id }
 
+// String and GoString keep the psk and link out of any %v / %+v / %#v output.
+func (s *Session) String() string   { return "pairing.Session{" + s.id + " [redacted]}" }
+func (s *Session) GoString() string { return s.String() }
+
+func isLoopback(h string) bool { return h == "127.0.0.1" || h == "localhost" || h == "::1" }
+
 // Deps lets tests replace the browser opener.
 type Deps struct {
 	API      *api.Client
@@ -66,7 +71,7 @@ func Start(ctx context.Context, d Deps, computerName string) (*Session, error) {
 		return nil, ErrAlreadyPaired
 	}
 	app, err := url.Parse(d.AppBase)
-	if err != nil || app.Scheme != "https" && !strings.HasPrefix(d.AppBase, "http://127.0.0.1") {
+	if err != nil || !(app.Scheme == "https" || app.Scheme == "http" && isLoopback(app.Hostname())) {
 		return nil, errors.New("app base must be https")
 	}
 	kemPub, err := d.Keys.KEMPub.MarshalBinary()
@@ -119,8 +124,8 @@ func Wait(ctx context.Context, d Deps, s *Session, every time.Duration) error {
 		switch {
 		case err == nil:
 			return accept(d, s, b)
-		case errors.As(err, &apiErr) && apiErr.Status == 404:
-			// not delivered yet
+		case errors.As(err, &apiErr) && (apiErr.Status == 404 || apiErr.Retryable()):
+			// not delivered yet, or a passing server/network problem: keep polling until the deadline
 		default:
 			return err
 		}
@@ -170,7 +175,7 @@ func accept(d Deps, s *Session, b blob) error {
 		return ErrBadHandoff
 	}
 	return state.With(d.StateDir, func(st *state.State) error {
-		if st.AccountPub != "" && st.AccountPub != p.AccountPubkey {
+		if st.AccountPub != "" && st.AccountPub != p.AccountPubkey || st.UserID != "" && st.UserID != p.UserID {
 			return ErrAccountChanged
 		}
 		st.UserID, st.AccountPub = p.UserID, p.AccountPubkey
@@ -182,8 +187,8 @@ func validID(s string) bool {
 	if len(s) != 26 {
 		return false
 	}
-	for _, c := range []byte(s) {
-		if !bytes.ContainsRune([]byte("0123456789abcdefghjkmnpqrstvwxyz"), rune(c)) {
+	for i := 0; i < len(s); i++ {
+		if strings.IndexByte("0123456789abcdefghjkmnpqrstvwxyz", s[i]) < 0 {
 			return false
 		}
 	}

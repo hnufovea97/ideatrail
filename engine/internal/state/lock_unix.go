@@ -12,17 +12,12 @@ import (
 
 const noFollow = unix.O_NOFOLLOW
 
-// LockTimeout bounds how long a caller waits for another engine process.
-var LockTimeout = 30 * time.Second
-
-var ErrLockTimeout = errors.New("state is locked by another engine process")
-
-func lock(path string) (func(), error) {
+func lock(path string, timeout time.Duration) (func(), error) {
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|unix.O_NOFOLLOW, 0o600)
 	if err != nil {
 		return nil, err
 	}
-	deadline := time.Now().Add(LockTimeout)
+	deadline := time.Now().Add(timeout)
 	for {
 		err = unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB)
 		if err == nil {

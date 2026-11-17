@@ -68,7 +68,10 @@ func Delta(ctx context.Context, d Deps, rootID, op string, value any, recordID s
 		if err != nil {
 			return err
 		}
-		body := map[string]any{"delta_id": deltaID, "root_id": rootID, "sealed_delta": ic.B64(sealed), "log_seq": strconv.FormatUint(seq, 10), "created_at": createdAt, "engine_sig": sig}
+		body, err := json.Marshal(map[string]any{"delta_id": deltaID, "root_id": rootID, "sealed_delta": ic.B64(sealed), "log_seq": strconv.FormatUint(seq, 10), "created_at": createdAt, "engine_sig": sig})
+		if err != nil {
+			return err
+		}
 		if err := writeJSON(filepath.Join(d.StateDir, pendingDir, deltaID+".json"), pendingFile{Kind: "delta", Path: "/v1/deltas", Body: body}); err != nil {
 			return err
 		}

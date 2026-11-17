@@ -80,7 +80,7 @@ func TestClientErrorReturnedImmediatelyWithoutServerMessage(t *testing.T) {
 	srv.FailNext(1, 409)
 	err := c.Do(context.Background(), "POST", "/v1/echo", nil, nil)
 	var apiErr *Error
-	if !errors.As(err, &apiErr) || apiErr.Status != 409 || apiErr.Code != "injected" {
+	if !errors.As(err, &apiErr) || apiErr.Status != 409 || apiErr.Code != "unknown" {
 		t.Fatalf("got %v", err)
 	}
 	if strings.Contains(err.Error(), "IGNORE") {

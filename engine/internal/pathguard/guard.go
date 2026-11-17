@@ -32,8 +32,9 @@ type Folder struct {
 // Guard holds registered folders and paths that must never be read (engine folder, local proof
 // copies, outbox).
 type Guard struct {
-	Folders []Folder
-	Deny    []string
+	Folders   []Folder
+	Deny      []string // directories never readable (engine folder, proof copies, outbox)
+	DenyFiles []string // files never readable even through a hard link (engine.key, state.json)
 }
 
 // Opened is a file that passed every check, already open.
@@ -85,22 +86,47 @@ func (g *Guard) open(p string) (*Opened, error) {
 	if ignored(root, rel) {
 		return nil, errors.New("ignored")
 	}
-	file, err := root.Open(filepath.FromSlash(rel)) // os.Root refuses escapes, even if rel changed under us
+	// os.Root refuses escapes; non-blocking so a FIFO cannot hang the engine before the fstat check.
+	file, err := root.OpenFile(filepath.FromSlash(rel), os.O_RDONLY|nonBlock, 0)
 	if err != nil {
 		return nil, err
 	}
 	fi, err := file.Stat()
-	if err != nil || !fi.Mode().IsRegular() || hardLinked(fi) {
+	if err != nil || !fi.Mode().IsRegular() || hardLinked(fi) || g.isDeniedFile(fi) || !g.stillSame(abs, f, fi) {
 		file.Close()
 		return nil, errors.New("not a plain file")
 	}
 	return &Opened{File: file, Folder: f, Rel: rel, Info: fi}, nil
 }
 
+// stillSame re-resolves the path after opening: if it was swapped for a symlink (even one
+// inside the folder, e.g. to .env), the opened file must still be the checked, allowed file.
+func (g *Guard) stillSame(abs string, f Folder, opened os.FileInfo) bool {
+	real, err := filepath.EvalSymlinks(abs)
+	if err != nil || !within(real, f.Path) {
+		return false
+	}
+	rel, err := filepath.Rel(f.Path, real)
+	if err != nil || excluded(filepath.ToSlash(rel)) {
+		return false
+	}
+	now, err := os.Stat(real)
+	return err == nil && os.SameFile(now, opened)
+}
+
+func (g *Guard) isDeniedFile(fi os.FileInfo) bool {
+	for _, p := range g.DenyFiles {
+		if d, err := os.Stat(p); err == nil && os.SameFile(d, fi) {
+			return true
+		}
+	}
+	return false
+}
+
 func (g *Guard) folderOf(real string) (Folder, string, bool) {
 	for _, f := range g.Folders {
 		fr, err := filepath.EvalSymlinks(f.Path) // re-resolve every time
-		if err != nil {
+		if err != nil || g.unsafeFolder(fr) {
 			continue
 		}
 		if within(real, fr) {
@@ -114,7 +140,42 @@ func (g *Guard) folderOf(real string) (Folder, string, bool) {
 	return Folder{}, "", false
 }
 
-// ValidateFolder refuses folders that are too broad or contain the engine's own files.
+// unsafeFolder re-applies the registration rules on every read: a registered folder swapped
+// for a link to the home folder, a secrets folder or an engine ancestor is ignored.
+func (g *Guard) unsafeFolder(real string) bool {
+	if broadOrSecret(real) {
+		return true
+	}
+	for _, d := range g.Deny {
+		if dr, err := filepath.EvalSymlinks(d); err == nil && within(dr, real) {
+			return true
+		}
+	}
+	return false
+}
+
+// broadOrSecret: filesystem roots, the home folder itself, or any path with an excluded
+// component (e.g. ~/.aws, ~/.ssh, ~/.config/gcloud).
+func broadOrSecret(real string) bool {
+	if filepath.Dir(real) == real {
+		return true
+	}
+	if h, err := os.UserHomeDir(); err == nil {
+		if hr, err := filepath.EvalSymlinks(h); err == nil {
+			if samePath(real, hr) {
+				return true
+			}
+			if within(real, hr) {
+				if rel, err := filepath.Rel(hr, real); err == nil && excluded(filepath.ToSlash(rel)) {
+					return true
+				}
+			}
+		}
+	}
+	return excluded(filepath.ToSlash(real))
+}
+
+// ValidateFolder refuses folders that are too broad, hold secrets, or contain the engine's files.
 func ValidateFolder(folder, engineDir string) error {
 	real, err := filepath.EvalSymlinks(folder)
 	if err != nil {
@@ -123,13 +184,8 @@ func ValidateFolder(folder, engineDir string) error {
 	if fi, err := os.Stat(real); err != nil || !fi.IsDir() {
 		return ErrNotAllowed
 	}
-	if filepath.Dir(real) == real { // filesystem root / drive root
+	if broadOrSecret(real) {
 		return ErrNotAllowed
-	}
-	if h, err := os.UserHomeDir(); err == nil {
-		if hr, err := filepath.EvalSymlinks(h); err == nil && samePath(real, hr) {
-			return ErrNotAllowed
-		}
 	}
 	if er, err := filepath.EvalSymlinks(engineDir); err == nil && within(er, real) {
 		return ErrNotAllowed
@@ -160,25 +216,37 @@ func isUNC(p string) bool {
 }
 
 // ignored applies the folder's .ideaignore (add-only: "!" lines cannot un-exclude anything).
+// It fails closed: an unreadable, oversized or malformed .ideaignore blocks the folder's files.
 func ignored(root *os.Root, rel string) bool {
 	f, err := root.Open(ignoreFile)
-	if err != nil {
+	if errors.Is(err, os.ErrNotExist) {
 		return false
 	}
+	if err != nil {
+		return true
+	}
 	defer f.Close()
+	if fi, err := f.Stat(); err != nil || fi.Size() > maxIgnoreBytes {
+		return true
+	}
 	sc := bufio.NewScanner(io.LimitReader(f, maxIgnoreBytes))
 	lines := 0
-	for sc.Scan() && lines < maxIgnoreLines {
-		lines++
+	for sc.Scan() {
+		if lines++; lines > maxIgnoreLines {
+			return true
+		}
 		pat := strings.TrimSpace(sc.Text())
 		if pat == "" || strings.HasPrefix(pat, "#") || strings.HasPrefix(pat, "!") {
 			continue
+		}
+		if _, err := path.Match(strings.Trim(pat, "/"), "x"); err != nil {
+			return true // malformed pattern
 		}
 		if matchIgnore(strings.ToLower(pat), strings.ToLower(rel)) {
 			return true
 		}
 	}
-	return false
+	return sc.Err() != nil
 }
 
 func matchIgnore(pat, rel string) bool {

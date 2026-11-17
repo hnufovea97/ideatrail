@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"time"
 )
 
 const (
@@ -22,6 +23,11 @@ const (
 )
 
 var ErrSeqExhausted = errors.New("sequence exhausted")
+
+// LockTimeout bounds how long a caller waits for state.lock held by another engine process.
+var LockTimeout = 30 * time.Second
+
+var ErrLockTimeout = errors.New("state is locked by another engine process")
 
 // Seq is a sequence number stored as a JSON string so values above 2^53 stay exact.
 type Seq uint64
@@ -69,7 +75,8 @@ type State struct {
 	Roots          map[string]Root   `json:"roots,omitempty"`
 	Folders        map[string]string `json:"folders,omitempty"` // resolved absolute folder → root_id (registered only via approved inbox)
 	PendingUploads []string          `json:"pending_uploads,omitempty"`
-	Blocked        string            `json:"blocked,omitempty"` // fixed code while the server keeps refusing an upload
+	Blocked        string            `json:"blocked,omitempty"`         // fixed code while the server keeps refusing an upload
+	BlockedVersion string            `json:"blocked_version,omitempty"` // engine version that hit the block (a new version retries)
 	AnchorsCursor  Seq               `json:"anchors_cursor"`
 }
 
@@ -92,7 +99,7 @@ func (s *State) RememberMsgID(id string) bool {
 // if fn returns nil. The lock is held for the whole call, so callers may do I/O inside fn when
 // the spec requires it (e.g. holding req_seq until the server answers).
 func With(dir string, fn func(*State) error) error {
-	unlock, err := lock(filepath.Join(dir, lockName))
+	unlock, err := lock(filepath.Join(dir, lockName), LockTimeout)
 	if err != nil {
 		return fmt.Errorf("state lock: %w", err)
 	}
@@ -107,9 +114,11 @@ func With(dir string, fn func(*State) error) error {
 	return write(dir, s)
 }
 
-// LockFile takes an exclusive cross-process lock on dir/name (e.g. "request.lock") and returns
-// the release function. Used to keep one engine request in flight at a time (spec §2).
-func LockFile(dir, name string) (func(), error) { return lock(filepath.Join(dir, name)) }
+// LockFile takes an exclusive cross-process lock on dir/name (e.g. "request.lock"), waiting up to
+// timeout, and returns the release function. Used to keep one engine request in flight (spec §2).
+func LockFile(dir, name string, timeout time.Duration) (func(), error) {
+	return lock(filepath.Join(dir, name), timeout)
+}
 
 // Read returns a snapshot under the lock (no write).
 func Read(dir string) (*State, error) {
@@ -151,6 +160,12 @@ func write(dir string, s *State) error {
 	if err != nil {
 		return fmt.Errorf("state write: %w", err)
 	}
+	ok := false
+	defer func() {
+		if !ok {
+			_ = os.Remove(tmp)
+		}
+	}()
 	if _, err := f.Write(b); err != nil {
 		f.Close()
 		return fmt.Errorf("state write: %w", err)
@@ -165,5 +180,9 @@ func write(dir string, s *State) error {
 	if err := replace(tmp, filepath.Join(dir, fileName)); err != nil {
 		return err
 	}
+	ok = true
 	return syncDir(dir)
 }
+
+// SyncDir makes a rename/create in dir durable (no-op where the OS journals it).
+func SyncDir(dir string) error { return syncDir(dir) }

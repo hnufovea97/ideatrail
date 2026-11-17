@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -145,5 +146,22 @@ func TestSessionHidesSecrets(t *testing.T) {
 	b, _ := json.Marshal(s)
 	if string(b) != "{}" {
 		t.Fatalf("session serializes secrets: %s", b)
+	}
+}
+
+func TestSessionRedactedInPrint(t *testing.T) {
+	s := &Session{id: sessionID, psk: []byte("SUPERSECRETPSK00SUPERSECRETPSK00"), link: "https://x/#v1.a.b.SECRET"}
+	for _, out := range []string{fmt.Sprintf("%v", s), fmt.Sprintf("%+v", s), fmt.Sprintf("%#v", s)} {
+		if strings.Contains(out, "SECRET") {
+			t.Fatalf("leaked: %s", out)
+		}
+	}
+}
+
+func TestLoopbackLookalikeRejected(t *testing.T) {
+	w := newWorld(t)
+	w.d.AppBase = "http://127.0.0.1.evil.example"
+	if _, err := Start(context.Background(), w.d, "pc"); err == nil {
+		t.Fatal("lookalike host accepted")
 	}
 }
