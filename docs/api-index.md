@@ -34,7 +34,8 @@
 | POST | `/v1/approvals` | 엔진 서명 | 승인 대기 만들기(가져오기·폴더 추가·원문 지우기·연결 끊기·**가입 ⑤ 추천 폴더 `signup_select`**, kind 10/11, appr_seq) | pending_approvals |
 | GET | `/v1/approvals` | 세션 | 승인 대기 목록 받기(가입 ⑤ 화면은 `signup_select`를 여기서 받음 — 선택은 `POST /v1/inbox`) | pending_approvals |
 | POST | `/v1/approvals/:id/decide` | 세션 + 재확인 | 대시보드에서 승인·거절 → 엔진 전달함으로 | pending_approvals, engine_inbox |
-| GET/DELETE | `/v1/inbox` · `/v1/inbox/:id` | 엔진 서명 | 엔진 전달함 읽기·지우기 | engine_inbox |
+| GET | `/v1/inbox` | 엔진 서명 | 엔진 전달함 읽기(최대 100통) | engine_inbox |
+| DELETE | `/v1/inbox/:id` | 엔진 서명 | 처리한 메시지 지우기(자기 것만) | engine_inbox |
 | POST | `/v1/inbox` | 세션 | 브라우저 → 엔진 메시지(GitHub 연결 요청·가입 ⑤ 선택 등) — **HPKE Auth 모드(AK)**라 서버 위조 불가 | engine_inbox |
 | GET | `/v1/sync?cursor=&limit=` | 세션 | 바뀐 것만 받기: roots·records·deltas·anchors·engines·**storage_links·pending_approvals** (user_id, 순번 커서). `limit` 기본 200, 응답에 `next_cursor`(더 없으면 null) | 여러 표 |
 | POST | `/v1/roots/:id/meta` | 세션 | 합친 목록 정보 저장 (meta_version 조건부) | roots, meta_deltas |
