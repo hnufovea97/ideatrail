@@ -5,6 +5,7 @@ import { messageFor } from "@ideatrail/crypto/message";
 import { ApiError } from "../http/errors";
 import { toBytes } from "../db/values";
 import type { AppEnv } from "../env";
+import { verifyEd25519Raw } from "./secrets";
 
 export const MAX_SKEW_SECONDS = 300n;
 /** D1 INTEGER is signed 64-bit: sequences stop at 2^63-1 (spec §2 says uint64; the server caps it). */
@@ -12,8 +13,6 @@ export const MAX_SEQ = 2n ** 63n - 1n;
 
 const SEQ_RE = /^[1-9][0-9]{0,18}$/;
 const TS_RE = /^[0-9]{1,12}$/;
-const ED25519_PUB = 32;
-const ED25519_SIG = 64;
 
 const rejected = () => new ApiError(401, "bad_signature", "Request signature rejected");
 
@@ -46,16 +45,6 @@ async function readSigned(c: Context<AppEnv>): Promise<SignedRequest> {
   }
 }
 
-async function verifyEd25519(pub: Uint8Array, msg: Uint8Array, sig: Uint8Array): Promise<boolean> {
-  if (pub.length !== ED25519_PUB || sig.length !== ED25519_SIG) return false;
-  try {
-    const key = await crypto.subtle.importKey("raw", pub, { name: "Ed25519" }, false, ["verify"]);
-    return await crypto.subtle.verify("Ed25519", key, sig, msg);
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Engine-signed routes. The signature is checked BEFORE the sequence moves, so a forged request
  * cannot burn an engine's sequence. The sequence check and update are one conditional UPDATE
@@ -66,7 +55,7 @@ export const requireEngine: MiddlewareHandler<AppEnv> = async (c, next) => {
   const row = await c.env.DB.prepare("SELECT sign_pubkey, user_id FROM engines WHERE engine_id = ? AND revoked_at IS NULL")
     .bind(s.engineId)
     .first<{ sign_pubkey: unknown; user_id: string }>();
-  if (!row || !(await verifyEd25519(toBytes(row.sign_pubkey), s.message, s.sig))) throw rejected();
+  if (!row || !(await verifyEd25519Raw(toBytes(row.sign_pubkey), s.message, s.sig))) throw rejected();
   const upd = await c.env.DB.prepare(
     "UPDATE engines SET last_req_seq = CAST(?1 AS INTEGER) WHERE engine_id = ?2 AND last_req_seq < CAST(?1 AS INTEGER) AND revoked_at IS NULL",
   ).bind(s.reqSeq.toString(), s.engineId).run();
@@ -87,7 +76,7 @@ export const requirePairingEngine: MiddlewareHandler<AppEnv> = async (c, next) =
   const row = await c.env.DB.prepare("SELECT sign_pubkey FROM pairing_sessions WHERE session_id = ? AND engine_id = ?")
     .bind(sessionId, s.engineId)
     .first<{ sign_pubkey: unknown }>();
-  if (!row || !(await verifyEd25519(toBytes(row.sign_pubkey), s.message, s.sig))) throw rejected();
+  if (!row || !(await verifyEd25519Raw(toBytes(row.sign_pubkey), s.message, s.sig))) throw rejected();
   const upd = await c.env.DB.prepare(
     "UPDATE pairing_sessions SET last_req_seq = CAST(?1 AS INTEGER) WHERE session_id = ?2 AND last_req_seq < CAST(?1 AS INTEGER)",
   ).bind(s.reqSeq.toString(), sessionId).run();

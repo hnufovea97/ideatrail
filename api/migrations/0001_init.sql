@@ -228,6 +228,7 @@ CREATE TABLE device_add_sessions (
   user_id      TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   t_pubkey     BLOB,
   join_mac     TEXT,
+  join_secret_hash TEXT,                                -- 새 기기에 1회 준 비밀값의 SHA-256 (M2a: d만 알아서는 패스키를 못 붙임)
   sealed_mk    BLOB,                                    -- HPKE kind 9
   key_mac      TEXT,
   used_at      TEXT,

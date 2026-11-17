@@ -18,7 +18,7 @@ const TIMEOUT_MS = 5 * 60 * 1000;
 
 export const webauthnFailed = () => new ApiError(400, "webauthn_failed", "Passkey check failed");
 
-export function registrationOptions(env: Bindings, userId: string) {
+export function registrationOptions(env: Bindings, userId: string, exclude: string[] = []) {
   return generateRegistrationOptions({
     rpName: env.RP_NAME,
     rpID: env.RP_ID,
@@ -29,6 +29,7 @@ export function registrationOptions(env: Bindings, userId: string) {
     authenticatorSelection: { residentKey: "required", userVerification: "required" },
     supportedAlgorithmIDs: ALGORITHMS,
     timeout: TIMEOUT_MS,
+    excludeCredentials: exclude.map((id) => ({ id })),
   });
 }
 
