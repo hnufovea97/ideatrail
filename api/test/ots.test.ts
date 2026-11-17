@@ -59,7 +59,12 @@ describe("OTS minimal parser (real M0 receipts)", () => {
     expect(() => parseTimestamp(fromHex(fx.pending_alice_hex).subarray(0, 20), digest)).toThrow(/truncated/);
     expect(() => parseTimestamp(new Uint8Array(9000), digest)).toThrow(/too large/);
     const deep = new Uint8Array(300).fill(0x08); // 300 nested sha256 ops
-    expect(() => parseTimestamp(deep, digest)).toThrow(/too deep/);
+    expect(() => parseTimestamp(deep, digest)).toThrow(/too deep|too many nodes/);
+    const wide = new Uint8Array(4000);
+    for (let i = 0; i < 1333; i++) wide.set([0xff, 0x08], i * 2); // many sha256 branches
+    expect(() => parseTimestamp(wide, digest)).toThrow(/too many nodes|truncated/);
+    const grow = Uint8Array.of(0xf0, 0xff, 0x1f, ...new Uint8Array(4095), 0x08);
+    expect(() => parseTimestamp(grow, digest)).toThrow(/message too long/);
     const unknownAtt = Uint8Array.of(0x00, 1, 2, 3, 4, 5, 6, 7, 8, 0x00);
     expect(() => parseTimestamp(unknownAtt, digest)).toThrow(/unsupported attestation/);
   });

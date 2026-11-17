@@ -7,6 +7,9 @@ import { concat } from "@ideatrail/crypto/bytes";
 export const MAX_RECEIPT_BYTES = 8 * 1024;
 const MAX_DEPTH = 256; // real calendar+bitcoin paths exceed 64 ops; size cap bounds the rest
 const MAX_ARG = 4096;
+const MAX_NODES = 256;
+const MAX_ATTESTATIONS_PER_NODE = 8;
+const MAX_MSG = 4096; // append/prepend growth cap (every hop re-hashes or copies the message)
 const MAX_URI = 1000;
 
 const OP_SHA256 = 0x08;
@@ -30,6 +33,7 @@ const bad = (why: string) => new OtsError(`ots: ${why}`);
 
 class Reader {
   i = 0;
+  nodes = 0;
   constructor(readonly b: Uint8Array) {}
   byte(): number {
     if (this.i >= this.b.length) throw bad("truncated");
@@ -43,7 +47,7 @@ class Reader {
   }
   varuint(): number {
     let v = 0;
-    for (let shift = 0; shift < 49; shift += 7) {
+    for (let shift = 0; shift < 49; shift += 7) { // at most 7 bytes
       const x = this.byte();
       v += (x & 0x7f) * 2 ** shift;
       if (!(x & 0x80)) return v;
@@ -81,9 +85,12 @@ function readOp(r: Reader, tag: number): Op {
 
 function readNode(r: Reader, msg: Uint8Array, depth: number): Timestamp {
   if (depth > MAX_DEPTH) throw bad("too deep");
+  if (++r.nodes > MAX_NODES) throw bad("too many nodes");
+  if (msg.length > MAX_MSG) throw bad("message too long");
   const node: Timestamp = { msg, attestations: [], ops: [] };
   const one = (tag: number) => {
     if (tag === ATTESTATION) {
+      if (node.attestations.length >= MAX_ATTESTATIONS_PER_NODE) throw bad("too many attestations");
       node.attestations.push(readAttestation(r));
       return;
     }
@@ -165,6 +172,7 @@ export function pendingPoints(t: Timestamp): PendingPoint[] {
   return out;
 }
 
+/** Lowest bitcoin height in the tree — an UNVERIFIED hint; the browser checks it against block headers (spec §8). */
 /** Highest-confidence bitcoin attestation in the tree, if any. */
 export function bitcoinHeight(t: Timestamp): number | null {
   let best: number | null = null;
