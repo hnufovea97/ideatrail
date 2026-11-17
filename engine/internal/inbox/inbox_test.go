@@ -1,0 +1,220 @@
+package inbox
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/cloudflare/circl/kem"
+
+	"ideatrail/engine/internal/api"
+	ic "ideatrail/engine/internal/crypto"
+	"ideatrail/engine/internal/keys"
+	"ideatrail/engine/internal/state"
+	"ideatrail/engine/internal/testsrv"
+)
+
+const testUser = "01jcm3v8q7s2kx4f9d6b5n0tqw"
+
+type env struct {
+	d         Deps
+	srv       *testsrv.Server
+	akPriv    kem.PrivateKey
+	folder    string
+	mu        sync.Mutex
+	approvals []map[string]any
+	inbox     []map[string]string
+	deleted   []string
+}
+
+func newEnv(t *testing.T) *env {
+	t.Helper()
+	base, _ := filepath.EvalSymlinks(t.TempDir())
+	engine := filepath.Join(base, "engine")
+	_ = os.Mkdir(engine, 0o700)
+	k, _ := keys.LoadOrCreate(engine)
+	e := &env{srv: testsrv.New(), folder: filepath.Join(base, "my-idea")}
+	_ = os.MkdirAll(e.folder, 0o700)
+	_ = os.WriteFile(filepath.Join(e.folder, "plan.md"), []byte("x"), 0o600)
+	t.Cleanup(e.srv.Close)
+	e.srv.AddEngine(k.EngineID, k.SignPub())
+	e.srv.Handle("POST", "/v1/approvals", func(w http.ResponseWriter, r *http.Request, body []byte, _ string) {
+		var b map[string]any
+		_ = json.Unmarshal(body, &b)
+		e.mu.Lock()
+		e.approvals = append(e.approvals, b)
+		e.mu.Unlock()
+		testsrv.JSON(w, 201, map[string]any{})
+	})
+	e.srv.Handle("GET", "/v1/inbox", func(w http.ResponseWriter, r *http.Request, _ []byte, _ string) {
+		e.mu.Lock()
+		defer e.mu.Unlock()
+		testsrv.JSON(w, 200, map[string]any{"messages": e.inbox})
+	})
+	e.srv.Handle("DELETE", "/v1/inbox/:id", func(w http.ResponseWriter, r *http.Request, _ []byte, _ string) {
+		e.mu.Lock()
+		e.deleted = append(e.deleted, r.URL.Path)
+		e.mu.Unlock()
+		testsrv.JSON(w, 200, map[string]any{})
+	})
+	sk, pk, _ := ic.GenerateKEMKey(rand.Reader)
+	e.akPriv = sk
+	pkRaw, _ := pk.MarshalBinary()
+	_ = state.With(engine, func(s *state.State) error { s.UserID, s.AccountPub = testUser, ic.B64(pkRaw); return nil })
+	c, _ := api.New(e.srv.URL, k, engine)
+	e.d = Deps{API: c, Keys: k, StateDir: engine}
+	return e
+}
+
+// send plays the dashboard: an Auth-mode message from the account key to the engine key.
+func (e *env) send(t *testing.T, approvalID string, p map[string]any, sender kem.PrivateKey) string {
+	t.Helper()
+	if _, ok := p["issued_at"]; !ok {
+		p["issued_at"] = ic.FormatTime(time.Now())
+	}
+	p["v"] = 1
+	pt, _ := json.Marshal(p)
+	msgID, _ := ic.NewID(rand.Reader)
+	var sealed []byte
+	var err error
+	if sender == nil {
+		sealed, err = ic.Seal(ic.KindRecordMeta, e.d.Keys.KEMPub, ic.AAD{UserID: testUser}, pt) // wrong kind/mode
+	} else {
+		sealed, err = ic.SealAuth(ic.KindEngineInbox, e.d.Keys.KEMPub, sender, ic.AAD{UserID: testUser, RootID: approvalID, RecordID: msgID}, pt)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.mu.Lock()
+	e.inbox = append(e.inbox, map[string]string{"msg_id": msgID, "sealed": ic.B64(sealed)})
+	e.mu.Unlock()
+	return msgID
+}
+
+func (e *env) process(t *testing.T) []Event {
+	t.Helper()
+	ev, err := Process(context.Background(), e.d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.mu.Lock()
+	e.inbox = nil
+	e.mu.Unlock()
+	return ev
+}
+
+func folders(t *testing.T, e *env) map[string]string {
+	st, _ := state.Read(e.d.StateDir)
+	return st.Folders
+}
+
+func TestApprovedImportRegistersOnlyRequestedFolder(t *testing.T) {
+	e := newEnv(t)
+	id, err := RequestImport(context.Background(), e.d, "import", []string{e.folder})
+	if err != nil || len(e.approvals) != 1 || e.approvals[0]["appr_seq"] != "1" {
+		t.Fatalf("%v %v", err, e.approvals)
+	}
+	if len(folders(t, e)) != 0 {
+		t.Fatal("registered before approval")
+	}
+	e.send(t, id, map[string]any{"type": "approval_result", "approval_id": id, "decision": "approved"}, e.akPriv)
+	ev := e.process(t)
+	if len(ev) != 1 || ev[0].Kind != "folders_registered" || ev[0].Folders != 1 {
+		t.Fatalf("%+v", ev)
+	}
+	if _, ok := folders(t, e)[e.folder]; !ok {
+		t.Fatal("folder not registered")
+	}
+	if len(e.deleted) != 1 {
+		t.Fatal("message not deleted")
+	}
+}
+
+func TestRejectedForgedReplayedAndForeignMessagesDoNothing(t *testing.T) {
+	e := newEnv(t)
+	id, _ := RequestImport(context.Background(), e.d, "import", []string{e.folder})
+	_, otherAK, _ := ic.GenerateKEMKey(rand.Reader)
+	otherPriv, _, _ := ic.GenerateKEMKey(rand.Reader)
+	_ = otherAK
+	e.send(t, id, map[string]any{"type": "approval_result", "approval_id": id, "decision": "approved"}, nil)                                // server-made (not Auth)
+	e.send(t, id, map[string]any{"type": "approval_result", "approval_id": id, "decision": "approved"}, otherPriv)                          // another account key
+	e.send(t, "", map[string]any{"type": "approval_result", "approval_id": "01jcm3v8q7s2kx4f9d6b5n0tqz", "decision": "approved"}, e.akPriv) // not our request
+	if ev := e.process(t); len(ev) != 0 || len(folders(t, e)) != 0 {
+		t.Fatalf("acted on bad messages: %+v", ev)
+	}
+	e.send(t, id, map[string]any{"type": "approval_result", "approval_id": id, "decision": "rejected"}, e.akPriv)
+	if ev := e.process(t); len(ev) != 1 || ev[0].Kind != "rejected" || len(folders(t, e)) != 0 {
+		t.Fatalf("%+v", ev)
+	}
+	// a later "approved" for the same (now closed) request does nothing
+	e.send(t, id, map[string]any{"type": "approval_result", "approval_id": id, "decision": "approved"}, e.akPriv)
+	if ev := e.process(t); len(ev) != 0 || len(folders(t, e)) != 0 {
+		t.Fatalf("%+v", ev)
+	}
+}
+
+func TestReplayedMessageIgnored(t *testing.T) {
+	e := newEnv(t)
+	msgID := e.send(t, "", map[string]any{"type": "connect_github"}, e.akPriv)
+	first := e.inbox[0]
+	if ev := e.process(t); len(ev) != 1 || ev[0].Kind != "connect_github" {
+		t.Fatalf("%+v", ev)
+	}
+	e.inbox = []map[string]string{first}
+	if ev := e.process(t); len(ev) != 0 {
+		t.Fatalf("replay of %s acted on", msgID)
+	}
+}
+
+func TestStaleConnectRequestIgnored(t *testing.T) {
+	e := newEnv(t)
+	e.send(t, "", map[string]any{"type": "connect_github", "issued_at": ic.FormatTime(time.Now().Add(-11 * time.Minute))}, e.akPriv)
+	if ev := e.process(t); len(ev) != 0 {
+		t.Fatalf("%+v", ev)
+	}
+}
+
+func TestSelectFoldersNeverAddsInventedFolders(t *testing.T) {
+	e := newEnv(t)
+	id, err := RequestImport(context.Background(), e.d, "signup_select", []string{e.folder})
+	if err != nil {
+		t.Fatal(err)
+	}
+	invented := filepath.Join(filepath.Dir(e.folder), "secret-notes")
+	_ = os.MkdirAll(invented, 0o700)
+	e.send(t, id, map[string]any{"type": "select_folders", "approval_id": id, "folders": []string{e.folder, invented}}, e.akPriv)
+	e.process(t)
+	f := folders(t, e)
+	if _, ok := f[invented]; ok || len(f) != 1 {
+		t.Fatalf("folders %v", f)
+	}
+}
+
+func TestRequestLimitsAndDangerousFolders(t *testing.T) {
+	e := newEnv(t)
+	fakeHome, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("HOME", fakeHome)
+	if _, err := RequestImport(context.Background(), e.d, "import", []string{fakeHome}); !errors.Is(err, ErrBadFolder) {
+		t.Fatalf("home accepted: %v", err)
+	}
+	if _, err := RequestImport(context.Background(), e.d, "import", []string{filepath.Dir(e.d.StateDir)}); !errors.Is(err, ErrBadFolder) {
+		t.Fatalf("engine ancestor accepted: %v", err)
+	}
+	for i := 0; i < MaxOpen; i++ {
+		d := filepath.Join(filepath.Dir(e.folder), "idea"+string(rune('a'+i)))
+		_ = os.MkdirAll(d, 0o700)
+		if _, err := RequestImport(context.Background(), e.d, "import", []string{d}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := RequestImport(context.Background(), e.d, "import", []string{e.folder}); !errors.Is(err, ErrTooMany) {
+		t.Fatalf("got %v", err)
+	}
+}

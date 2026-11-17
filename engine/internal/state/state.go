@@ -63,21 +63,31 @@ type Root struct {
 	LastRecordID string   `json:"last_record_id,omitempty"`
 }
 
+// Approval is a request this engine made; inbox answers must match one of these (M3b review).
+type Approval struct {
+	Kind      string   `json:"kind"`
+	Folders   []string `json:"folders"` // resolved real paths the engine asked about
+	CreatedAt string   `json:"created_at"`
+	Done      bool     `json:"done,omitempty"`
+	Body      string   `json:"body,omitempty"` // signed request body, kept until the server accepts it
+}
+
 // State is the whole state.json document.
 type State struct {
-	ReqSeq         Seq               `json:"req_seq"`
-	LogSeq         Seq               `json:"log_seq"`
-	ApprSeq        Seq               `json:"appr_seq"`
-	SeenMsgIDs     []string          `json:"seen_msg_ids,omitempty"`
-	UserID         string            `json:"user_id,omitempty"`
-	AccountPub     string            `json:"account_pubkey,omitempty"` // b64u, pinned at pairing
-	RepoFullName   string            `json:"repo_full_name,omitempty"`
-	Roots          map[string]Root   `json:"roots,omitempty"`
-	Folders        map[string]string `json:"folders,omitempty"` // resolved absolute folder → root_id (registered only via approved inbox)
-	PendingUploads []string          `json:"pending_uploads,omitempty"`
-	Blocked        string            `json:"blocked,omitempty"`         // fixed code while the server keeps refusing an upload
-	BlockedVersion string            `json:"blocked_version,omitempty"` // engine version that hit the block (a new version retries)
-	AnchorsCursor  Seq               `json:"anchors_cursor"`
+	ReqSeq         Seq                 `json:"req_seq"`
+	LogSeq         Seq                 `json:"log_seq"`
+	ApprSeq        Seq                 `json:"appr_seq"`
+	SeenMsgIDs     []string            `json:"seen_msg_ids,omitempty"`
+	UserID         string              `json:"user_id,omitempty"`
+	AccountPub     string              `json:"account_pubkey,omitempty"` // b64u, pinned at pairing
+	RepoFullName   string              `json:"repo_full_name,omitempty"`
+	Roots          map[string]Root     `json:"roots,omitempty"`
+	Folders        map[string]string   `json:"folders,omitempty"` // resolved absolute folder → root_id (registered only via approved inbox)
+	PendingUploads []string            `json:"pending_uploads,omitempty"`
+	Blocked        string              `json:"blocked,omitempty"`         // fixed code while the server keeps refusing an upload
+	BlockedVersion string              `json:"blocked_version,omitempty"` // engine version that hit the block (a new version retries)
+	AnchorsCursor  Seq                 `json:"anchors_cursor"`
+	Approvals      map[string]Approval `json:"approvals,omitempty"`
 }
 
 // RememberMsgID records a processed inbox msg_id, keeping the newest MaxSeenMsgIDs.
