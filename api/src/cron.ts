@@ -9,7 +9,7 @@ import { bitcoinHeight, MAX_RECEIPT_BYTES, mergeInto, parseTimestamp, pendingPoi
 /** Free plan: 50 outbound subrequests per invocation; keep 2 spare. */
 export const FETCH_BUDGET = 48;
 /** Receipts handled per run: parsing is CPU work (free plan 10ms), so stay well below the fetch budget. */
-export const ANCHORS_PER_RUN = 16;
+export const ANCHORS_PER_RUN = 8; // staging: 9 confirmations took 62ms CPU (≈20ms cold start + ≈4.5ms each)
 const RESPONSE_CAP = 4096;
 const FETCH_TIMEOUT_MS = 10_000;
 const BASE_INTERVAL_S = 30 * 60;
