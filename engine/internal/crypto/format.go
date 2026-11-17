@@ -50,3 +50,33 @@ func hexSHA(b []byte) string {
 	h := sha256.Sum256(b)
 	return hex.EncodeToString(h[:])
 }
+
+// idField returns "-" for an empty id, the id itself when it is 26 Crockford base32 chars,
+// or ErrBadField otherwise (spec §2).
+func idField(s string) (string, error) {
+	if s == "" || s == "-" {
+		return "-", nil
+	}
+	if len(s) != 26 {
+		return "", ErrBadField
+	}
+	for _, c := range []byte(s) {
+		if !strings.ContainsRune(crockford, rune(c)) {
+			return "", ErrBadField
+		}
+	}
+	return s, nil
+}
+
+// numField accepts "" (→ "-") or decimal ASCII digits.
+func numField(s string) (string, error) {
+	if s == "" || s == "-" {
+		return "-", nil
+	}
+	for _, c := range []byte(s) {
+		if c < '0' || c > '9' {
+			return "", ErrBadField
+		}
+	}
+	return s, nil
+}
