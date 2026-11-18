@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -25,53 +24,113 @@ var importRecord = Record
 // tree cannot hold the import.
 var maxImportExamined = 5000
 
-// ImportFolders records the existing files of folders newly registered at signup: at most limit
-// files in all, MaxFiles and under MaxRecordBytes per record, each record marked as the signup
-// import, and never more records than the server's import allowance has left. Files the path guard
-// refuses or over the record limit are left out up front; a chunk that changes while read is
-// skipped and the rest goes on. A cancelled context, a full queue or an OTS/API failure stops the
-// import. Files beyond the limit are left for ordinary recording when they change. The journal
-// gets counts only. Returns how many files were recorded. No folders means no network call.
+// maxImportAttempts bounds how often an import that keeps stopping is resumed.
+const maxImportAttempts = 5
+
+// ImportFolders starts the signup first import for folders and runs it (see ResumeImport).
 func ImportFolders(ctx context.Context, d Deps, folders []string, limit int) (int, error) {
-	if len(folders) == 0 || limit <= 0 {
-		return 0, nil
+	if err := StartImport(d, folders); err != nil {
+		return 0, err
+	}
+	return ResumeImport(ctx, d, limit)
+}
+
+// StartImport saves folders as the first import to run; folders already waiting are kept.
+func StartImport(d Deps, folders []string) error {
+	if len(folders) == 0 {
+		return nil
+	}
+	return state.With(d.StateDir, func(s *state.State) error {
+		job := state.ImportJob{}
+		if s.Import != nil {
+			job = *s.Import
+		}
+		have := map[string]bool{}
+		for _, f := range job.Folders {
+			have[f] = true
+		}
+		for _, f := range folders {
+			if !have[f] {
+				job.Folders = append(job.Folders, f)
+				have[f] = true
+			}
+		}
+		s.Import = &job
+		return nil
+	})
+}
+
+// ImportPending reports whether a first import is waiting to run or resume.
+func ImportPending(d Deps) bool {
+	st, err := state.Read(d.StateDir)
+	return err == nil && st.Import != nil
+}
+
+// ResumeImport runs the saved first import from where it stopped: at most limit files in all,
+// MaxFiles and under MaxRecordBytes per record, each record marked as the signup import, and never
+// more records than the server's import allowance has left. Files the path guard refuses or over
+// the record limit are left out up front; a chunk that changes while read is skipped and the rest
+// goes on. A cancelled context, a full queue or an OTS/API failure stops it and keeps the job for
+// the next run. Files beyond the limit are left for ordinary recording when they change. The
+// journal gets counts only. Returns how many files this run recorded. No job means no network call.
+func ResumeImport(ctx context.Context, d Deps, limit int) (int, error) {
+	st, err := state.Read(d.StateDir)
+	if err != nil || st.Import == nil {
+		return 0, err
+	}
+	job := *st.Import
+	if job.Attempts >= maxImportAttempts || limit <= 0 {
+		importJournal(d, "import_given_up", job.Done)
+		return 0, saveImport(d, nil)
+	}
+	job.Attempts++
+	if err := saveImport(d, &job); err != nil {
+		return 0, err
 	}
 	records, err := importAllowance(ctx, d)
 	if err != nil {
-		importJournal(d, "import_stopped", 0)
-		return 0, err
-	}
-	st, err := state.Read(d.StateDir)
-	if err != nil {
+		importJournal(d, "import_stopped", job.Done)
 		return 0, err
 	}
 	g := d.guard(st)
 	done, skipped := 0, 0
-	for _, f := range folders {
-		if done >= limit || records <= 0 {
-			break
+	for job.Folder < len(job.Folders) && job.Done < limit && records > 0 {
+		f := job.Folders[job.Folder]
+		files := importable(ctx, g, f, st.Folders[f], job.Skip+limit-job.Done)
+		if err := ctx.Err(); err != nil {
+			return done, err
 		}
-		files := importable(ctx, g, f, st.Folders[f], limit-done)
-		for _, chunk := range importChunks(files, limit-done) {
+		files = files[min(job.Skip, len(files)):]
+		for _, chunk := range importChunks(files, limit-job.Done) {
 			if records <= 0 {
 				break
 			}
 			_, err := importRecord(ctx, d, Input{Paths: chunk, Note: importNote, Import: true})
-			if errors.Is(err, ErrChanged) || errors.Is(err, ErrTooLarge) {
+			switch {
+			case err == nil:
+				done, job.Done, records = done+len(chunk), job.Done+len(chunk), records-1
+			case errors.Is(err, ErrChanged) || errors.Is(err, ErrTooLarge):
 				skipped += len(chunk)
-				continue
-			}
-			if err != nil {
+			default:
 				importJournal(d, "import_skipped", skipped)
-				importJournal(d, "import_stopped", done)
+				importJournal(d, "import_stopped", job.Done)
 				return done, err
 			}
-			done += len(chunk)
-			records--
+			job.Skip += len(chunk)
+			_ = saveImport(d, &job)
 		}
+		if records <= 0 || job.Done >= limit {
+			break
+		}
+		job.Folder, job.Skip = job.Folder+1, 0
+		_ = saveImport(d, &job)
 	}
 	importJournal(d, "import_skipped", skipped)
-	return done, ctx.Err()
+	return done, saveImport(d, nil)
+}
+
+func saveImport(d Deps, job *state.ImportJob) error {
+	return state.With(d.StateDir, func(s *state.State) error { s.Import = job; return nil })
 }
 
 // importJournal writes one count-only line (no paths, names or error text); zero skips write nothing.
@@ -123,7 +182,8 @@ type importFile struct {
 	size int64
 }
 
-// importable lists, in path order, up to want regular files under folder that the guard lets this
+// importable lists, in walk order (by name, folder by folder; stable, so a resume can skip what it
+// handled), up to want regular files under folder that the guard lets this
 // folder's record read: hidden entries and node_modules are skipped, and so are files of another
 // registered folder nested inside (they belong to that idea) and files over the record byte limit.
 // The walk stops at want files, after maxImportExamined entries, or when ctx ends.
@@ -165,6 +225,5 @@ func importable(ctx context.Context, g *pathguard.Guard, folder, rootID string, 
 		}
 		return nil
 	})
-	sort.Slice(out, func(i, j int) bool { return out[i].path < out[j].path })
 	return out
 }

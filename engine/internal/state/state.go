@@ -91,6 +91,17 @@ type State struct {
 	BlockedVersion string              `json:"blocked_version,omitempty"` // engine version that hit the block (a new version retries)
 	AnchorsCursor  Seq                 `json:"anchors_cursor"`
 	Approvals      map[string]Approval `json:"approvals,omitempty"`
+	Import         *ImportJob          `json:"import,omitempty"` // signup first import not finished yet
+}
+
+// ImportJob is the signup first import's progress, kept so an interrupted import resumes where it
+// stopped instead of recording the same files twice.
+type ImportJob struct {
+	Folders  []string `json:"folders"`
+	Folder   int      `json:"folder"`   // index of the folder in progress
+	Skip     int      `json:"skip"`     // files of that folder already handled (recorded or skipped)
+	Done     int      `json:"done"`     // files recorded in all
+	Attempts int      `json:"attempts"` // runs started; a job that keeps failing is given up
 }
 
 // RememberMsgID records a processed inbox msg_id, keeping the newest MaxSeenMsgIDs.

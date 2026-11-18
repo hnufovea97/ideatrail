@@ -139,3 +139,48 @@ func TestImportableStopsEarly(t *testing.T) {
 		t.Fatalf("cancelled walk returned %d files", len(got))
 	}
 }
+
+// An import cut off (engine closed, time budget) is kept in state and resumes where it stopped:
+// files already handled are not recorded twice, and a finished import leaves nothing behind.
+func TestImportResumesWhereItWasInterrupted(t *testing.T) {
+	e := newEnv(t)
+	e.allowance(200)
+	for i := 0; i < 120; i++ {
+		e.file(t, fmt.Sprintf("n%03d.md", i), "x")
+	}
+	if err := StartImport(e.d, []string{e.folder}); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	seen := map[string]int{}
+	old := importRecord
+	t.Cleanup(func() { importRecord = old })
+	importRecord = func(c context.Context, d Deps, in Input) (*Result, error) {
+		if err := c.Err(); err != nil {
+			return nil, err
+		}
+		for _, p := range in.Paths {
+			seen[p]++
+		}
+		cancel() // interrupted right after the first record
+		return &Result{Status: "sent"}, nil
+	}
+	if _, err := ResumeImport(ctx, e.d, ImportLimit); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err=%v, want cancelled", err)
+	}
+	if !ImportPending(e.d) {
+		t.Fatal("interrupted import was not kept")
+	}
+	n, err := ResumeImport(context.Background(), e.d, ImportLimit)
+	if err != nil || n != 70 {
+		t.Fatalf("resumed n=%d err=%v, want the 70 files left", n, err)
+	}
+	for p, c := range seen {
+		if c != 1 {
+			t.Fatalf("%s recorded %d times", filepath.Base(p), c)
+		}
+	}
+	if len(seen) != 120 || ImportPending(e.d) {
+		t.Fatalf("seen=%d pending=%v", len(seen), ImportPending(e.d))
+	}
+}
