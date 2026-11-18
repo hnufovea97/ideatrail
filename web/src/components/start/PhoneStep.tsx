@@ -4,6 +4,7 @@ import { offerDevice, pollOffer, type DeviceOffer, type OfferProgress } from "..
 import type { StepProps } from "../../lib/signup/context";
 import { stepNumber } from "../../lib/signup/machine";
 import { POLL_MS } from "../../lib/timing";
+import { CopyButton } from "../ui/CopyButton";
 import { Qr } from "../ui/Qr";
 import { Screen } from "../ui/Screen";
 import { usePolling } from "../ui/usePolling";
@@ -46,7 +47,16 @@ export function PhoneStep({ api, ctx, state, dispatch }: StepProps) {
   return (
     <Screen step={stepNumber(state.step)} title={COPY.phone.title} why={COPY.phone.why} done={state.done} error={error}>
       <p>{COPY.phone.scan}</p>
-      {offer ? <Qr text={offer.url} label={COPY.phone.qrLabel} /> : null}
+      {offer ? (
+        <>
+          <Qr text={offer.url} label={COPY.phone.qrLabel} />
+          <details class="no-scan">
+            <summary>{COPY.phone.noScan}</summary>
+            <p class="small">{COPY.phone.linkWarn}</p>
+            <CopyButton text={offer.url} label={COPY.phone.copyLink} />
+          </details>
+        </>
+      ) : null}
       <p class="small" aria-live="polite">{progress === "sent" ? COPY.phone.sent : note ?? ""}</p>
       <button type="button" class="link" onClick={() => dispatch({ type: "phone_skip" })}>{COPY.phone.skip}</button>
     </Screen>

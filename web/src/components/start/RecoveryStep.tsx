@@ -58,7 +58,7 @@ export function RecoveryStep({ api, ctx, state, dispatch }: StepProps) {
           <p>{COPY.recovery.sheetTitle}</p>
           <p class="key" data-testid="recovery-key">{plan.display}</p>
         </div>
-        {method === "manager" ? <CopyButton text={plan.display} /> : <button type="button" onClick={() => window.print()}>{COPY.recovery.printAction}</button>}
+        {method === "manager" ? <CopyButton text={plan.display} label={COPY.recovery.copy} /> : <button type="button" onClick={() => window.print()}>{COPY.recovery.printAction}</button>}
         <button type="button" class="primary" onClick={() => setPhase("check")}>{COPY.recovery.wrote}</button>
       </Screen>
     );

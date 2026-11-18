@@ -33,7 +33,10 @@ export const COPY = {
     title: "휴대폰도 같이 등록",
     why: "출근길에 휴대폰으로 보려고, 그리고 기기 하나를 잃어도 다른 기기로 열 수 있게요.",
     scan: "휴대폰 카메라로 찍으세요",
-    qrLabel: "휴대폰으로 찍을 QR 코드 (2분 유효)",
+    qrLabel: "휴대폰으로 찍을 QR 코드 (2분 유효). 찍을 수 없으면 아래 'QR을 찍을 수 없어요'에서 링크를 복사하세요",
+    noScan: "QR을 찍을 수 없어요", // 새 문구
+    copyLink: "링크 복사 (내 휴대폰에서만 열기)", // 새 문구
+    linkWarn: "이 링크는 한 번만 쓰는 비밀 열쇠예요. 2분 동안만 쓸 수 있고, 다른 사람에게는 절대 보내지 마세요", // 새 문구
     sent: "휴대폰에서 기기 잠금을 해 주세요", // 새 문구
     skip: "휴대폰이 지금 없어요",
   },
@@ -56,7 +59,7 @@ export const COPY = {
     print: "PDF로 인쇄",
     make: "지금 만들기",
     later: "나중에",
-    copy: "복사",
+    copy: "복구 키 복사",
     printAction: "인쇄",
     wrote: "다 적었어요", // 새 문구
     firstFour: "앞 4자리",
@@ -109,7 +112,7 @@ export const COPY = {
     offline: "인터넷이 끊겼어요. 연결되면 다시 불러올게요",
     not_registered: "이 기기는 아직 등록 안 됐어요. 쓰던 기기에서 '기기 추가'를 눌러 주세요",
   },
-  actions: { copy: "복사", copyLink: "링크 복사", copied: "복사했어요", retry: "다시" },
+  actions: { copy: "복사", copyCommand: "명령 복사", copyLink: "링크 복사", copied: "복사했어요", copyFailed: "복사하지 못했어요. 직접 선택해서 복사하세요", retry: "다시" },
   errors: {
     passkey_cancel: "기기 잠금 확인이 안 됐어요. 다시 해 볼까요?", // UX 오류표 "지문 확인" → "기기 잠금 확인"(founder 결정)
     qr_expired: "2분이 지나서 새로 만들었어요",

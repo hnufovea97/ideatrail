@@ -12,6 +12,6 @@ export default defineConfig({
   webServer: [
     { command: "node e2e/api-server.mjs", port: 8787, reuseExistingServer: false, timeout: 180_000 },
     // `--ignore-lock` keeps `astro preview` in the foreground (Astro 7 backgrounds itself when it detects an AI agent).
-    { command: "pnpm build && pnpm preview --ignore-lock", port: 4321, reuseExistingServer: false, timeout: 180_000, env: { PUBLIC_API_BASE: "http://localhost:8787" } },
+    { command: "pnpm build && pnpm preview --ignore-lock", port: 4321, reuseExistingServer: false, timeout: 180_000, env: { PUBLIC_API_BASE: "http://localhost:8787", PUBLIC_TEST_HOOKS: "1" } },
   ],
 });

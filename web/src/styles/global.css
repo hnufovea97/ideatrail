@@ -20,6 +20,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); ou
 .error { color: var(--warn); font-weight: 600; }
 .banner { border: 1px solid var(--accent); border-radius: 10px; padding: 12px; margin-bottom: 16px; }
 .qr { width: min(100%, 260px); height: auto; display: block; margin: 16px auto; background: #fff; }
+details.no-scan { margin: 0 0 12px; }
+details.no-scan summary { cursor: pointer; padding: 10px 0; color: var(--accent); text-decoration: underline; }
 .key { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.1rem; letter-spacing: 0.05em; word-break: break-all; padding: 12px; border: 1px dashed var(--line); border-radius: 8px; }
 fieldset { border: 0; padding: 0; margin: 12px 0; }
 label.choice { display: flex; gap: 10px; align-items: center; min-height: 44px; }
