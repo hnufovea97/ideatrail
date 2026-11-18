@@ -8,8 +8,9 @@ export function GithubBanner({ api, ctx, onLinked }: { api: Api; ctx: SignupCont
   return (
     <section class="banner" aria-label={COPY.github.title}>
       <p>{COPY.github.banner}</p>
-      {phase === "waiting" ? <p aria-live="polite">{COPY.github.waiting}</p> : <button type="button" onClick={start}>{COPY.github.bannerAction}</button>}
-      {error ? <p class="error" role="alert">{error}</p> : null}
+      {phase === "waiting" ? null : <button type="button" onClick={start}>{COPY.github.bannerAction}</button>}
+      <p class="small" role="status">{phase === "waiting" ? COPY.github.waiting : ""}</p>
+      <p class="error" role="alert">{error ?? ""}</p>
     </section>
   );
 }

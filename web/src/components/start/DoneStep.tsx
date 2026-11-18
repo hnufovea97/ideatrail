@@ -7,7 +7,7 @@ import { GithubBanner } from "./GithubBanner";
 export function DoneStep({ api, ctx, state, dispatch }: StepProps) {
   const [closing, setClosing] = useState(false);
   return (
-    <Screen title={COPY.done.title}>
+    <Screen title={COPY.done.title} mark={COPY.done.mark}>
       {state.githubLater ? <GithubBanner api={api} ctx={ctx} onLinked={() => dispatch({ type: "github_done" })} /> : null}
       {state.done.phone ? <p>{COPY.done.phone}</p> : null}
       {state.foldersChosen === 0 ? <p>{COPY.done.freshStart}</p> : null}

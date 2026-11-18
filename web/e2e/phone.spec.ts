@@ -24,7 +24,7 @@ test("phone joins with the QR secret, registers its own passkey, PC moves on", a
   });
   await phone.goto(url!);
   await phone.getByRole("button", { name: "이 기기 잠금으로 등록" }).click();
-  await confirmPasskey(phone, "이 기기에서도 열려요 ✓");
+  await confirmPasskey(phone, "이 기기에서도 열려요");
   await expect(phone.getByText("홈 화면에 추가")).toBeVisible();
   await expect(page.getByRole("heading", { name: "GitHub 보관" })).toBeVisible();
   await expectClean(phone, w);
@@ -95,5 +95,5 @@ test("a failed QR request offers [다시]", async ({ page }) => {
   await expect(page.getByRole("alert")).toHaveText("잠시 문제가 생겼어요. 다시 해 볼까요?");
   await page.getByRole("button", { name: "다시", exact: true }).click();
   await expect(page.getByRole("img", { name: /휴대폰으로 찍을 QR 코드/ })).toBeVisible();
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByRole("alert")).toHaveText("");
 });

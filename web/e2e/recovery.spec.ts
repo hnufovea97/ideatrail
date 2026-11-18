@@ -37,6 +37,8 @@ test("a wrong first four is caught in the browser with zero requests", async ({ 
   await page.getByLabel("앞 4자리").fill("ZZZZ");
   await page.getByRole("button", { name: "확인하고 저장" }).click();
   await expect(page.getByRole("alert")).toHaveText("앞 4자리가 달라요. 보관한 복구 키를 다시 확인해 주세요");
+  await expect(page.getByLabel("앞 4자리")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByLabel("앞 4자리")).toHaveAttribute("aria-errormessage", "screen-error");
   expect(w.requests.length).toBe(before);
 });
 
@@ -49,6 +51,11 @@ test("each phase inside the step moves focus to its title (choose → show → c
   await page.getByRole("button", { name: "지금 만들기" }).click();
   await expect(page.getByTestId("recovery-key")).toBeVisible();
   await expect(h1).toBeFocused();
+  await expect(h1).toHaveAccessibleName("복구 키 중요");
+  const groups = page.getByTestId("recovery-key").locator('span[translate="no"][lang="en"]');
+  expect(await groups.count()).toBeGreaterThan(1);
+  await expect(page.getByText("4글자씩 끊어 천천히 읽어 보세요")).toBeVisible();
+  await expect(page.getByText("5단계 중 4단계")).toBeAttached();
   await page.getByRole("button", { name: "다 적었어요" }).click();
   await expect(page.getByLabel("앞 4자리")).toBeVisible();
   await expect(h1).toBeFocused();

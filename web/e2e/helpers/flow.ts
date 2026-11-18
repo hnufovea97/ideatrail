@@ -39,7 +39,7 @@ export async function githubLater(page: Page) {
 export async function saveRecoveryKey(page: Page): Promise<string> {
   await page.getByLabel("비밀번호 관리자에 저장").check();
   await page.getByRole("button", { name: "지금 만들기" }).click();
-  const display = (await page.getByTestId("recovery-key").innerText()).trim();
+  const display = ((await page.getByTestId("recovery-key").textContent()) ?? "").trim(); // groups wrap as flex items
   const prepared = page.waitForResponse((r) => r.url().endsWith("/v1/webauthn/stepup/options"));
   await page.getByRole("button", { name: "다 적었어요" }).click();
   await prepared;

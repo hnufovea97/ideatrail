@@ -13,6 +13,8 @@ export const CHECKLIST: readonly { key: keyof Checklist; label: string }[] = [
 ];
 
 export const COPY = {
+  busy: "불러오고 있어요…", // 새 문구
+  noscript: "이 페이지는 JavaScript를 켜야 열려요", // 새 문구
   limit: "알아 둘 것: 내용은 당신과, 함께 작업하는 AI만 봐요. 우리 서버는 못 봐요.",
   intro: {
     title: "시작하기 전에",
@@ -67,12 +69,13 @@ export const COPY = {
     save: "확인하고 저장", // 새 문구
     mismatch: "앞 4자리가 달라요. 보관한 복구 키를 다시 확인해 주세요", // 새 문구
     sheetTitle: "아이디어 로그 복구 키",
+    readHint: "4글자씩 끊어 천천히 읽어 보세요", // 새 문구
   },
   folders: {
     title: "기록할 것 고르기",
     why: "이미 있는 문서로 아이디어마다 어디까지 왔는지 점검표를 바로 채워요. 날짜 증명은 오늘부터이고, 원래 날짜는 참고로 붙어요.",
     current: "지금 프로젝트",
-    files: (n: number) => `문서 ${n}`,
+    files: (n: number) => `문서 ${n}개`,
     action: "기록하기",
     none: "새 기록부터 시작하기", // 새 문구
     noneNote: "고른 폴더가 없어요. 앞으로 생기는 변화부터 기록해요", // 새 문구
@@ -82,7 +85,8 @@ export const COPY = {
     retry: "다시",
   },
   done: {
-    title: "준비됐어요 ✓",
+    title: "준비됐어요",
+    mark: "✓",
     phone: "휴대폰에서도 열려요.",
     how: "앞으로 이렇게 동작해요",
     lines: [
@@ -98,7 +102,8 @@ export const COPY = {
     title: "이 기기에서도 열기",
     waiting: "컴퓨터와 연결하고 있어요", // 새 문구
     action: "이 기기 잠금으로 등록", // 새 문구
-    done: "이 기기에서도 열려요 ✓",
+    done: "이 기기에서도 열려요",
+    doneMark: "✓",
     a2hs: "브라우저 메뉴(⋮)에서 \"홈 화면에 추가\"를 누르면 앱처럼 열 수 있어요", // 새 문구
     expired: "QR이 만료됐어요. 컴퓨터 화면의 새 QR을 다시 찍어 주세요", // 새 문구
   },

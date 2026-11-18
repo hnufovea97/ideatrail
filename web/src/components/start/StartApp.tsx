@@ -4,6 +4,7 @@ import { ApiFailure, createApi, type PairingInfo } from "../../lib/api";
 import { prfSupport, type CapabilityEnv } from "../../lib/capability";
 import { clearFragment, engineKeysMatch, parseStartLink } from "../../lib/fragment";
 import type { SignupContext } from "../../lib/signup/context";
+import { COPY } from "../../lib/copy";
 import { initialState, reduce, type StopReason } from "../../lib/signup/machine";
 import { DoneStep } from "./DoneStep";
 import { FoldersStep } from "./FoldersStep";
@@ -23,7 +24,7 @@ function stopFor(e: unknown): StopReason {
   return "offline";
 }
 
-const Busy = () => <main class="screen" aria-busy="true"><p class="small">…</p></main>;
+const Busy = () => <main class="screen" aria-busy="true"><p class="small" role="status">{COPY.busy}</p></main>;
 
 export default function StartApp() {
   const api = useMemo(() => createApi(API_BASE), []);

@@ -17,8 +17,8 @@ async function toFolders(page: Page, folders: SuggestedFolder[]): Promise<{ engi
 
 test("current project is on, suggestions off; the choice reaches the engine sealed and bound", async ({ page }) => {
   const { engine, approvalId } = await toFolders(page, [PROJECT, BUDGET]);
-  await expect(page.getByRole("checkbox", { name: /지금 프로젝트 · 아이디어 로그 \(문서 18\)/ })).toBeChecked();
-  const budget = page.getByRole("checkbox", { name: /가계부 앱 \(문서 12\)/ });
+  await expect(page.getByRole("checkbox", { name: /지금 프로젝트 · 아이디어 로그 \(문서 18개\)/ })).toBeChecked();
+  const budget = page.getByRole("checkbox", { name: /가계부 앱 \(문서 12개\)/ });
   await expect(budget).not.toBeChecked();
   await budget.check();
   const decided = page.waitForResponse((r) => r.url().endsWith(`/v1/approvals/${approvalId}/decide`) && r.status() === 200);

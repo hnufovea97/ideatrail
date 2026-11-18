@@ -138,7 +138,7 @@ export default function ConnectApp() {
   }
 
   if (phase === "stopped") return <Screen title={stop ?? COPY.errors.generic} />;
-  if (phase === "done") return <Screen title={COPY.connect.done}><p>{COPY.connect.a2hs}</p></Screen>;
+  if (phase === "done") return <Screen title={COPY.connect.done} mark={COPY.connect.doneMark}><p>{COPY.connect.a2hs}</p></Screen>;
   if (phase === "retry") {
     return <Screen title={COPY.pc.retryPrf} error={error}><button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.pc.retryAction}</button></Screen>;
   }
@@ -157,5 +157,5 @@ export default function ConnectApp() {
       </Screen>
     );
   }
-  return <Screen title={COPY.connect.title} error={error}><p aria-live="polite">{COPY.connect.waiting}</p></Screen>;
+  return <Screen title={COPY.connect.title} error={error} status={phase === "waiting" ? COPY.connect.waiting : null} />;
 }

@@ -81,7 +81,7 @@ export function FoldersStep({ api, ctx, state, dispatch }: StepProps) {
       });
   }
 
-  if (phase === "waiting") return <Screen {...head}><p aria-live="polite">{COPY.folders.waiting}</p></Screen>;
+  if (phase === "waiting") return <Screen {...head} status={COPY.folders.waiting} />;
   if (phase === "timeout") {
     return (
       <Screen {...head} error={COPY.folders.timeout}>

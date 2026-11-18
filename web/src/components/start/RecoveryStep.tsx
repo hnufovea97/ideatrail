@@ -6,9 +6,15 @@ import { canSkipRecovery, stepNumber } from "../../lib/signup/machine";
 import { confirmWithPasskey, prepareStepup, type PreparedStepup } from "../../lib/stepup";
 import { STEPUP_REFRESH_MS } from "../../lib/timing";
 import { CopyButton } from "../ui/CopyButton";
-import { Screen } from "../ui/Screen";
+import { ERROR_ID, Screen } from "../ui/Screen";
 
 type Phase = "choose" | "show" | "check";
+
+/** One span per group (the hyphen stays with it, so the text is the key as written); never translated. */
+const groups = (display: string) => {
+  const parts = display.split("-");
+  return parts.map((g, i) => <span key={i} translate={false} lang="en">{i < parts.length - 1 ? `${g}-` : g}</span>);
+};
 
 export function RecoveryStep({ api, ctx, state, dispatch }: StepProps) {
   const [phase, setPhase] = useState<Phase>("choose");
@@ -19,6 +25,7 @@ export function RecoveryStep({ api, ctx, state, dispatch }: StepProps) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const mandatory = !canSkipRecovery(state);
+  const mismatch = error === COPY.recovery.mismatch;
 
   // The step-up challenge is fetched before the click, and renewed before it expires.
   useEffect(() => {
@@ -57,8 +64,9 @@ export function RecoveryStep({ api, ctx, state, dispatch }: StepProps) {
       <Screen {...head}>
         <div class="print-sheet">
           <p>{COPY.recovery.sheetTitle}</p>
-          <p class="key" data-testid="recovery-key">{plan.display}</p>
+          <p class="key" data-testid="recovery-key">{groups(plan.display)}</p>
         </div>
+        <p class="small">{COPY.recovery.readHint}</p>
         {method === "manager" ? <CopyButton text={plan.display} label={COPY.recovery.copy} /> : <button type="button" onClick={() => window.print()}>{COPY.recovery.printAction}</button>}
         <button type="button" class="primary" onClick={() => setPhase("check")}>{COPY.recovery.wrote}</button>
       </Screen>
@@ -70,7 +78,7 @@ export function RecoveryStep({ api, ctx, state, dispatch }: StepProps) {
         <label for="first-four">{COPY.recovery.firstFour}</label>
         <p class="small" id="first-four-help">{COPY.recovery.firstFourHelp}</p>
         <input id="first-four" type="text" inputMode="text" maxLength={6} autoComplete="off" spellcheck={false} autoCapitalize="characters"
-          aria-describedby="first-four-help" value={typed} onInput={(e) => setTyped((e.target as HTMLInputElement).value)} />
+          aria-describedby="first-four-help" aria-invalid={mismatch ? "true" : undefined} aria-errormessage={mismatch ? ERROR_ID : undefined} value={typed} onInput={(e) => setTyped((e.target as HTMLInputElement).value)} />
         <button type="button" class="primary" onClick={save} disabled={!prepared || busy}>{COPY.recovery.save}</button>
       </Screen>
     );

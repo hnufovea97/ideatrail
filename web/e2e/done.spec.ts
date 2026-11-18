@@ -11,7 +11,7 @@ test("end screen: 3 lines, the GitHub banner stays until the engine's link arriv
   await githubLater(page);
   await saveRecoveryKey(page);
   await page.getByRole("button", { name: "기록하기" }).click();
-  await expect(page.getByRole("heading", { name: "준비됐어요 ✓" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "준비됐어요", exact: true })).toBeVisible();
   await expect(page.getByTestId("done-how")).toMatchAriaSnapshot(`
     - heading "앞으로 이렇게 동작해요" [level=2]
     - list:
@@ -41,6 +41,6 @@ test("nothing chosen → the end screen says new records start from now", async 
   await saveRecoveryKey(page);
   await page.getByRole("checkbox", { name: /p/ }).uncheck();
   await page.getByRole("button", { name: "새 기록부터 시작하기" }).click();
-  await expect(page.getByRole("heading", { name: "준비됐어요 ✓" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "준비됐어요", exact: true })).toBeVisible();
   await expect(page.getByText("새 기록부터 남겨요")).toBeVisible();
 });

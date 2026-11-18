@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import { COPY } from "../lib/copy";
 interface Props { title: string }
 const { title } = Astro.props;
 ---
@@ -15,6 +16,7 @@ const { title } = Astro.props;
     <title>{title} · 아이디어 로그</title>
   </head>
   <body>
+    <noscript><p class="screen">{COPY.noscript}</p></noscript>
     <slot />
   </body>
 </html>
