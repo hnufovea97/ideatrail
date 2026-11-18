@@ -14,21 +14,21 @@ import (
 // Every sentence the AI can receive. Nothing from the server, GitHub, files or errors is ever
 // passed through (injection channel), only these fixed texts plus a sanitized folder name.
 const (
-	msgPairing       = "가입을 브라우저에서 이어 가세요. 끝나면 다시 기록할 수 있어요."
-	msgPairingOpened = "브라우저에 가입 화면을 열었어요. 가입을 마치면 기록할 수 있어요."
-	msgNotRegistered = "이 폴더는 아직 기록 대상이 아니에요. 대시보드에서 승인하면 기록할 수 있어요."
-	msgNotAllowed    = "허용되지 않은 파일이에요(등록된 폴더 밖이거나 비밀 파일)."
-	msgBadInput      = "기록 내용이 너무 길거나 형식이 맞지 않아요."
-	msgTooLarge      = "파일이 너무 많거나 커요(50개·100MB까지)."
-	msgQueueFull     = "올리지 못한 기록이 너무 많아요. 인터넷 연결을 확인해 주세요."
-	msgOTSFailed     = "비트코인 시각 서버에 연결하지 못했어요. 잠시 뒤 다시 기록해 주세요."
-	msgFailed        = "기록하지 못했어요. 잠시 뒤 다시 시도해 주세요."
-	msgImportAsked   = "대시보드에 승인 요청을 보냈어요. 승인하면 그 폴더도 기록돼요."
-	msgImportBad     = "그 폴더는 기록 대상으로 쓸 수 없어요(홈 폴더·비밀 폴더 등)."
-	msgImportTooMany = "승인을 기다리는 요청이 이미 있어요. 대시보드에서 먼저 처리해 주세요."
-	msgPublicRefusal = "공개·삭제·공유는 대시보드에서 직접만 할 수 있어요."
-	suffixQueued     = " (인터넷 연결 뒤 자동으로 올라가요)"
-	suffixBlocked    = " (서버가 기록을 받지 않아요 — 엔진 업데이트가 필요해요)"
+	msgPairing       = "가입이 아직 안 끝났어요. 앞서 열린 브라우저 창에서 이어 가 주세요(약 5분). 다 마치면 여기로 돌아와 다시 말해 주세요."
+	msgPairingOpened = "가입하려고 브라우저 창을 열었어요. 약 5분이면 끝나요. 화면이 하라는 대로 마친 뒤 여기 Claude Code로 돌아와 주세요."
+	msgNotRegistered = "이 폴더는 아직 기록하지 않는 폴더예요. 대시보드에서 이 폴더를 허락하면 기록할 수 있어요."
+	msgNotAllowed    = "이 파일은 기록할 수 없어요. 기록하기로 고른 폴더 밖에 있거나, 비밀번호 같은 비밀 파일이에요."
+	msgBadInput      = "기록 설명이 너무 길거나 형식이 맞지 않아요. 짧게 다시 정리해 주세요."
+	msgTooLarge      = "한 번에 기록하기엔 파일이 너무 많거나 커요. 한 번에 50개, 100MB까지예요."
+	msgQueueFull     = "아직 보내지 못한 기록이 너무 많이 쌓였어요. 인터넷 연결을 확인해 주세요."
+	msgOTSFailed     = "날짜 증명 서버에 연결하지 못했어요. 잠시 뒤 다시 기록해 주세요."
+	msgFailed        = "기록하지 못했어요. 잠시 뒤 다시 해 주세요."
+	msgImportAsked   = "대시보드에 '이 폴더도 기록할까요?' 요청을 보냈어요. 허락하면 그 폴더도 기록돼요."
+	msgImportBad     = "그 폴더는 기록할 수 없어요(홈 폴더 전체나 비밀 폴더 등)."
+	msgImportTooMany = "아직 답하지 않은 요청이 있어요. 대시보드에서 먼저 답해 주세요."
+	msgPublicRefusal = "공개로 바꾸기·지우기·공유는 대시보드에서 본인만 직접 할 수 있어요."
+	suffixQueued     = " (인터넷이 연결되면 저절로 올라가요)"
+	suffixBlocked    = " (지금은 서버가 기록을 받지 않아요. 기록 도우미를 업데이트해 주세요)"
 )
 
 var stageLabels = map[string]string{

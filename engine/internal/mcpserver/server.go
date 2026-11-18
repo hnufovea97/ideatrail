@@ -173,9 +173,12 @@ func (e *Engine) recordTool(ctx context.Context, in recordIn) string {
 	if err != nil {
 		return recordError(err)
 	}
-	msg := "기록했어요 · " + cleanName(r.Title) + " · " + stageLabel(in.Milestone)
-	if in.Milestone != "" && in.Milestone != "none" && !in.MilestoneCertain {
-		msg += " (AI 추정)"
+	msg := "기록했어요 · " + cleanName(r.Title)
+	if in.Milestone != "" && in.Milestone != "none" { // a plain record names no stage
+		msg += " · 단계: " + stageLabel(in.Milestone)
+		if !in.MilestoneCertain {
+			msg += " (AI 추정)"
+		}
 	}
 	switch r.Status {
 	case "queued":
@@ -201,9 +204,9 @@ func (e *Engine) statusTool(ctx context.Context, _ struct{}) string {
 		return msgNotRegistered
 	}
 	root := st.Roots[rootID]
-	msg := cleanName(filepath.Base(real)) + " · " + stageLabel(root.Stage)
+	msg := cleanName(filepath.Base(real)) + " · 지금 단계: " + stageLabel(root.Stage)
 	if root.LastRecordID == "" {
-		msg += " · 아직 기록 없음"
+		msg += " · 아직 기록이 없어요"
 	}
 	if st.Blocked != "" {
 		msg += suffixBlocked

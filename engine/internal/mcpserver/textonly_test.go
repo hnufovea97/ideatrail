@@ -28,7 +28,7 @@ func TestToolsAnswerOnlyOneFixedTextContent(t *testing.T) {
 		want string
 	}{
 		{"record", map[string]any{"paths": []string{"/etc/passwd"}, "note": "x"}, msgNotAllowed},
-		{"status", map[string]any{}, cleanName(filepath.Base(e.folder)) + " · " + stageLabel("") + " · 아직 기록 없음"},
+		{"status", map[string]any{}, cleanName(filepath.Base(e.folder)) + " · 지금 단계: " + stageLabel("") + " · 아직 기록이 없어요"},
 		{"request_import", map[string]any{"folders": []string{"/"}}, msgImportBad},
 	}
 	for _, c := range cases {
