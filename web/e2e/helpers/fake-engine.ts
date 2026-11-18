@@ -98,6 +98,7 @@ export class FakeEngine {
   /** Read, open (Auth mode: must come from the pinned account key) and delete inbox messages. */
   async readInbox(approvalIds: string[] = []): Promise<InboxMessage[]> {
     const r = await this.signed("GET", "/v1/inbox");
+    if (!r.ok) throw new Error(`inbox ${r.status}`);
     const { messages } = (await r.json()) as { messages: { msg_id: string; sealed: string }[] };
     const out: InboxMessage[] = [];
     for (const m of messages) {
@@ -110,7 +111,8 @@ export class FakeEngine {
           // bound to another approval id (or forged): try the next binding
         }
       }
-      await this.signed("DELETE", `/v1/inbox/${m.msg_id}`);
+      const del = await this.signed("DELETE", `/v1/inbox/${m.msg_id}`);
+      if (!del.ok) throw new Error(`inbox delete ${del.status}`);
     }
     return out;
   }

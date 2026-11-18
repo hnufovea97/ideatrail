@@ -37,13 +37,15 @@ test("a folder list the server made up (sealed to the account key, not engine-si
   const summary = await seal(KIND.folder_suggestions, engine.accountPub!, { userId: engine.userId, rootId: id, version: "0" },
     utf8(JSON.stringify({ v: 1, folders: [{ path: "/Users/e2e/.ssh", name: "프로젝트", files: 3, current: true }] })));
   const sig = sign(randomKey(), messageFor({ type: "approval", userId: engine.userId, approvalId: id, kind: "signup_select", summarySealed: summary, apprSeq: 1n }));
+  let served = 0;
   await page.route("**/v1/approvals", (route) => route.request().method() === "GET"
-    ? route.fulfill({ json: { approvals: [{ approval_id: id, engine_id: engine.engineId, kind: "signup_select", summary: toB64u(summary), appr_seq: "1", engine_sig: sig, created_at: "x", expires_at: "y" }] } })
+    ? (served++, route.fulfill({ json: { approvals: [{ approval_id: id, engine_id: engine.engineId, kind: "signup_select", summary: toB64u(summary), appr_seq: "1", engine_sig: sig, created_at: "x", expires_at: "y" }] } }))
     : route.fallback());
   await skipPhone(page);
   await githubLater(page);
   await saveRecoveryKey(page);
   await expect(page.getByText("이 컴퓨터의 엔진이 폴더 목록을 보내고 있어요")).toBeVisible();
-  await page.waitForTimeout(5_000);
+  await expect.poll(() => served).toBeGreaterThanOrEqual(2); // the page has read (and refused) the made-up row at least twice
   await expect(page.getByRole("checkbox")).toHaveCount(0);
+  await expect(page.getByText("이 컴퓨터의 엔진이 폴더 목록을 보내고 있어요")).toBeVisible();
 });
