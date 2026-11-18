@@ -333,3 +333,9 @@ func writeOwnerOnly(path string, b []byte) error {
 	}
 	return os.Rename(tmp, path)
 }
+
+// OutboxEmpty reports whether no GitHub commit is waiting in the queue.
+func OutboxEmpty(d Deps) bool {
+	names, err := queued(d.OutboxDir)
+	return err == nil && len(names) == 0
+}

@@ -6,6 +6,7 @@ import (
 
 	"ideatrail/engine/internal/inbox"
 	"ideatrail/engine/internal/record"
+	"ideatrail/engine/internal/repo"
 	"ideatrail/engine/internal/state"
 )
 
@@ -54,14 +55,17 @@ func watchSignup(ctx context.Context, t signupTiming, poll func(context.Context)
 	}
 }
 
-// signupDone: the signup list was answered (or closed) and no GitHub login is running. Without a
-// posted list the watcher runs for its full time.
+// signupDone: the signup list was answered (or closed), no GitHub login is running, and what the
+// answer started has gone out: the first import is recorded, uploaded and pushed to GitHub. No
+// tool call drives background work after signup, so stopping earlier left it queued for hours.
+// Without a posted list, or while something cannot go out, the watcher runs for its full time.
 func (e *Engine) signupDone(approvalID string) bool {
-	if approvalID == "" || e.connecting.Load() {
+	if approvalID == "" || e.connecting.Load() || e.importing.Load() {
 		return false
 	}
 	st, err := state.Read(e.StateDir)
-	return err == nil && st.Approvals[approvalID].Done
+	return err == nil && st.Approvals[approvalID].Done && st.Import == nil &&
+		len(st.PendingUploads) == 0 && repo.OutboxEmpty(e.Repo)
 }
 
 // postSignupList posts signup step 5's list, retrying a few times with backoff; a final failure is
