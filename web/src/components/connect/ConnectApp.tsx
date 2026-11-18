@@ -74,7 +74,6 @@ export default function ConnectApp() {
       setPending(null);
       setPhase("register");
       freshOptions();
-      setBusy(false);
       return;
     }
     await submit(created, body, false);
@@ -99,8 +98,6 @@ export default function ConnectApp() {
       setUnsent(null);
       setError(errorMessage(e));
       freshOptions();
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -108,22 +105,27 @@ export default function ConnectApp() {
     if (!opts || busy) return;
     setBusy(true);
     setError(null);
-    createPasskey(opts.options).then((c) => {
-      if (c.prf) return finish(c, c.prf);
-      setPending(c);
-      setPhase("retry");
-      setBusy(false);
-    }, (e) => { setError(errorMessage(e)); setBusy(false); });
+    createPasskey(opts.options)
+      .then((c) => {
+        if (c.prf) return finish(c, c.prf);
+        setPending(c);
+        setPhase("retry");
+      })
+      .catch((e: unknown) => setError(errorMessage(e)))
+      .finally(() => setBusy(false));
   }
 
   function retry() {
     if (!pending || busy) return;
     setBusy(true);
-    readPrf(pending.rawId, opts?.options.rp.id).then(async (prf) => {
-      if (prf) return finish(pending, prf);
-      await forgetCredential(rpId(), pending.rawId);
-      halt(COPY.stop.prf_missing);
-    }, (e) => { setError(errorMessage(e)); setBusy(false); });
+    readPrf(pending.rawId, opts?.options.rp.id)
+      .then(async (prf) => {
+        if (prf) return finish(pending, prf);
+        await forgetCredential(rpId(), pending.rawId);
+        halt(COPY.stop.prf_missing);
+      })
+      .catch((e: unknown) => setError(errorMessage(e)))
+      .finally(() => setBusy(false));
   }
 
   if (phase === "stopped") return <Screen title={stop ?? COPY.errors.generic} />;
@@ -132,7 +134,7 @@ export default function ConnectApp() {
     return <Screen title={COPY.pc.retryPrf} error={error}><button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.pc.retryAction}</button></Screen>;
   }
   if (phase === "register" && unsent) {
-    const again = () => { setBusy(true); setError(null); void submit(unsent.created, unsent.body, true); };
+    const again = () => { setBusy(true); setError(null); void submit(unsent.created, unsent.body, true).finally(() => setBusy(false)); };
     return (
       <Screen title={COPY.connect.title} focusKey="unsent" error={error}>
         <button type="button" class="primary" onClick={again} disabled={busy}>{COPY.actions.retry}</button>

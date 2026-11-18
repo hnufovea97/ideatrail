@@ -1,5 +1,6 @@
 // WebAuthn JSON <-> binary for the API (SimpleWebAuthn on the server), with PRF (spec §11).
-// Every create/get here starts synchronously so callers can invoke them straight from a click.
+// Every create/get here starts synchronously so callers can invoke them straight from a click. They are
+// async functions: the body up to create/get still runs in the click, and a sync throw becomes a rejection.
 import { ab, fromB64u, toB64u } from "@ideatrail/crypto/bytes";
 import { PRF_SALT } from "@ideatrail/crypto/envelope";
 import type { AssertionJSON, CreationOptionsJSON, RegistrationJSON, RequestOptionsJSON } from "./api";
@@ -18,7 +19,7 @@ export function creationOptions(o: CreationOptionsJSON): PublicKeyCredentialCrea
     pubKeyCredParams: o.pubKeyCredParams,
     timeout: o.timeout,
     attestation: "none",
-    authenticatorSelection: o.authenticatorSelection,
+    authenticatorSelection: { ...o.authenticatorSelection, userVerification: "required" }, // never weaker than the server asked
     excludeCredentials: (o.excludeCredentials ?? []).map((c) => ({ type: "public-key" as const, id: ab(fromB64u(c.id)) })),
     extensions: prfInput(),
   };
@@ -39,16 +40,14 @@ function asCredential(c: Credential | null): PublicKeyCredential {
 export interface Created { credential: PublicKeyCredential; rawId: Uint8Array; prf: Uint8Array | null }
 
 /** Call directly in a click handler: no await before create (Safari, QA B4). */
-export function createPasskey(o: CreationOptionsJSON, nav: CredentialsContainer = navigator.credentials): Promise<Created> {
-  return nav.create({ publicKey: creationOptions(o) }).then((c) => {
-    const credential = asCredential(c);
-    return { credential, rawId: new Uint8Array(credential.rawId), prf: prfOf(credential) };
-  });
+export async function createPasskey(o: CreationOptionsJSON, nav: CredentialsContainer = navigator.credentials): Promise<Created> {
+  const credential = asCredential(await nav.create({ publicKey: creationOptions(o) }));
+  return { credential, rawId: new Uint8Array(credential.rawId), prf: prfOf(credential) };
 }
 
 /** Spec §11 P3: when create gave no PRF output, one get on the same credential (local challenge, not sent anywhere). */
-export function readPrf(rawId: Uint8Array, rpId: string | undefined, nav: CredentialsContainer = navigator.credentials): Promise<Uint8Array | null> {
-  return nav.get({
+export async function readPrf(rawId: Uint8Array, rpId: string | undefined, nav: CredentialsContainer = navigator.credentials): Promise<Uint8Array | null> {
+  const c = await nav.get({
     publicKey: {
       challenge: ab(crypto.getRandomValues(new Uint8Array(32))),
       rpId,
@@ -56,12 +55,13 @@ export function readPrf(rawId: Uint8Array, rpId: string | undefined, nav: Creden
       userVerification: "required",
       extensions: prfInput(),
     },
-  }).then((c) => prfOf(asCredential(c)));
+  });
+  return prfOf(asCredential(c));
 }
 
 /** Server step-up: assertion only (no PRF). Starts synchronously. */
-export function assertWithPasskey(o: RequestOptionsJSON, nav: CredentialsContainer = navigator.credentials): Promise<AssertionJSON> {
-  return nav.get({
+export async function assertWithPasskey(o: RequestOptionsJSON, nav: CredentialsContainer = navigator.credentials): Promise<AssertionJSON> {
+  const c = await nav.get({
     publicKey: {
       challenge: ab(fromB64u(o.challenge)),
       rpId: o.rpId,
@@ -69,7 +69,8 @@ export function assertWithPasskey(o: RequestOptionsJSON, nav: CredentialsContain
       userVerification: "required",
       allowCredentials: (o.allowCredentials ?? []).map((c) => ({ type: "public-key" as const, id: ab(fromB64u(c.id)) })),
     },
-  }).then((c) => assertionJSON(asCredential(c)));
+  });
+  return assertionJSON(asCredential(c));
 }
 
 /** What /register/verify receives. Extension results are always {} — the PRF output never leaves the browser. */

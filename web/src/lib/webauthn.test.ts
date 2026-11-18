@@ -56,4 +56,21 @@ describe("passkeys with PRF", () => {
     expect(a.response.userHandle).toBeUndefined();
     expect(a.clientExtensionResults).toEqual({});
   });
+  it("bad options reject instead of throwing synchronously, so .catch() sees them", async () => {
+    const bad = { ...OPTIONS, challenge: "!!not base64!!" };
+    let p: Promise<unknown> | undefined;
+    expect(() => { p = createPasskey(bad, nav(null)); }).not.toThrow();
+    await expect(p).rejects.toThrow();
+    let q: Promise<unknown> | undefined;
+    expect(() => { q = assertWithPasskey({ challenge: "!!not base64!!" }, nav(null)); }).not.toThrow();
+    await expect(q).rejects.toThrow();
+    const throwing = { get: () => { throw new TypeError("no webauthn"); } } as unknown as CredentialsContainer;
+    let r: Promise<unknown> | undefined;
+    expect(() => { r = readPrf(Uint8Array.of(1), "localhost", throwing); }).not.toThrow();
+    await expect(r).rejects.toThrow("no webauthn");
+  });
+  it("always asks for user verification on create, whatever the server sent", () => {
+    expect(creationOptions({ ...OPTIONS, authenticatorSelection: { residentKey: "required", userVerification: "discouraged" } }).authenticatorSelection?.userVerification).toBe("required");
+    expect(creationOptions({ ...OPTIONS, authenticatorSelection: undefined }).authenticatorSelection?.userVerification).toBe("required");
+  });
 });

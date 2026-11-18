@@ -79,7 +79,6 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
   }
 
   function fail(e: unknown) {
-    setBusy(false);
     setError(errorMessage(e));
     setAttempt((n) => n + 1); // a used or expired challenge is never reused
   }
@@ -88,21 +87,26 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
     if (!opts || busy) return;
     setBusy(true);
     setError(null);
-    createPasskey(opts.options).then(async (created) => {
-      if (created.prf) await finish(created, created.prf);
-      else setPending(created);
-      setBusy(false);
-    }, fail);
+    createPasskey(opts.options)
+      .then(async (created) => {
+        if (created.prf) await finish(created, created.prf);
+        else setPending(created);
+      })
+      .catch(fail)
+      .finally(() => setBusy(false));
   }
 
   function retryPrf() {
     if (!pending || busy) return;
     setBusy(true);
-    readPrf(pending.rawId, opts?.options.rp.id).then(async (prf) => {
-      if (prf) return finish(pending, prf).finally(() => setBusy(false));
-      await forgetCredential(rpId(), pending.rawId); // never registered on the server
-      dispatch({ type: "stop", reason: "prf_missing" });
-    }, fail);
+    readPrf(pending.rawId, opts?.options.rp.id)
+      .then(async (prf) => {
+        if (prf) return finish(pending, prf);
+        await forgetCredential(rpId(), pending.rawId); // never registered on the server
+        dispatch({ type: "stop", reason: "prf_missing" });
+      })
+      .catch(fail)
+      .finally(() => setBusy(false));
   }
 
   if (unsent) {
