@@ -117,6 +117,7 @@ export const COPY = {
     github_not_done: "GitHub 승인이 끝나지 않았어요. Claude Code에서 다시 시작할게요",
     offline: "인터넷이 끊겼어요. 연결되면 다시 불러올게요",
     generic: "잠시 문제가 생겼어요. 다시 해 볼까요?", // 새 문구
+    verify_unsure: "연결을 확인하고 다시 해 주세요", // 새 문구: 등록 응답이 끊김, 아무것도 지우지 않음
   },
 } as const;
 

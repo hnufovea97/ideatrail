@@ -2,7 +2,7 @@ import { fromB64u, fromHex, toB64u, toHex } from "@ideatrail/crypto/bytes";
 import { newKemKeyPair, randomKey } from "@ideatrail/crypto/keypair";
 import { bytesEqual, deviceJoinMac, deviceKeyMac } from "@ideatrail/crypto/mac";
 import { KIND, open, seal } from "@ideatrail/crypto/seal";
-import { ApiFailure, type Api } from "./api";
+import { ApiFailure, type Api, type RegisterVerifyBody } from "./api";
 import type { Created } from "./webauthn";
 import { registrationJSON } from "./webauthn";
 import { makeEnvelope, type Vault } from "./signup/account";
@@ -68,8 +68,13 @@ export async function receiveMasterKey(api: Api, j: Joined): Promise<{ userId: s
   return { userId: r.user_id, mk };
 }
 
-/** Phone: this device's own envelope (unwrapped once before upload), registered under the device-add session. */
-export async function registerThisDevice(api: Api, p: { challengeId: string; userId: string; mk: Uint8Array; created: Created; prf: Uint8Array }): Promise<void> {
+/** Phone: this device's own envelope (unwrapped once before upload), built once so a retry sends the same body. */
+export function prepareDevice(p: { challengeId: string; userId: string; mk: Uint8Array; created: Created; prf: Uint8Array }): RegisterVerifyBody {
   const envelope = makeEnvelope(p.mk, p.userId, p.prf, p.created.rawId);
-  await api.registerVerify({ challenge_id: p.challengeId, response: registrationJSON(p.created.credential), envelope });
+  return { challenge_id: p.challengeId, response: registrationJSON(p.created.credential), envelope };
+}
+
+/** Registered under the device-add session. */
+export async function submitDevice(api: Api, body: RegisterVerifyBody): Promise<void> {
+  await api.registerVerify(body);
 }

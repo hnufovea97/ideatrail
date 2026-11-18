@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { newId } from "@ideatrail/crypto/ids";
 import { newKemKeyPair, randomKey } from "@ideatrail/crypto/keypair";
 import { ApiFailure, type Api } from "./api";
-import { joinOffer, offerDevice, pollOffer, receiveMasterKey } from "./device-add";
+import { joinOffer, offerDevice, pollOffer, prepareDevice, receiveMasterKey, submitDevice } from "./device-add";
+import { fakeCredential } from "./testing/fake-credential";
 import { parseConnectLink } from "./fragment";
 
 const USER = "01jcm3v8q7s2kx4f9d6b5n0tqw";
@@ -82,5 +83,15 @@ describe("device add (spec §10)", () => {
     const { api } = fakeServer();
     const offer = await offerDevice(api, "http://localhost:4321");
     expect(await pollOffer(api, offer, vault())).toBe("waiting");
+  });
+  it("a retried phone register/verify sends the same envelope again", async () => {
+    const bodies: unknown[] = [];
+    let fail = true;
+    const api = { registerVerify: async (b: unknown) => { bodies.push(b); if (fail) { fail = false; throw new ApiFailure(503, "unknown"); } return { user_id: USER }; } } as unknown as Api;
+    const prf = new Uint8Array(32).fill(2);
+    const body = prepareDevice({ challengeId: "c", userId: USER, mk: randomKey(), created: { credential: fakeCredential({ prf }), rawId: Uint8Array.of(1), prf }, prf });
+    await expect(submitDevice(api, body)).rejects.toThrow("unknown");
+    await submitDevice(api, body);
+    expect(JSON.stringify(bodies[1])).toBe(JSON.stringify(bodies[0]));
   });
 });

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { API_BASE } from "../../config";
-import { createApi, type RegisterOptions } from "../../lib/api";
+import { createApi, type RegisterOptions, type RegisterVerifyBody } from "../../lib/api";
 import { prfSupport, type CapabilityEnv } from "../../lib/capability";
 import { COPY, errorMessage } from "../../lib/copy";
-import { joinOffer, receiveMasterKey, registerThisDevice, type Joined } from "../../lib/device-add";
+import { joinOffer, prepareDevice, receiveMasterKey, submitDevice, type Joined } from "../../lib/device-add";
 import { clearFragment, parseConnectLink } from "../../lib/fragment";
+import { verifyFailure } from "../../lib/signup/pc-flow";
 import { POLL_MS } from "../../lib/timing";
 import { createPasskey, forgetCredential, readPrf, type Created } from "../../lib/webauthn";
 import { Screen } from "../ui/Screen";
@@ -20,6 +21,7 @@ export default function ConnectApp() {
   const [key, setKey] = useState<{ userId: string; mk: Uint8Array } | null>(null);
   const [opts, setOpts] = useState<RegisterOptions | null>(null);
   const [pending, setPending] = useState<Created | null>(null);
+  const [unsent, setUnsent] = useState<{ created: Created; body: RegisterVerifyBody } | null>(null); // verify answer lost
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -57,18 +59,46 @@ export default function ConnectApp() {
 
   const rpId = () => opts?.options.rp.id ?? location.hostname;
 
+  const freshOptions = () => {
+    if (joined) api.registerOptions({ device_add_session_id: joined.d, join_secret: joined.joinSecret }).then(setOpts, (e2) => setError(errorMessage(e2))); // a used challenge is never reused
+  };
+
   async function finish(created: Created, prf: Uint8Array) {
     if (!opts || !key) return;
+    let body: RegisterVerifyBody;
     try {
-      await registerThisDevice(api, { challengeId: opts.challenge_id, userId: key.userId, mk: key.mk, created, prf });
-      setKey(null);
-      setPhase("done");
+      body = prepareDevice({ challengeId: opts.challenge_id, userId: key.userId, mk: key.mk, created, prf });
     } catch (e) {
-      await forgetCredential(rpId(), created.rawId);
+      await forgetCredential(rpId(), created.rawId); // nothing was sent
       setError(errorMessage(e));
       setPending(null);
       setPhase("register");
-      if (joined) api.registerOptions({ device_add_session_id: joined.d, join_secret: joined.joinSecret }).then(setOpts, (e2) => setError(errorMessage(e2))); // a used challenge is never reused
+      freshOptions();
+      setBusy(false);
+      return;
+    }
+    await submit(created, body, false);
+  }
+
+  /** `unsure`: an earlier try of this same body may have reached the server, so never forget it now. */
+  async function submit(created: Created, body: RegisterVerifyBody, unsure: boolean) {
+    try {
+      await submitDevice(api, body);
+      setKey(null);
+      setUnsent(null);
+      setPhase("done");
+    } catch (e) {
+      setPending(null);
+      setPhase("register");
+      if (verifyFailure(e) === "unsure") {
+        setUnsent({ created, body }); // keep the passkey and the key in memory; retry sends the same body
+        setError(COPY.errors.verify_unsure);
+        return;
+      }
+      if (!unsure) await forgetCredential(rpId(), created.rawId); // a definitive refusal
+      setUnsent(null);
+      setError(errorMessage(e));
+      freshOptions();
     } finally {
       setBusy(false);
     }
@@ -100,6 +130,14 @@ export default function ConnectApp() {
   if (phase === "done") return <Screen title={COPY.connect.done}><p>{COPY.connect.a2hs}</p></Screen>;
   if (phase === "retry") {
     return <Screen title={COPY.pc.retryPrf} error={error}><button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.pc.retryAction}</button></Screen>;
+  }
+  if (phase === "register" && unsent) {
+    const again = () => { setBusy(true); setError(null); void submit(unsent.created, unsent.body, true); };
+    return (
+      <Screen title={COPY.connect.title} error={error}>
+        <button type="button" class="primary" onClick={again} disabled={busy}>{COPY.actions.retry}</button>
+      </Screen>
+    );
   }
   if (phase === "register") {
     return (

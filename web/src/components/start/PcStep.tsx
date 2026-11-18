@@ -5,7 +5,7 @@ import { browserStore } from "../../lib/engine-list";
 import type { StepProps } from "../../lib/signup/context";
 import { stepNumber } from "../../lib/signup/machine";
 import type { Vault } from "../../lib/signup/account";
-import { finishAccount, handOff } from "../../lib/signup/pc-flow";
+import { handOff, prepareAccount, submitAccount, verifyFailure, type PreparedAccount } from "../../lib/signup/pc-flow";
 import { createPasskey, forgetCredential, readPrf, type Created } from "../../lib/webauthn";
 import { Screen } from "../ui/Screen";
 
@@ -14,6 +14,7 @@ const isWindows = () => /Windows/.test(navigator.userAgent);
 export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
   const [opts, setOpts] = useState<RegisterOptions | null>(null);
   const [pending, setPending] = useState<Created | null>(null); // created, PRF still missing
+  const [unsent, setUnsent] = useState<{ created: Created; prepared: PreparedAccount } | null>(null); // verify answer lost: maybe stored
   const [undelivered, setUndelivered] = useState<Vault | null>(null); // registered, handoff not done yet
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,16 +30,38 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
 
   async function finish(created: Created, prf: Uint8Array) {
     if (!opts) return;
-    let vault: Vault;
+    let prepared: PreparedAccount;
     try {
-      vault = await finishAccount(api, { challengeId: opts.challenge_id, userId: opts.user_id, created, prf });
+      prepared = prepareAccount({ challengeId: opts.challenge_id, userId: opts.user_id, created, prf });
     } catch (e) {
-      await forgetCredential(rpId(), created.rawId); // the server refused it, so nothing refers to it
+      await forgetCredential(rpId(), created.rawId); // nothing was sent, so nothing refers to it
       setPending(null);
       setError(errorMessage(e));
       setAttempt((n) => n + 1);
       return;
     }
+    await submit(created, prepared, false);
+  }
+
+  /** `unsure`: an earlier try of this same body may have reached the server, so never forget it now. */
+  async function submit(created: Created, prepared: PreparedAccount, unsure: boolean) {
+    let vault: Vault;
+    try {
+      vault = await submitAccount(api, prepared);
+    } catch (e) {
+      setPending(null);
+      if (verifyFailure(e) === "unsure") {
+        setUnsent({ created, prepared }); // keep the passkey and the vault; retry sends the same body
+        setError(COPY.errors.verify_unsure);
+        return;
+      }
+      if (!unsure) await forgetCredential(rpId(), created.rawId); // a definitive refusal: nothing refers to it
+      setUnsent(null);
+      setError(errorMessage(e));
+      setAttempt((n) => n + 1);
+      return;
+    }
+    setUnsent(null);
     setPending(null);
     await deliver(vault);
   }
@@ -82,6 +105,14 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
     }, fail);
   }
 
+  if (unsent) {
+    const retry = () => { setBusy(true); setError(null); void submit(unsent.created, unsent.prepared, true).finally(() => setBusy(false)); };
+    return (
+      <Screen step={stepNumber(state.step)} title={COPY.pc.title} done={state.done} error={error}>
+        <button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.actions.retry}</button>
+      </Screen>
+    );
+  }
   if (undelivered) {
     const retry = () => { setBusy(true); void deliver(undelivered).finally(() => setBusy(false)); };
     return (

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { expectClean, watch } from "./helpers/guards";
 import { openSignup, passStepOne } from "./helpers/flow";
 
@@ -31,4 +31,51 @@ test("no PRF on create or get: nothing registered on the server, guide to anothe
   const pairing = await (await request.get(`http://localhost:8787/v1/pairing/${engine.sessionId}`)).json();
   expect(pairing.delivered).toBe(false);
   await expect(page.getByRole("button", { name: "링크 복사" })).toBeVisible();
+});
+
+const UNSURE = "연결을 확인하고 다시 해 주세요";
+
+async function startStepOne(page: Page) {
+  await page.getByRole("button", { name: "시작하기", exact: true }).click();
+  await page.getByRole("button", { name: "이 컴퓨터로 시작하기" }).click();
+  const again = page.getByRole("button", { name: "확인", exact: true });
+  const unsure = page.getByText(UNSURE);
+  await expect(unsure.or(again)).toBeVisible();
+  if (await again.isVisible()) await again.click();
+  await expect(unsure).toBeVisible();
+}
+
+test("register/verify never answered (offline): passkey kept, [다시] sends the same body and goes on", async ({ page }) => {
+  const w = await watch(page);
+  const { engine, auth } = await openSignup(page, { prf: true });
+  let dropped = false;
+  await page.route("**/v1/webauthn/register/verify", (route) => {
+    if (dropped) return route.fallback();
+    dropped = true;
+    return route.abort("internetdisconnected");
+  });
+  await startStepOne(page);
+  expect(await auth.count()).toBe(1);
+  await page.getByRole("button", { name: "다시", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "휴대폰도 같이 등록" })).toBeVisible();
+  await engine.takeHandoff();
+  const verifies = w.requests.filter((r) => r.url.endsWith("/v1/webauthn/register/verify"));
+  expect(verifies).toHaveLength(2);
+  expect(verifies[1].body).toBe(verifies[0].body);
+  expect(await auth.count()).toBe(1);
+});
+
+test("register/verify stored but the answer was a 5xx: the retry's refusal never forgets the passkey", async ({ page }) => {
+  const { auth } = await openSignup(page, { prf: true });
+  let first = true;
+  await page.route("**/v1/webauthn/register/verify", async (route) => {
+    if (!first) return route.fallback();
+    first = false;
+    await route.fetch(); // the server stores it …
+    await route.fulfill({ status: 503, json: { error: { code: "unavailable" } } }); // … but the answer is lost
+  });
+  await startStepOne(page);
+  await page.getByRole("button", { name: "다시", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText("잠시 문제가 생겼어요. 다시 해 볼까요?");
+  expect(await auth.count()).toBe(1);
 });

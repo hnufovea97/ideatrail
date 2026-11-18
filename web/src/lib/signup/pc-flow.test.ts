@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { fromB64u, toB64u, toHex } from "@ideatrail/crypto/bytes";
 import { prfWrapKey, unwrapMasterKey } from "@ideatrail/crypto/envelope";
 import { newKemKeyPair, randomKey } from "@ideatrail/crypto/keypair";
-import type { Api, CreationOptionsJSON, DeliverBody, RegisterVerifyBody } from "../api";
+import { ApiFailure, type Api, type CreationOptionsJSON, type DeliverBody, type RegisterVerifyBody } from "../api";
 import { memoryStore, rememberVersion } from "../engine-list";
 import { fakeCredential } from "../testing/fake-credential";
 import { createPasskey, readPrf } from "../webauthn";
-import { finishAccount, handOff } from "./pc-flow";
+import { finishAccount, handOff, prepareAccount, submitAccount, verifyFailure } from "./pc-flow";
 
 const SID = "01jcm3v8q7s2kx4f9d6b5n0tqw";
 const USER = "01jcm3v8q7s2kx4f9d6b5n0tqx";
@@ -56,7 +56,30 @@ describe("step 1 orchestration", () => {
     const info = { engine_id: SID, sign_pubkey: "s", kem_pubkey: "k", expires_at: "x", delivered: false };
     await expect(handOff(api, { link, info, kemPub: randomKey() }, vault, store)).rejects.toThrow("engine_list_rollback");
   });
+  it("a retried register/verify sends the very same account and envelope (one MK, one credential)", async () => {
+    const bodies: RegisterVerifyBody[] = [];
+    let fail = true;
+    const api = { registerVerify: async (b: RegisterVerifyBody) => { bodies.push(b); if (fail) { fail = false; throw new ApiFailure(0, "offline"); } return { user_id: USER }; } } as unknown as Api;
+    const prf = new Uint8Array(32).fill(3);
+    const prepared = prepareAccount({ challengeId: "c", userId: USER, created: { credential: fakeCredential({ prf }), rawId: Uint8Array.of(1), prf }, prf });
+    await expect(submitAccount(api, prepared)).rejects.toThrow("offline");
+    expect(await submitAccount(api, prepared)).toBe(prepared.vault);
+    expect(bodies).toHaveLength(2);
+    expect(JSON.stringify(bodies[1])).toBe(JSON.stringify(bodies[0]));
+  });
+});
 
+describe("register/verify failure: forget the passkey only on a definitive refusal", () => {
+  it("a 4xx answer is a refusal", () => {
+    for (const s of [400, 403, 409, 410]) expect(verifyFailure(new ApiFailure(s, "x"))).toBe("refused");
+  });
+  it("offline, timeout, 5xx or anything else is unsure: the server may have stored it", () => {
+    expect(verifyFailure(new ApiFailure(0, "offline"))).toBe("unsure");
+    expect(verifyFailure(new ApiFailure(502, "unknown"))).toBe("unsure");
+    expect(verifyFailure(new ApiFailure(200, "bad_response"))).toBe("unsure");
+    expect(verifyFailure(new Error("boom"))).toBe("unsure");
+    expect(verifyFailure(new DOMException("x", "AbortError"))).toBe("unsure");
+  });
 });
 
 const OPTIONS: CreationOptionsJSON = {

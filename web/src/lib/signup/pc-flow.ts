@@ -1,20 +1,36 @@
 import { formatTime } from "@ideatrail/crypto/ids";
-import type { Api, PairingInfo } from "../api";
+import { ApiFailure, type Api, type PairingInfo, type RegisterVerifyBody } from "../api";
 import { isRollback, openEngineList, rememberVersion, type EngineEntry, type VersionStore } from "../engine-list";
 import type { PairingLink } from "../fragment";
 import { registrationJSON, type Created } from "../webauthn";
 import { newAccount, type Vault } from "./account";
 import { buildDeliver } from "./pairing";
 
+export interface PreparedAccount { vault: Vault; body: RegisterVerifyBody }
+
+/** New account + envelope for this credential, built once so a retry sends the very same body. */
+export function prepareAccount(p: { challengeId: string; userId: string; created: Created; prf: Uint8Array }): PreparedAccount {
+  const a = newAccount(p.userId, p.prf, p.created.rawId);
+  return { vault: a.vault, body: { challenge_id: p.challengeId, response: registrationJSON(p.created.credential), account: a.account, envelope: a.envelope } };
+}
+
 /**
  * register/verify (account + envelope, session cookie). After this resolves the credential exists on
  * the server, so callers must never "forget" it locally again. The PRF output stays in memory.
  */
-export async function finishAccount(api: Api, p: { challengeId: string; userId: string; created: Created; prf: Uint8Array }): Promise<Vault> {
-  const a = newAccount(p.userId, p.prf, p.created.rawId);
-  await api.registerVerify({ challenge_id: p.challengeId, response: registrationJSON(p.created.credential), account: a.account, envelope: a.envelope });
-  return a.vault;
+export async function submitAccount(api: Api, p: PreparedAccount): Promise<Vault> {
+  await api.registerVerify(p.body);
+  return p.vault;
 }
+
+export const finishAccount = (api: Api, p: Parameters<typeof prepareAccount>[0]): Promise<Vault> => submitAccount(api, prepareAccount(p));
+
+/**
+ * Only a 4xx answer says the server did not keep the credential. Offline, a timeout, a 5xx or an
+ * unreadable reply may have come after the server stored it: keep the passkey and retry the same body.
+ */
+export const verifyFailure = (e: unknown): "refused" | "unsure" =>
+  e instanceof ApiFailure && e.status >= 400 && e.status < 500 ? "refused" : "unsure";
 
 /**
  * Confirm (the envelope was unwrapped once here — spec §11; idempotent), then hand the account key to
