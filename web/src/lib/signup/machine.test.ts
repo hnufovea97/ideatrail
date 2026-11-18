@@ -38,6 +38,17 @@ describe("signup state machine", () => {
     expect(s.githubLater).toBe(false);
     expect(s.done.github).toBe(true);
   });
+  it("remembers what was just finished, for the next screen's short confirmation", () => {
+    expect(run(toPhone).justDid).toBe("pc");
+    expect(run([...toPhone, { type: "phone_done" }]).justDid).toBe("phone");
+    expect(run([...toPhone, { type: "phone_skip" }]).justDid).toBeNull(); // a skip made nothing
+    expect(run([...toPhone, { type: "phone_skip" }, { type: "github_done" }]).justDid).toBe("github");
+    expect(run([...toPhone, { type: "phone_done" }, { type: "github_later" }]).justDid).toBeNull();
+    const end = run([...toPhone, { type: "phone_done" }, { type: "github_later" }, { type: "recovery_done" }]);
+    expect(end.justDid).toBe("recovery");
+    expect(reduce(end, { type: "folders_done", count: 1 }).justDid).toBe("folders");
+    expect(initialState.justDid).toBeNull();
+  });
   it("numbers only steps 1..5", () => {
     expect(["intro", "pc", "phone", "github", "recovery", "folders", "done"].map((x) => stepNumber(x as SignupState["step"]))).toEqual([null, 1, 2, 3, 4, 5, null]);
   });

@@ -12,6 +12,8 @@ export interface SignupState {
   recoveryLater: boolean;
   foldersChosen: number | null;
   done: Checklist;
+  /** The item finished by the last event, for the next screen's "방금 한 일" line; null after a skip. */
+  justDid: keyof Checklist | null;
 }
 
 export type SignupEvent =
@@ -22,7 +24,7 @@ export type SignupEvent =
   | { type: "folders_done"; count: number };
 
 export const initialState: SignupState = {
-  step: "check", stop: null, phoneSkipped: false, githubLater: false, recoveryLater: false, foldersChosen: null,
+  step: "check", stop: null, phoneSkipped: false, githubLater: false, recoveryLater: false, foldersChosen: null, justDid: null,
   done: { pc: false, phone: false, github: false, recovery: false, folders: false },
 };
 
@@ -33,6 +35,8 @@ export const stepNumber = (step: Step): number | null => NUMBERS[step] ?? null;
 export const canSkipRecovery = (s: SignupState): boolean => !s.phoneSkipped;
 
 const tick = (s: SignupState, key: keyof Checklist): Checklist => ({ ...s.done, [key]: true });
+/** Finish `key`: tick it and remember it as what was just done. */
+const finish = (s: SignupState, key: keyof Checklist) => ({ done: tick(s, key), justDid: key });
 
 export function reduce(s: SignupState, e: SignupEvent): SignupState {
   if (e.type === "stop") return { ...s, step: "stopped", stop: e.reason };
@@ -42,23 +46,23 @@ export function reduce(s: SignupState, e: SignupEvent): SignupState {
     case "intro":
       return e.type === "begin" ? { ...s, step: "pc" } : s;
     case "pc":
-      return e.type === "pc_done" ? { ...s, step: "phone", done: tick(s, "pc") } : s;
+      return e.type === "pc_done" ? { ...s, step: "phone", ...finish(s, "pc") } : s;
     case "phone":
-      if (e.type === "phone_done") return { ...s, step: "github", done: tick(s, "phone") };
-      if (e.type === "phone_skip") return { ...s, step: "github", phoneSkipped: true };
+      if (e.type === "phone_done") return { ...s, step: "github", ...finish(s, "phone") };
+      if (e.type === "phone_skip") return { ...s, step: "github", phoneSkipped: true, justDid: null };
       return s;
     case "github":
-      if (e.type === "github_done") return { ...s, step: "recovery", githubLater: false, done: tick(s, "github") };
-      if (e.type === "github_later") return { ...s, step: "recovery", githubLater: true };
+      if (e.type === "github_done") return { ...s, step: "recovery", githubLater: false, ...finish(s, "github") };
+      if (e.type === "github_later") return { ...s, step: "recovery", githubLater: true, justDid: null };
       return s;
     case "recovery":
-      if (e.type === "recovery_done") return { ...s, step: "folders", done: tick(s, "recovery") };
-      if (e.type === "recovery_later" && canSkipRecovery(s)) return { ...s, step: "folders", recoveryLater: true };
+      if (e.type === "recovery_done") return { ...s, step: "folders", ...finish(s, "recovery") };
+      if (e.type === "recovery_later" && canSkipRecovery(s)) return { ...s, step: "folders", recoveryLater: true, justDid: null };
       return s;
     case "folders":
-      return e.type === "folders_done" ? { ...s, step: "done", foldersChosen: e.count, done: tick(s, "folders") } : s;
+      return e.type === "folders_done" ? { ...s, step: "done", foldersChosen: e.count, ...finish(s, "folders") } : s;
     case "done":
-      return e.type === "github_done" ? { ...s, githubLater: false, done: tick(s, "github") } : s;
+      return e.type === "github_done" ? { ...s, githubLater: false, ...finish(s, "github") } : s;
     default:
       return s;
   }
