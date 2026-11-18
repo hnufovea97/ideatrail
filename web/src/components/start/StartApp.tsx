@@ -15,6 +15,8 @@ import { RecoveryStep } from "./RecoveryStep";
 import { StoppedScreen } from "./StoppedScreen";
 
 const PROTECT_STEPS = new Set(["phone", "github", "recovery", "folders"]);
+/** Warn before leaving while keys live only in this tab: steps 2–5, and step 1 once a vault exists. */
+const shouldProtect = (step: string, hasVault: boolean) => PROTECT_STEPS.has(step) || (step === "pc" && hasVault);
 
 function stopFor(e: unknown): StopReason {
   if (e instanceof ApiFailure && (e.status === 404 || e.status === 410)) return "link_expired";
@@ -51,12 +53,20 @@ export default function StartApp() {
     })().catch(() => dispatch({ type: "stop", reason: "failed" })); // anything unexpected stops here
   }, [api]);
 
+  const hasVault = !!ctx?.vault;
   useEffect(() => {
-    if (!PROTECT_STEPS.has(state.step)) return;
+    if (!shouldProtect(state.step, hasVault)) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     addEventListener("beforeunload", warn);
     return () => removeEventListener("beforeunload", warn);
-  }, [state.step]);
+  }, [state.step, hasVault]);
+
+  // The end: drop the keys and the link from memory. The GitHub banner still needs the vault until it links.
+  useEffect(() => {
+    if (state.step !== "done" || state.githubLater) return;
+    setCtx((c) => (c && (c.vault || c.href) ? { ...c, vault: null, href: null } : c));
+    setHref(null);
+  }, [state.step, state.githubLater]);
 
   if (state.step === "stopped" && state.stop) return <StoppedScreen reason={state.stop} href={href} />;
   if (!ctx) return <Busy />;

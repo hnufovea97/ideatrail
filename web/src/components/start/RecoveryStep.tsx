@@ -41,7 +41,8 @@ export function RecoveryStep({ api, ctx, state, dispatch }: StepProps) {
     confirmWithPasskey(prepared)
       .then((assertion) => api.putRecovery({ ...plan.body, assertion }))
       .then(() => {
-        setPlan(null);
+        setPlan(null); // the key is not kept once it is saved
+        setTyped("");
         dispatch({ type: "recovery_done" });
       }, (e) => {
         setError(errorMessage(e));

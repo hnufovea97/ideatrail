@@ -7,7 +7,7 @@ import type { SignupEvent, SignupState } from "./machine";
 /** Everything the signup screens hold in memory (never in storage). */
 export interface SignupContext {
   link: PairingLink;
-  href: string; // original link, for [링크 복사] when this browser cannot do PRF
+  href: string | null; // original link, for [링크 복사] when this browser cannot do PRF; dropped at the end
   info: PairingInfo;
   signPub: Uint8Array;
   kemPub: Uint8Array;

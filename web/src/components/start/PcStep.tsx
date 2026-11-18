@@ -57,17 +57,20 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
       setPending(null);
       if (verifyFailure(e) === "unsure") {
         setUnsent({ created, prepared }); // keep the passkey and the vault; retry sends the same body
+        setCtx({ ...ctx, vault: prepared.vault }); // a vault now exists: leaving the page warns
         setError(COPY.errors.verify_unsure);
         return;
       }
       if (!unsure) await forgetCredential(rpId(), created.rawId); // a definitive refusal: nothing refers to it
       setUnsent(null);
+      setCtx({ ...ctx, vault: null });
       setError(errorMessage(e));
       setAttempt((n) => n + 1);
       return;
     }
     setUnsent(null);
     setPending(null);
+    setCtx({ ...ctx, vault }); // registered: leaving the page warns from here on
     await deliver(vault);
   }
 
