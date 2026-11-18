@@ -97,6 +97,14 @@ func journalLine(stateDir string, rec map[string]string) error {
 	return err
 }
 
+var errSwept = errors.New("swept")
+
+// sweepOrphansLocked sweeps under the state lock, so a pending file another Record has just
+// written and queued is always listed in the state it compares against.
+func sweepOrphansLocked(d Deps) {
+	_ = state.With(d.StateDir, func(s *state.State) error { sweepOrphans(d, s); return errSwept })
+}
+
 // sweepOrphans removes files a crash left behind between writing them and saving state:
 // pending bodies not listed in pending_uploads, and outbox entries numbered past log_seq.
 func sweepOrphans(d Deps, st *state.State) {

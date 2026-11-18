@@ -132,7 +132,7 @@ func Record(ctx context.Context, d Deps, in Input) (*Result, error) {
 	if st.UserID == "" || st.AccountPub == "" {
 		return nil, ErrNotPaired
 	}
-	sweepOrphans(d, st)
+	sweepOrphansLocked(d)
 	ak, err := accountKey(st.AccountPub)
 	if err != nil {
 		return nil, err
