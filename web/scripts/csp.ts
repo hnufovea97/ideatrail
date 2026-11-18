@@ -1,5 +1,6 @@
 // After `astro build`: compute sha256 hashes of every inline <script>/<style> in each page, put a
-// CSP <meta> into the page, and write dist/_headers (same policy + frame-ancestors) for deploys.
+// CSP <meta> into the page, and write dist/_headers (same policy + frame-ancestors, framing/opener/
+// passkey permissions, no-store for the signup pages) for deploys.
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -28,6 +29,23 @@ export function injectMeta(html: string, policy: string): string {
   return html.replace(META_CHARSET, (m) => `${m}<meta http-equiv="Content-Security-Policy" content="${escaped}">`);
 }
 
+/** Pages that hold secrets in memory: never stored by a cache (both URL forms Pages may serve). */
+const NO_STORE = ["/start", "/start/", "/connect", "/connect/"];
+
+/** Cloudflare Pages `_headers`: what <meta> cannot carry, for every path, plus no-store for the signup pages. */
+export function headersFile(csp: string): string {
+  const all = [
+    "/*",
+    `  Content-Security-Policy: ${csp} frame-ancestors 'none';`,
+    "  X-Frame-Options: DENY",
+    "  Cross-Origin-Opener-Policy: same-origin",
+    "  Permissions-Policy: publickey-credentials-create=(self), publickey-credentials-get=(self)",
+    "  X-Content-Type-Options: nosniff",
+    "  Referrer-Policy: no-referrer",
+  ].join("\n");
+  return [all, ...NO_STORE.map((p) => `${p}\n  Cache-Control: no-store`)].join("\n\n") + "\n";
+}
+
 function htmlFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const p = join(dir, name);
@@ -48,13 +66,7 @@ function main() {
   }
   if (policies.length === 0) throw new Error("no pages built");
   // Deploy headers apply to every path: the union of all page hashes, plus what <meta> cannot carry.
-  writeFileSync(join(dist, "_headers"), [
-    "/*",
-    `  Content-Security-Policy: ${unionFrom(policies, apiBase)} frame-ancestors 'none';`,
-    "  X-Content-Type-Options: nosniff",
-    "  Referrer-Policy: no-referrer",
-    "",
-  ].join("\n"));
+  writeFileSync(join(dist, "_headers"), headersFile(unionFrom(policies, apiBase)));
   console.log(`csp: ${policies.length} pages`);
 }
 
