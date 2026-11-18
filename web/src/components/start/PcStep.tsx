@@ -5,7 +5,7 @@ import { browserStore } from "../../lib/engine-list";
 import type { StepProps } from "../../lib/signup/context";
 import { stepNumber } from "../../lib/signup/machine";
 import type { Vault } from "../../lib/signup/account";
-import { handOff, prepareAccount, submitAccount, verifyFailure, type PreparedAccount } from "../../lib/signup/pc-flow";
+import { handOff, handOffAgain, prepareAccount, submitAccount, verifyFailure, type PreparedAccount } from "../../lib/signup/pc-flow";
 import { createPasskey, forgetCredential, readPrf, type Created } from "../../lib/webauthn";
 import { Screen } from "../ui/Screen";
 
@@ -71,9 +71,9 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
     await deliver(vault);
   }
 
-  async function deliver(vault: Vault) {
+  async function deliver(vault: Vault, again = false) {
     try {
-      const engine = await handOff(api, ctx, vault, browserStore());
+      const engine = await (again ? handOffAgain : handOff)(api, ctx, vault, browserStore());
       setUndelivered(null);
       setCtx({ ...ctx, vault, engine });
       dispatch({ type: "pc_done" });
@@ -123,7 +123,7 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
     );
   }
   if (undelivered) {
-    const retry = () => { setBusy(true); void deliver(undelivered).finally(() => setBusy(false)); };
+    const retry = () => { setBusy(true); void deliver(undelivered, true).finally(() => setBusy(false)); };
     return (
       <Screen step={stepNumber(state.step)} title={COPY.pc.title} focusKey="undelivered" done={state.done} error={error}>
         <button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.actions.retry}</button>

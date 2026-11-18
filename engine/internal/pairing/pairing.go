@@ -71,7 +71,7 @@ func Start(ctx context.Context, d Deps, computerName string) (*Session, error) {
 		return nil, ErrAlreadyPaired
 	}
 	app, err := url.Parse(d.AppBase)
-	if err != nil || !(app.Scheme == "https" || app.Scheme == "http" && isLoopback(app.Hostname())) {
+	if err != nil || !(app.Scheme == "https" || (app.Scheme == "http" && isLoopback(app.Hostname()))) {
 		return nil, errors.New("app base must be https")
 	}
 	kemPub, err := d.Keys.KEMPub.MarshalBinary()
@@ -175,7 +175,7 @@ func accept(d Deps, s *Session, b blob) error {
 		return ErrBadHandoff
 	}
 	return state.With(d.StateDir, func(st *state.State) error {
-		if st.AccountPub != "" && st.AccountPub != p.AccountPubkey || st.UserID != "" && st.UserID != p.UserID {
+		if (st.AccountPub != "" && st.AccountPub != p.AccountPubkey) || (st.UserID != "" && st.UserID != p.UserID) {
 			return ErrAccountChanged
 		}
 		st.UserID, st.AccountPub = p.UserID, p.AccountPubkey

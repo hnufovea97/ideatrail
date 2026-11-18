@@ -402,3 +402,24 @@ func TestSignupSelectionOfNothingCarriesNoPaths(t *testing.T) {
 		t.Fatal("registered a folder nobody chose")
 	}
 }
+
+// Only select_folders completes a signup list: an approval_result for it (which would register
+// every folder the engine offered) is ignored and leaves the request open.
+func TestApprovalResultCannotCompleteASignupList(t *testing.T) {
+	e := newEnv(t)
+	id, err := RequestImport(context.Background(), e.d, "signup_select", []string{e.folder})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.send(t, id, map[string]any{"type": "approval_result", "approval_id": id, "decision": "approved"}, e.akPriv)
+	if ev := e.process(t); len(ev) != 0 {
+		t.Fatalf("events %+v", ev)
+	}
+	if len(folders(t, e)) != 0 {
+		t.Fatal("approval_result registered signup folders")
+	}
+	st, _ := state.Read(e.d.StateDir)
+	if st.Approvals[id].Done {
+		t.Fatal("approval_result closed the signup list")
+	}
+}

@@ -6,7 +6,7 @@ import { ApiFailure, type Api, type CreationOptionsJSON, type DeliverBody, type 
 import { memoryStore, rememberVersion } from "../engine-list";
 import { fakeCredential } from "../testing/fake-credential";
 import { createPasskey, readPrf } from "../webauthn";
-import { finishAccount, handOff, prepareAccount, submitAccount, verifyFailure } from "./pc-flow";
+import { finishAccount, handOff, handOffAgain, prepareAccount, submitAccount, verifyFailure } from "./pc-flow";
 
 const SID = "01jcm3v8q7s2kx4f9d6b5n0tqw";
 const USER = "01jcm3v8q7s2kx4f9d6b5n0tqx";
@@ -66,6 +66,28 @@ describe("step 1 orchestration", () => {
     expect(await submitAccount(api, prepared)).toBe(prepared.vault);
     expect(bodies).toHaveLength(2);
     expect(JSON.stringify(bodies[1])).toBe(JSON.stringify(bodies[0]));
+  });
+});
+
+describe("handoff retry (the first deliver's answer may have been lost)", () => {
+  const ek = newKemKeyPair();
+  const info = { engine_id: SID, sign_pubkey: "s", kem_pubkey: toB64u(ek.pub), expires_at: "x", delivered: false };
+  const link = { sessionId: SID, signFp: randomKey(), kemFp: randomKey(), psk: randomKey(), computerName: "Steven-Air" };
+  const vault = { userId: USER, mk: randomKey(), akPriv: randomKey(), akPub: randomKey() };
+
+  it("already delivered → success, nothing sent again", async () => {
+    const calls: string[] = [];
+    const api = { ...fakeApi(calls, {}), pairing: async () => { calls.push("pairing"); return { ...info, delivered: true }; } } as unknown as Api;
+    const entry = await handOffAgain(api, { link, info, kemPub: ek.pub }, vault, memoryStore());
+    expect(calls).toEqual(["pairing"]);
+    expect(entry.engine_id).toBe(SID);
+    expect(entry.name).toBe("Steven-Air");
+  });
+  it("not delivered yet → the normal handoff", async () => {
+    const calls: string[] = [];
+    const api = { ...fakeApi(calls, {}), pairing: async () => { calls.push("pairing"); return info; } } as unknown as Api;
+    await handOffAgain(api, { link, info, kemPub: ek.pub }, vault, memoryStore());
+    expect(calls).toEqual(["pairing", "confirm", "account", "deliver"]);
   });
 });
 

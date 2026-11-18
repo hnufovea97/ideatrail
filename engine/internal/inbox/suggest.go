@@ -1,6 +1,8 @@
 package inbox
 
 import (
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -9,16 +11,31 @@ import (
 	"ideatrail/engine/internal/pathguard"
 )
 
+// maxSiblingsExamined caps the parent's entries looked at, so a huge folder cannot hold signup.
+var maxSiblingsExamined = 1000
+
 // SuggestFolders offers up to max sibling folders of project that look like ideas (signup step 5):
 // visible, not node_modules, with a Markdown file directly inside, allowed by pathguard, newest
-// first. Only when the project's parent lies strictly inside home (never home's own children).
+// first. Only when the project's parent lies strictly inside home (never home's own children),
+// both resolved through links first.
 // Names and counts leave the machine only sealed to the account key (kind 11).
 func SuggestFolders(project, stateDir, home string, max int) []string {
-	parent := filepath.Dir(project)
-	if max <= 0 || !strictlyInside(home, parent) {
+	if max <= 0 || project == "" || home == "" {
 		return nil
 	}
-	entries, err := os.ReadDir(parent)
+	realProject, err := filepath.EvalSymlinks(project)
+	if err != nil {
+		return nil
+	}
+	realHome, err := filepath.EvalSymlinks(home)
+	if err != nil {
+		return nil
+	}
+	parent := filepath.Dir(realProject)
+	if !strictlyInside(realHome, parent) {
+		return nil
+	}
+	entries, err := readDirCapped(parent, maxSiblingsExamined)
 	if err != nil {
 		return nil
 	}
@@ -30,7 +47,7 @@ func SuggestFolders(project, stateDir, home string, max int) []string {
 	for _, e := range entries {
 		name := e.Name()
 		p := filepath.Join(parent, name)
-		if !e.IsDir() || strings.HasPrefix(name, ".") || name == "node_modules" || filepath.Clean(p) == filepath.Clean(project) {
+		if !e.IsDir() || strings.HasPrefix(name, ".") || name == "node_modules" || p == realProject {
 			continue
 		}
 		if !hasMarkdown(p) || pathguard.ValidateFolder(p, stateDir) != nil {
@@ -51,6 +68,20 @@ func SuggestFolders(project, stateDir, home string, max int) []string {
 		out[i] = c.path
 	}
 	return out
+}
+
+// readDirCapped reads at most n entries of dir, in no particular order.
+func readDirCapped(dir string, n int) ([]os.DirEntry, error) {
+	f, err := os.Open(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	entries, err := f.ReadDir(n)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	return entries, nil
 }
 
 func hasMarkdown(dir string) bool {

@@ -136,7 +136,7 @@ func (s *Server) matchPattern(r *http.Request) (handler, bool) {
 				score++
 			}
 		}
-		if score > bestScore || score == bestScore && key < bestKey {
+		if score > bestScore || (score == bestScore && key < bestKey) {
 			best, bestKey, bestScore = h, key, score
 		}
 	}

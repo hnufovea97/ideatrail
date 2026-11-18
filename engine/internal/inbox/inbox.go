@@ -85,11 +85,17 @@ func RequestImport(ctx context.Context, d Deps, kind string, folders []string) (
 			}
 			return "", ErrBadFolder
 		}
-		r, _ := filepath.EvalSymlinks(f)
+		r, err := filepath.EvalSymlinks(f)
+		if err != nil { // gone or changed since the check: never list an unresolved path
+			if signup {
+				continue
+			}
+			return "", ErrBadFolder
+		}
 		if signup && i == 0 {
 			current = r
 		}
-		if _, taken := st.Folders[r]; taken && r != current || seen[r] {
+		if _, taken := st.Folders[r]; (taken && r != current) || seen[r] {
 			continue
 		}
 		seen[r] = true
@@ -100,7 +106,7 @@ func RequestImport(ctx context.Context, d Deps, kind string, folders []string) (
 		}
 		summary = append(summary, item)
 	}
-	if len(real) == 0 && !signup || len(real) > MaxFolders {
+	if (len(real) == 0 && !signup) || len(real) > MaxFolders {
 		return "", ErrBadFolder
 	}
 	plain, err := json.Marshal(map[string]any{"v": 1, "folders": summary})
@@ -342,6 +348,11 @@ func handle(d Deps, pub kem.PublicKey, m message) (Event, bool, bool) {
 			if !exists || a.Done || p.ApprovalID != boundTo || expired(a, d.now()) {
 				return nil
 			}
+			// signup lists close only by the browser's choice; an approval_result would register
+			// every folder offered
+			if p.Type == "approval_result" && a.Kind == "signup_select" {
+				return nil
+			}
 			chosen := a.Folders // approval_result: everything this engine asked about
 			if p.Type == "select_folders" {
 				if a.Kind != "signup_select" {
@@ -415,7 +426,7 @@ func validID(s string) bool {
 	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
-		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'z') || c == 'i' || c == 'l' || c == 'o' || c == 'u' {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')) || c == 'i' || c == 'l' || c == 'o' || c == 'u' {
 			return false
 		}
 	}
