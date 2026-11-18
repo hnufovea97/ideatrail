@@ -196,11 +196,23 @@ func TestStopSilentCases(t *testing.T) {
 func TestSessionStartLines(t *testing.T) {
 	fakeHome(t)
 	dir := t.TempDir()
-	if got := SessionStart(strings.NewReader(hookJSON("a", "/", false)), dir); !strings.Contains(got, "가입 전") {
+	if got := SessionStart(strings.NewReader(hookJSON("a", "/", false)), dir); !strings.Contains(got, "가입 전") || !strings.Contains(got, "브라우저") || !strings.Contains(got, "약 5분") {
 		t.Errorf("unregistered line: %q", got)
 	}
 	stateDir, folder := setup(t)
 	if got := SessionStart(strings.NewReader(hookJSON("b", folder, false)), stateDir); got != "" {
 		t.Errorf("registered should be silent: %q", got)
+	}
+}
+
+// Hook lines reach the person through the AI: plain words, no engine jargon (G1 feedback).
+func TestHookSentencesUsePlainWords(t *testing.T) {
+	for _, s := range []string{GuardMessage, msgBeforeSignup, msgBlocked, stopReason(3)} {
+		if strings.Contains(s, "엔진") || strings.Contains(s, "\n") {
+			t.Errorf("not plain: %q", s)
+		}
+	}
+	if !strings.Contains(stopReason(3), "3건") {
+		t.Errorf("stop reason %q", stopReason(3))
 	}
 }

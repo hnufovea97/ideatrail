@@ -23,7 +23,7 @@ func showCode(code string) error {
 	_ = cp.Run()
 	dlg := exec.Command("/usr/bin/osascript",
 		"-e", "on run argv",
-		"-e", `display dialog ("GitHub 연결 코드: " & item 1 of argv & return & return & "복사해 두었어요. 열린 GitHub 화면에 붙여 넣어 주세요.") buttons {"확인"} default button 1 with title "ideatrail" giving up after 600`,
+		"-e", `display dialog ("GitHub 연결 코드: " & item 1 of argv & return & return & "이미 복사해 두었어요. 열린 GitHub 화면의 칸에 붙여 넣고(Cmd+V) [Continue], 이어서 [Authorize]를 눌러 주세요.") buttons {"확인"} default button 1 with title "ideatrail" giving up after 600`,
 		"-e", "end run", code)
 	if err := dlg.Start(); err != nil {
 		return err

@@ -18,13 +18,23 @@ import (
 )
 
 const (
-	GuardMessage  = "ideatrail 엔진 폴더는 열 수 없어요"
+	GuardMessage  = "ideatrail: 기록 도우미의 보관 폴더는 열 수 없어요. 기록을 지키려고 막아 두었어요."
 	maxInput      = 1 << 20
 	maxGuardInput = 64 << 20
 	markerTTL     = 7 * 24 * time.Hour
 	scanBudget    = 2 * time.Second
 	maxScanFiles  = 20000
 )
+
+const (
+	msgBeforeSignup = "ideatrail: 아직 가입 전이에요. 처음 기록할 때 브라우저에 가입 창이 열려요(약 5분)."
+	msgBlocked      = "ideatrail: 지금은 서버가 기록을 받지 않아요. 기록 도우미를 업데이트해 주세요."
+)
+
+// stopReason asks once whether to keep the session's unrecorded changes.
+func stopReason(n int) string {
+	return "아직 기록하지 않은 변경이 " + strconv.Itoa(n) + "건 있어요. ideatrail에 남길까요?"
+}
 
 var sessionRe = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
@@ -220,9 +230,9 @@ func SessionStart(r io.Reader, stateDir string) string {
 	case err != nil:
 		return ""
 	case st.UserID == "" || st.AccountPub == "":
-		return "ideatrail: 아직 가입 전이에요. 기록을 시작하면 가입 화면이 열려요."
+		return msgBeforeSignup
 	case st.Blocked != "":
-		return "ideatrail: 서버가 기록을 받지 않고 있어요. 엔진을 업데이트해 주세요."
+		return msgBlocked
 	}
 	return ""
 }
@@ -264,7 +274,7 @@ func Stop(r io.Reader, stateDir string) string {
 	if n == 0 {
 		return ""
 	}
-	b, _ := json.Marshal(map[string]string{"decision": "block", "reason": "기록 안 된 변경 " + strconv.Itoa(n) + "건이 있어요. ideatrail에 남길까요?"})
+	b, _ := json.Marshal(map[string]string{"decision": "block", "reason": stopReason(n)})
 	return string(b)
 }
 

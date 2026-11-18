@@ -30,10 +30,10 @@ import (
 
 const (
 	msgUsage       = "사용법: ideatrail mcp | hook <guard|session-start|stop> | version"
-	msgNotReady    = "ideatrail: 이 엔진은 정식 배포본이 아니라 실행할 수 없어요. 플러그인을 다시 설치해 주세요."
-	msgTampered    = "ideatrail: 엔진 파일이 바뀐 것 같아 멈췄어요. 플러그인을 다시 설치해 주세요."
-	msgSynced      = "ideatrail: 엔진 폴더가 동기화 폴더 안에 있어 멈췄어요."
-	msgStartFailed = "ideatrail: 엔진을 시작하지 못했어요."
+	msgNotReady    = "ideatrail: 정식으로 배포된 기록 도우미가 아니라서 실행할 수 없어요. 플러그인을 다시 설치해 주세요."
+	msgTampered    = "ideatrail: 기록 도우미 파일이 바뀐 것 같아 멈췄어요. 플러그인을 다시 설치해 주세요."
+	msgSynced      = "ideatrail: 기록 도우미의 보관 폴더가 동기화 폴더(iCloud·Dropbox·Syncthing 등) 안에 있어서 멈췄어요."
+	msgStartFailed = "ideatrail: 기록 도우미를 시작하지 못했어요. Claude Code를 다시 켜 주세요."
 	githubAPI      = "https://api.github.com"
 )
 
