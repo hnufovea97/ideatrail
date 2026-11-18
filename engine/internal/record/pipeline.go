@@ -88,6 +88,7 @@ type Input struct {
 	MilestoneCertain bool
 	Routine          []Routine
 	Tags             []string
+	Import           bool // signup first import: uses the server's import allowance, not the hourly cap
 }
 
 // Result is safe to show: ids, a status code and the idea title — no paths or secrets.
@@ -200,7 +201,7 @@ func Record(ctx context.Context, d Deps, in Input) (*Result, error) {
 		if err != nil {
 			return err
 		}
-		body, err := json.Marshal(uploadBody(recordID, col, parents, commitHex, recordedAt, seq, sig, sealed, receipts))
+		body, err := json.Marshal(uploadBody(recordID, col, parents, commitHex, recordedAt, seq, sig, sealed, receipts, in.Import))
 		if err != nil {
 			return err
 		}
@@ -308,7 +309,7 @@ func accountKey(b64 string) (kem.PublicKey, error) {
 
 func hexSHA(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
 
-func uploadBody(recordID string, col *Collected, parents []string, commitHex, recordedAt string, seq uint64, sig string, p *sealedParts, receipts []ots.Receipt) map[string]any {
+func uploadBody(recordID string, col *Collected, parents []string, commitHex, recordedAt string, seq uint64, sig string, p *sealedParts, receipts []ots.Receipt, imported bool) map[string]any {
 	otsList := make([]map[string]string, 0, len(receipts))
 	for _, r := range receipts {
 		otsList = append(otsList, map[string]string{"calendar": r.Calendar, "pending": ic.B64(r.Pending)})
@@ -316,11 +317,15 @@ func uploadBody(recordID string, col *Collected, parents []string, commitHex, re
 	if parents == nil {
 		parents = []string{}
 	}
-	return map[string]any{
+	body := map[string]any{
 		"record_id": recordID, "root_id": col.RootID, "parent_ids": parents, "commitment": commitHex, "manifest": col.Manifest,
 		"recorded_at": recordedAt, "log_seq": strconv.FormatUint(seq, 10), "list_meta": ic.B64(p.meta),
 		"body_hash": hexSHA(p.body), "nonce_hash": hexSHA(p.nonce), "engine_sig": sig, "ots": otsList,
 	}
+	if imported {
+		body["import"] = true // stored in pending/ with the rest, so a retry sends the same bytes
+	}
+	return body
 }
 
 // bundle is the §12 bundle.json (GitHub form carries nonce_sealed; the local form carries the nonce).

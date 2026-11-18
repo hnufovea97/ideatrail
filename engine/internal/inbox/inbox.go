@@ -227,6 +227,8 @@ func prune(s *state.State, now time.Time) {
 type Event struct {
 	Kind    string // "folders_registered" | "rejected" | "connect_github"
 	Folders int
+	Paths   []string // folders_registered: the folders newly registered by this message
+	Signup  bool     // folders_registered from the signup step 5 choice (first import applies)
 }
 
 type message struct {
@@ -354,6 +356,7 @@ func handle(d Deps, pub kem.PublicKey, m message) (Event, bool, bool) {
 				return nil
 			}
 			n := 0
+			var added []string
 			for _, f := range chosen {
 				if pathguard.ValidateFolder(f, d.StateDir) != nil { // re-check at registration time
 					continue
@@ -369,9 +372,10 @@ func handle(d Deps, pub kem.PublicKey, m message) (Event, bool, bool) {
 					return err
 				}
 				s.Folders[f] = id
+				added = append(added, f)
 				n++
 			}
-			ev, ok = Event{Kind: "folders_registered", Folders: n}, true
+			ev, ok = Event{Kind: "folders_registered", Folders: n, Paths: added, Signup: a.Kind == "signup_select"}, true
 		}
 		return nil
 	})

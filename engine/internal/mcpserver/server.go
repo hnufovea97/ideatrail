@@ -266,6 +266,13 @@ func (e *Engine) Tick(ctx context.Context) {
 					_, _ = repo.PushOutbox(cctx, e.Repo) // the token may be saved even if the link upload failed
 				})
 			}
+			if paths := firstImportPaths(ev); len(paths) > 0 {
+				e.goSafe(func() {
+					ictx, cancel := context.WithTimeout(e.ctxBase(), importBudget)
+					defer cancel()
+					_, _ = record.ImportFolders(ictx, e.Record, paths, record.ImportLimit)
+				})
+			}
 		}
 	}
 	record.Flush(ctx, e.Record)

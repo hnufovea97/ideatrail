@@ -371,3 +371,34 @@ func TestSignupListAtMostFive(t *testing.T) {
 		t.Fatalf("five folders: %v", err)
 	}
 }
+
+func TestSignupSelectionReportsRegisteredPaths(t *testing.T) {
+	e := newEnv(t)
+	id, err := RequestImport(context.Background(), e.d, "signup_select", []string{e.folder})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.send(t, id, map[string]any{"type": "select_folders", "approval_id": id, "folders": []string{e.folder}}, e.akPriv)
+	ev := e.process(t)
+	if len(ev) != 1 || ev[0].Kind != "folders_registered" || !ev[0].Signup || len(ev[0].Paths) != 1 || ev[0].Paths[0] != e.folder {
+		t.Fatalf("events %+v", ev)
+	}
+}
+
+// Zero folders chosen: the browser sends decide "rejected" + select_folders []. The request closes
+// and the event carries no paths, so the first import does nothing.
+func TestSignupSelectionOfNothingCarriesNoPaths(t *testing.T) {
+	e := newEnv(t)
+	id, err := RequestImport(context.Background(), e.d, "signup_select", []string{e.folder})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.send(t, id, map[string]any{"type": "select_folders", "approval_id": id, "folders": []string{}}, e.akPriv)
+	ev := e.process(t)
+	if len(ev) != 1 || ev[0].Kind != "folders_registered" || ev[0].Folders != 0 || len(ev[0].Paths) != 0 {
+		t.Fatalf("events %+v", ev)
+	}
+	if len(folders(t, e)) != 0 {
+		t.Fatal("registered a folder nobody chose")
+	}
+}

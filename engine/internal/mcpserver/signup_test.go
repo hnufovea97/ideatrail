@@ -41,3 +41,23 @@ func TestSignupFoldersNothingAroundARefusedProject(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 }
+
+// Only a signup choice that newly registered folders starts the first import; zero chosen
+// (n=0), an AI-asked import, or a rejection never does.
+func TestFirstImportOnlyForNewSignupFolders(t *testing.T) {
+	cases := []struct {
+		ev   inbox.Event
+		want int
+	}{
+		{inbox.Event{Kind: "folders_registered", Folders: 1, Paths: []string{"/p"}, Signup: true}, 1},
+		{inbox.Event{Kind: "folders_registered", Folders: 0, Signup: true}, 0},
+		{inbox.Event{Kind: "folders_registered", Folders: 1, Paths: []string{"/p"}}, 0},
+		{inbox.Event{Kind: "rejected"}, 0},
+		{inbox.Event{Kind: "connect_github"}, 0},
+	}
+	for _, c := range cases {
+		if got := firstImportPaths(c.ev); len(got) != c.want {
+			t.Fatalf("%+v → %v", c.ev, got)
+		}
+	}
+}

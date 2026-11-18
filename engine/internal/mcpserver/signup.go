@@ -1,6 +1,8 @@
 package mcpserver
 
 import (
+	"time"
+
 	"ideatrail/engine/internal/inbox"
 	"ideatrail/engine/internal/pathguard"
 )
@@ -16,4 +18,16 @@ func signupFolders(project, stateDir, home string) []string {
 		return nil
 	}
 	return append([]string{project}, inbox.SuggestFolders(project, stateDir, home, maxSuggestions)...)
+}
+
+// importBudget bounds the signup first import (one OTS submission per record).
+const importBudget = 10 * time.Minute
+
+// firstImportPaths is what the signup first import records: only folders newly registered by the
+// signup step 5 choice. Zero chosen, an AI-asked import or a rejection imports nothing.
+func firstImportPaths(ev inbox.Event) []string {
+	if ev.Kind != "folders_registered" || !ev.Signup {
+		return nil
+	}
+	return ev.Paths
 }
