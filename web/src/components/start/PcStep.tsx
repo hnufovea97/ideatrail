@@ -135,7 +135,7 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
   }
   if (pending) {
     return (
-      <Screen step={stepNumber(state.step)} title={COPY.pc.retryPrf} done={state.done} error={error}>
+      <Screen step={stepNumber(state.step)} title={COPY.pc.retryPrf} why={COPY.pc.retryWhy} done={state.done} error={error}>
         <button type="button" class="primary" onClick={retryPrf} disabled={busy}>{COPY.pc.retryAction}</button>
       </Screen>
     );
@@ -144,6 +144,7 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
     <Screen step={stepNumber(state.step)} title={COPY.pc.title} why={COPY.pc.why} done={state.done} error={error}>
       <p class="small">{COPY.pc.noSensor}</p>
       {isWindows() ? <p class="small">{COPY.pc.windows}</p> : null}
+      <p class="ahead">{COPY.pc.ahead}</p>
       {optsFailed
         ? <button type="button" class="primary" onClick={() => { setError(null); setAttempt((n) => n + 1); }}>{COPY.actions.retry}</button>
         : <button type="button" class="primary" onClick={start} disabled={!opts || busy}>{COPY.pc.action}</button>}

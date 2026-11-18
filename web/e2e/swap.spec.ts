@@ -44,8 +44,8 @@ test("a folder list the server made up (sealed to the account key, not engine-si
   await skipPhone(page);
   await githubLater(page);
   await saveRecoveryKey(page);
-  await expect(page.getByText("이 컴퓨터의 엔진이 폴더 목록을 보내고 있어요")).toBeVisible();
+  await expect(page.getByText("이 컴퓨터의 기록 도우미가 폴더 목록을 보내고 있어요")).toBeVisible();
   await expect.poll(() => served).toBeGreaterThanOrEqual(2); // the page has read (and refused) the made-up row at least twice
   await expect(page.getByRole("checkbox")).toHaveCount(0);
-  await expect(page.getByText("이 컴퓨터의 엔진이 폴더 목록을 보내고 있어요")).toBeVisible();
+  await expect(page.getByText("이 컴퓨터의 기록 도우미가 폴더 목록을 보내고 있어요")).toBeVisible();
 });

@@ -1,4 +1,4 @@
-import { COPY } from "../../lib/copy";
+import { COPY, didLine } from "../../lib/copy";
 import type { StepProps } from "../../lib/signup/context";
 import { stepNumber } from "../../lib/signup/machine";
 import { Screen } from "../ui/Screen";
@@ -7,7 +7,7 @@ import { useGithubLink } from "./useGithubLink";
 export function GithubStep({ api, ctx, state, dispatch }: StepProps) {
   const { phase, error, start } = useGithubLink(api, ctx, () => dispatch({ type: "github_done" }));
   return (
-    <Screen step={stepNumber(state.step)} title={COPY.github.title} focusKey={phase} why={COPY.github.why} done={state.done} error={error} status={phase === "waiting" ? COPY.github.waiting : null}>
+    <Screen step={stepNumber(state.step)} did={phase === "waiting" ? null : didLine(state)} title={COPY.github.title} focusKey={phase} why={COPY.github.why} done={state.done} error={error} status={phase === "waiting" ? COPY.github.waiting : null}>
       {phase === "waiting" ? null : (
         <>
           <ol>{COPY.github.steps.map((s) => <li key={s}>{s}</li>)}</ol>

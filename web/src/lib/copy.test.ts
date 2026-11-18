@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { COPY, CHECKLIST, errorMessage } from "./copy";
+import { COPY, CHECKLIST, didLine, errorMessage } from "./copy";
+import { initialState } from "./signup/machine";
 import { ApiFailure } from "./api";
 
 const allStrings = (v: unknown): string[] =>
@@ -12,6 +13,23 @@ describe("screen copy", () => {
   it("says '기기 잠금' for the user's own unlock, never '지문 확인'/'지문 센서' (founder decision D2)", () => {
     for (const s of allStrings(COPY)) expect(s).not.toMatch(/지문 (확인|센서)/);
     expect(COPY.errors.passkey_cancel).toBe("기기 잠금 확인이 안 됐어요. 다시 해 볼까요?");
+  });
+  it("keeps technical words off the screen (plain-language vocabulary)", () => {
+    for (const s of [...allStrings(COPY), ...CHECKLIST.map((c) => c.label)]) expect(s).not.toMatch(/패스키|PRF|봉투|HPKE|엔진|서명|복구 키/i);
+  });
+  it("names the four things with the same words everywhere", () => {
+    expect(COPY.intro.map.map((m) => m.name)).toEqual(["열쇠", "예비 열쇠", "증명 보관함", "비상 열쇠"]);
+    expect(COPY.intro.map.map((m) => m.where)).toEqual(["이 컴퓨터", "휴대폰", "내 GitHub", "종이·비밀번호 관리자"]);
+    expect(COPY.done.made.map((m) => m.key)).toEqual(["pc", "phone", "github", "recovery"]);
+    for (const m of COPY.done.made) expect(m.when.length).toBeGreaterThan(0);
+    expect(CHECKLIST.map((c) => c.label).slice(0, 4).map((l) => l.split(" (")[0].replace(" [중요]", ""))).toEqual(["열쇠", "예비 열쇠", "증명 보관함", "비상 열쇠"]);
+  });
+  it("tells, before each action, what will pop up, and after it, what was just made", () => {
+    for (const k of ["pc", "phone", "github", "recovery", "folders"] as const) expect(COPY.did[k]).toMatch(/^✓ /);
+    expect(COPY.pc.ahead).toContain("Touch ID");
+    expect(didLine({ ...initialState, justDid: "pc" })).toBe("✓ 이 컴퓨터에 열쇠를 만들었어요. 이 열쇠 없이는 우리도 못 열어요");
+    expect(didLine(initialState)).toBeNull();
+    expect(COPY.intro.time).toContain("5분");
   });
   it("uses the UX error table wording", () => {
     expect(COPY.stop.link_mismatch).toBe("이 링크는 이 컴퓨터의 설치와 맞지 않아 멈췄어요. Claude Code에서 설치 링크를 다시 받아 주세요");

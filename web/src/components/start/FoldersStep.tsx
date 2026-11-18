@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { ApprovalRow } from "../../lib/api";
-import { COPY, errorMessage } from "../../lib/copy";
+import { COPY, didLine, errorMessage } from "../../lib/copy";
 import { buildDecision, initialSelection, openSuggestions, planImport, signupApproval, type SuggestedFolder } from "../../lib/folders";
 import type { StepProps } from "../../lib/signup/context";
 import { stepNumber } from "../../lib/signup/machine";
@@ -53,7 +53,7 @@ export function FoldersStep({ api, ctx, state, dispatch }: StepProps) {
   }, [row, api]);
 
   if (!vault || !engine) return null;
-  const head = { step: stepNumber(state.step), title: COPY.folders.title, focusKey: phase, why: COPY.folders.why, done: state.done, error };
+  const head = { step: stepNumber(state.step), did: didLine(state), title: COPY.folders.title, focusKey: phase, why: COPY.folders.why, done: state.done, error };
 
   const toggle = (path: string) => setSelected((prev) => {
     const next = new Set(prev);
@@ -103,6 +103,7 @@ export function FoldersStep({ api, ctx, state, dispatch }: StepProps) {
       </fieldset>
       {selected.size === 0 ? <p class="small">{COPY.folders.noneNote}</p> : null}
       {plan.later > 0 ? <p class="small">{COPY.folders.split(plan.later)}</p> : null}
+      <p class="ahead">{COPY.folders.ahead}</p>
       <button type="button" class="primary" onClick={submit} disabled={!prepared || busy}>{selected.size === 0 ? COPY.folders.none : COPY.folders.action}</button>
     </Screen>
   );

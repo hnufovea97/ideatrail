@@ -10,6 +10,12 @@ test("shows the computer name from the link and removes the secret from the addr
   await page.goto(await engine.start());
   await expect(page.getByText("연결할 컴퓨터: Steven의 MacBook Air")).toBeVisible();
   await expect(page.getByText("Claude Code가 직접 연 링크가 아니라면 닫으세요")).toBeVisible();
+  await expect(page.getByText("약 5분 걸려요", { exact: false })).toBeVisible();
+  const map = page.getByRole("region", { name: "만들게 될 4가지와 있는 곳" });
+  await expect(map.getByRole("listitem")).toHaveCount(4);
+  await expect(map.getByRole("listitem").nth(0)).toContainText("열쇠이 컴퓨터");
+  await expect(map.getByRole("listitem").nth(3)).toContainText("비상 열쇠종이·비밀번호 관리자");
+  await expect(map).toContainText("우리 서버에는 잠긴 기록과 날짜 증명만 있어요. 우리는 못 열어요.");
   expect(new URL(page.url()).hash).toBe("");
   await expectClean(page, w);
 });

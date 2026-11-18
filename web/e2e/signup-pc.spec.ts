@@ -9,6 +9,9 @@ test("PRF authenticator: account confirmed, engine receives the account key, lis
   await passStepOne(page, engine);
   expect(engine.accountPub?.length).toBe(32);
   await expect(page.getByText("2/5")).toBeVisible();
+  const h1 = page.getByRole("heading", { level: 1 });
+  await expect(h1).toHaveAccessibleDescription("✓ 이 컴퓨터에 열쇠를 만들었어요. 이 열쇠 없이는 우리도 못 열어요");
+  await expect(h1).toBeFocused();
   const verify = w.requests.find((r) => r.url.endsWith("/v1/webauthn/register/verify"));
   expect(JSON.parse(verify!.body).response.clientExtensionResults).toEqual({});
   expect(w.requests.filter((r) => r.body.includes('"prf"'))).toEqual([]); // no PRF extension output in any body
@@ -24,9 +27,9 @@ test("no PRF on create or get: nothing registered on the server, guide to anothe
   const w = await watch(page);
   const { engine } = await openSignup(page, { prf: false });
   await page.getByRole("button", { name: "시작하기", exact: true }).click();
-  await page.getByRole("button", { name: "이 컴퓨터로 시작하기" }).click();
+  await page.getByRole("button", { name: "열쇠 만들기" }).click();
   await page.getByRole("button", { name: "확인", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "이 브라우저에선 내용을 풀 수 없어요. Chrome(Google 계정 패스키)이나 Safari 최신 버전으로 열어 주세요" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "이 브라우저에선 열쇠로 내용을 열 수 없어요. Chrome이나 Safari 최신 버전으로 열어 주세요" })).toBeVisible();
   expect(w.requests.filter((r) => r.url.endsWith("/register/verify") || r.url.endsWith("/account/confirm"))).toEqual([]);
   const pairing = await (await request.get(`http://localhost:8787/v1/pairing/${engine.sessionId}`)).json();
   expect(pairing.delivered).toBe(false);
@@ -37,7 +40,7 @@ const UNSURE = "연결을 확인하고 다시 해 주세요";
 
 async function startStepOne(page: Page) {
   await page.getByRole("button", { name: "시작하기", exact: true }).click();
-  await page.getByRole("button", { name: "이 컴퓨터로 시작하기" }).click();
+  await page.getByRole("button", { name: "열쇠 만들기" }).click();
   const again = page.getByRole("button", { name: "확인", exact: true });
   const unsure = page.getByText(UNSURE);
   await expect(unsure.or(again)).toBeVisible();
@@ -57,7 +60,7 @@ test("register/verify never answered (offline): passkey kept, [다시] sends the
   await startStepOne(page);
   expect(await auth.count()).toBe(1);
   await page.getByRole("button", { name: "다시", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "휴대폰도 같이 등록" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "휴대폰에 예비 열쇠 만들기" })).toBeVisible();
   await engine.takeHandoff();
   const verifies = w.requests.filter((r) => r.url.endsWith("/v1/webauthn/register/verify"));
   expect(verifies).toHaveLength(2);
@@ -90,7 +93,7 @@ test("register options failing offers [다시] instead of a dead button", async 
   const { engine } = await openSignup(page, { prf: true });
   await page.getByRole("button", { name: "시작하기", exact: true }).click();
   await page.getByRole("button", { name: "다시", exact: true }).click();
-  await page.getByRole("button", { name: "이 컴퓨터로 시작하기" }).click();
-  await confirmPasskey(page, "휴대폰도 같이 등록");
+  await page.getByRole("button", { name: "열쇠 만들기" }).click();
+  await confirmPasskey(page, "휴대폰에 예비 열쇠 만들기");
   await engine.takeHandoff();
 });

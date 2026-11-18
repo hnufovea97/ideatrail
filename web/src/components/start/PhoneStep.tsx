@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
-import { COPY, errorMessage } from "../../lib/copy";
+import { COPY, didLine, errorMessage } from "../../lib/copy";
 import { offerDevice, pollOffer, type DeviceOffer, type OfferProgress } from "../../lib/device-add";
 import type { StepProps } from "../../lib/signup/context";
 import { stepNumber } from "../../lib/signup/machine";
@@ -55,7 +55,8 @@ export function PhoneStep({ api, ctx, state, dispatch }: StepProps) {
   }, [offer, progress], (e) => setError(errorMessage(e)));
 
   return (
-    <Screen step={stepNumber(state.step)} title={COPY.phone.title} why={COPY.phone.why} done={state.done} error={error}>
+    <Screen step={stepNumber(state.step)} did={didLine(state)} title={COPY.phone.title} why={COPY.phone.why} done={state.done} error={error}>
+      <p class="ahead">{COPY.phone.ahead}</p>
       <p>{COPY.phone.scan}</p>
       {offer ? (
         <>

@@ -33,3 +33,20 @@ input[type="text"] { font: inherit; padding: 10px; border-radius: 8px; border: 1
   .print-sheet, .print-sheet * { visibility: visible; }
   .print-sheet { position: absolute; inset: 0 auto auto 0; padding: 24px; color: #000; }
 }
+.did { color: var(--ok); font-weight: 600; margin: 8px 0 0; }
+.ahead { border-left: 3px solid var(--accent); padding: 2px 0 2px 10px; margin: 16px 0 4px; }
+.choice-help { margin: -6px 0 8px 30px; }
+.map h2, .screen section h2 { font-size: 1.05rem; margin: 20px 0 8px; }
+.map ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.map li { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 2px; }
+.map-icon { width: 28px; height: 28px; color: var(--accent); }
+.map-name { font-weight: 700; }
+.map-where { color: var(--accent); font-size: 0.9rem; }
+.map-note, .map-server { color: var(--muted); font-size: 0.85rem; }
+.map-server { margin: 8px 0 0; }
+.made { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.made li { display: grid; border-left: 3px solid var(--ok); padding-left: 10px; }
+.made li.not-yet { border-left-color: var(--line); }
+.made-name { font-weight: 600; }
+.made-when { color: var(--muted); font-size: 0.875rem; }
+@media (max-width: 360px) { .map ul { grid-template-columns: 1fr; } }

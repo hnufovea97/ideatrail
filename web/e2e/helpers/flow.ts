@@ -22,18 +22,18 @@ export async function confirmPasskey(page: Page, next: string) {
 /** Step 0 → step 1 done; the fake engine then takes the handoff like the real one. */
 export async function passStepOne(page: Page, engine: FakeEngine) {
   await page.getByRole("button", { name: "시작하기", exact: true }).click();
-  await page.getByRole("button", { name: "이 컴퓨터로 시작하기" }).click();
-  await confirmPasskey(page, "휴대폰도 같이 등록");
+  await page.getByRole("button", { name: "열쇠 만들기" }).click();
+  await confirmPasskey(page, "휴대폰에 예비 열쇠 만들기");
   await engine.takeHandoff();
 }
 export async function skipPhone(page: Page) {
   await page.getByRole("button", { name: "휴대폰이 지금 없어요" }).click();
-  await expect(page.getByRole("heading", { name: "GitHub 보관" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "증명 보관함 만들기" })).toBeVisible();
 }
 
 export async function githubLater(page: Page) {
   await page.getByRole("button", { name: "나중에", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /복구 키/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /비상 열쇠/ })).toBeVisible();
 }
 /** Make and save a recovery key via the password-manager path; returns what the screen showed. */
 export async function saveRecoveryKey(page: Page): Promise<string> {
@@ -41,7 +41,7 @@ export async function saveRecoveryKey(page: Page): Promise<string> {
   await page.getByRole("button", { name: "지금 만들기" }).click();
   const display = ((await page.getByTestId("recovery-key").textContent()) ?? "").trim(); // groups wrap as flex items
   const prepared = page.waitForResponse((r) => r.url().endsWith("/v1/webauthn/stepup/options"));
-  await page.getByRole("button", { name: "다 적었어요" }).click();
+  await page.getByRole("button", { name: "다 보관했어요" }).click();
   await prepared;
   await page.getByLabel("앞 4자리").fill(display.slice(0, 4));
   const saved = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().endsWith("/v1/envelopes"));

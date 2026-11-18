@@ -138,9 +138,9 @@ export default function ConnectApp() {
   }
 
   if (phase === "stopped") return <Screen title={stop ?? COPY.errors.generic} />;
-  if (phase === "done") return <Screen title={COPY.connect.done} mark={COPY.connect.doneMark}><p>{COPY.connect.a2hs}</p></Screen>;
+  if (phase === "done") return <Screen title={COPY.connect.done} mark={COPY.connect.doneMark} did={COPY.connect.did}><p>{COPY.connect.a2hs}</p></Screen>;
   if (phase === "retry") {
-    return <Screen title={COPY.pc.retryPrf} error={error}><button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.pc.retryAction}</button></Screen>;
+    return <Screen title={COPY.pc.retryPrf} why={COPY.connect.retryWhy} error={error}><button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.pc.retryAction}</button></Screen>;
   }
   if (phase === "register" && unsent) {
     const again = () => { setBusy(true); setError(null); void submit(unsent.created, unsent.body, true).finally(() => setBusy(false)); };
@@ -153,6 +153,7 @@ export default function ConnectApp() {
   if (phase === "register") {
     return (
       <Screen title={COPY.connect.title} focusKey="register" why={COPY.phone.why} error={error}>
+        <p class="ahead">{COPY.connect.ahead}</p>
         <button type="button" class="primary" onClick={start} disabled={!opts || busy}>{COPY.connect.action}</button>
       </Screen>
     );
