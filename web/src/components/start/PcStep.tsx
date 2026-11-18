@@ -19,11 +19,16 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [optsFailed, setOptsFailed] = useState(false);
 
   // Options first, so the click can call create() with no await before it (QA B4).
   useEffect(() => {
     setOpts(null);
-    api.registerOptions({ pairing_session_id: ctx.link.sessionId }).then(setOpts, (e) => setError(errorMessage(e)));
+    setOptsFailed(false);
+    api.registerOptions({ pairing_session_id: ctx.link.sessionId }).then(setOpts, (e) => {
+      setError(errorMessage(e));
+      setOptsFailed(true);
+    });
   }, [api, ctx.link.sessionId, attempt]);
 
   const rpId = () => opts?.options.rp.id ?? location.hostname;
@@ -136,7 +141,9 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
     <Screen step={stepNumber(state.step)} title={COPY.pc.title} why={COPY.pc.why} done={state.done} error={error}>
       <p class="small">{COPY.pc.noSensor}</p>
       {isWindows() ? <p class="small">{COPY.pc.windows}</p> : null}
-      <button type="button" class="primary" onClick={start} disabled={!opts || busy}>{COPY.pc.action}</button>
+      {optsFailed
+        ? <button type="button" class="primary" onClick={() => { setError(null); setAttempt((n) => n + 1); }}>{COPY.actions.retry}</button>
+        : <button type="button" class="primary" onClick={start} disabled={!opts || busy}>{COPY.pc.action}</button>}
       <p class="small">{COPY.limit}</p>
     </Screen>
   );

@@ -82,3 +82,18 @@ test("QR을 찍을 수 없어요 → a one-time link to copy, never shown as tex
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
   expect(await page.locator("body").innerText()).not.toContain(new URL(url).hash);
 });
+
+test("a failed QR request offers [다시]", async ({ page }) => {
+  const { engine } = await openSignup(page);
+  let fail = true;
+  await page.route("**/v1/device-add", (route) => {
+    if (route.request().method() !== "POST" || !fail) return route.fallback();
+    fail = false;
+    return route.fulfill({ status: 503, json: { error: { code: "unavailable" } } });
+  });
+  await passStepOne(page, engine);
+  await expect(page.getByRole("alert")).toHaveText("잠시 문제가 생겼어요. 다시 해 볼까요?");
+  await page.getByRole("button", { name: "다시", exact: true }).click();
+  await expect(page.getByRole("img", { name: /휴대폰으로 찍을 QR 코드/ })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});

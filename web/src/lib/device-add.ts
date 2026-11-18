@@ -3,6 +3,7 @@ import { newKemKeyPair, randomKey } from "@ideatrail/crypto/keypair";
 import { bytesEqual, deviceJoinMac, deviceKeyMac } from "@ideatrail/crypto/mac";
 import { KIND, open, seal } from "@ideatrail/crypto/seal";
 import { ApiFailure, type Api, type RegisterVerifyBody } from "./api";
+import { DEVICE_ADD_TTL_MS } from "./timing";
 import type { Created } from "./webauthn";
 import { registrationJSON } from "./webauthn";
 import { makeEnvelope, type Vault } from "./signup/account";
@@ -21,11 +22,16 @@ function decode(f: (s: string) => Uint8Array, s: string): Uint8Array | null {
 export interface DeviceOffer { d: string; qpsk: Uint8Array; url: string; expiresAt: number }
 export type OfferProgress = "waiting" | "sent" | "done" | "intruder";
 
-/** PC, spec §10-1: a 2-minute session and the QR link carrying qpsk after #. */
-export async function offerDevice(api: Api, appOrigin: string): Promise<DeviceOffer> {
-  const { session_id, expires_at } = await api.deviceAddStart();
+/**
+ * PC, spec §10-1: a 2-minute session and the QR link carrying qpsk after #. The timer runs on this
+ * browser's clock from the moment the session arrived (`now`), so a skewed PC clock cannot keep a
+ * stale QR up or drop a fresh one.
+ */
+export async function offerDevice(api: Api, appOrigin: string, now?: number): Promise<DeviceOffer> {
+  const { session_id } = await api.deviceAddStart();
+  const receivedAt = now ?? Date.now();
   const qpsk = randomKey();
-  return { d: session_id, qpsk, url: `${appOrigin}/connect?d=${session_id}#v1.${toB64u(qpsk)}`, expiresAt: Date.parse(expires_at) };
+  return { d: session_id, qpsk, url: `${appOrigin}/connect?d=${session_id}#v1.${toB64u(qpsk)}`, expiresAt: receivedAt + DEVICE_ADD_TTL_MS };
 }
 
 /** PC, spec §10-3: once the joiner's MAC proves qpsk, seal MK to its temporary key (kind 9) + MAC2. */

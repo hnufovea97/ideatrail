@@ -14,12 +14,22 @@ export function PhoneStep({ api, ctx, state, dispatch }: StepProps) {
   const [progress, setProgress] = useState<OfferProgress>("waiting");
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [offerFailed, setOfferFailed] = useState(false);
 
+  // The note is cleared first and set again once the new QR is up, so every renewal is announced.
   const renew = useCallback((why: string | null) => {
-    setNote(why);
+    setNote(null);
     setProgress("waiting");
     setOffer(null);
-    offerDevice(api, location.origin).then(setOffer, (e) => setError(errorMessage(e)));
+    setOfferFailed(false);
+    offerDevice(api, location.origin).then((o) => {
+      setOffer(o);
+      setNote(why);
+      setError(null);
+    }, (e) => {
+      setError(errorMessage(e));
+      setOfferFailed(true);
+    });
   }, [api]);
   useEffect(() => renew(null), [renew]);
 
@@ -57,7 +67,8 @@ export function PhoneStep({ api, ctx, state, dispatch }: StepProps) {
           </details>
         </>
       ) : null}
-      <p class="small" aria-live="polite">{progress === "sent" ? COPY.phone.sent : note ?? ""}</p>
+      {offerFailed ? <button type="button" class="primary" onClick={() => renew(null)}>{COPY.actions.retry}</button> : null}
+      <p class="small" role="status">{progress === "sent" ? COPY.phone.sent : note ?? ""}</p>
       <button type="button" class="link" onClick={() => dispatch({ type: "phone_skip" })}>{COPY.phone.skip}</button>
     </Screen>
   );

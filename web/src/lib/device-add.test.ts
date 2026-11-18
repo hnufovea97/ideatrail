@@ -94,4 +94,10 @@ describe("device add (spec §10)", () => {
     await submitDevice(api, body);
     expect(JSON.stringify(bodies[1])).toBe(JSON.stringify(bodies[0]));
   });
+  it("the QR expires 2 minutes after this browser got it, whatever the server clock says", async () => {
+    const { api } = fakeServer();
+    const skewed = { ...api, deviceAddStart: async () => ({ ...(await api.deviceAddStart()), expires_at: "1999-01-01T00:00:00Z" }) } as Api;
+    const offer = await offerDevice(skewed, "http://localhost:4321", 1_000_000);
+    expect(offer.expiresAt).toBe(1_000_000 + 120_000);
+  });
 });

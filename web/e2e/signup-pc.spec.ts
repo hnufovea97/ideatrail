@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { expectClean, watch } from "./helpers/guards";
-import { openSignup, passStepOne } from "./helpers/flow";
+import { confirmPasskey, openSignup, passStepOne } from "./helpers/flow";
 
 test("PRF authenticator: account confirmed, engine receives the account key, list v1", async ({ page }) => {
   const w = await watch(page);
@@ -78,4 +78,19 @@ test("register/verify stored but the answer was a 5xx: the retry's refusal never
   await page.getByRole("button", { name: "다시", exact: true }).click();
   await expect(page.getByRole("alert")).toHaveText("잠시 문제가 생겼어요. 다시 해 볼까요?");
   expect(await auth.count()).toBe(1);
+});
+
+test("register options failing offers [다시] instead of a dead button", async ({ page }) => {
+  let fail = true;
+  await page.route("**/v1/webauthn/register/options", (route) => {
+    if (!fail) return route.fallback();
+    fail = false;
+    return route.fulfill({ status: 503, json: { error: { code: "unavailable" } } });
+  });
+  const { engine } = await openSignup(page, { prf: true });
+  await page.getByRole("button", { name: "시작하기", exact: true }).click();
+  await page.getByRole("button", { name: "다시", exact: true }).click();
+  await page.getByRole("button", { name: "이 컴퓨터로 시작하기" }).click();
+  await confirmPasskey(page, "휴대폰도 같이 등록");
+  await engine.takeHandoff();
 });
