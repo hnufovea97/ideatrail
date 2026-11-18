@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ideatrail 사용 설명서</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -82,6 +84,29 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
   .keys{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:420px){ .step dl{grid-template-columns:minmax(0,1fr)} .step dt{margin-top:4px} h1{font-size:1.7rem} }
+/* 2장: 어디에 무엇이 — 사용자 쪽 네 곳 vs Ideatrail 서버 한 곳 */
+.store{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px;margin:20px 0}
+.side{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--paper);min-width:0}
+.side > b{font-family:var(--f-head);display:block;margin-bottom:10px;font-size:15px}
+.side.user{border-top:4px solid var(--k-spare)}
+.side.srv{border-top:4px solid var(--muted);background:var(--bg)}
+.place{border-left:3px solid var(--c,var(--line));padding:4px 0 4px 12px;margin:0 0 12px}
+.place:last-child{margin-bottom:0}
+.place b{font-family:var(--f-head);font-size:14px;display:block}
+.place p{font-size:14px;margin:2px 0 0;color:var(--ink)}
+.place .who{font-size:12px;color:var(--muted)}
+.lock{display:inline-block;font-size:12px;font-weight:700;color:var(--k-vault);border:1px solid var(--k-vault);border-radius:999px;padding:0 8px;margin-left:4px;white-space:nowrap}
+.srv ul{margin:6px 0 0;padding-left:18px;font-size:14px}
+.srv .none{margin-top:12px;font-size:14px}
+.srv .none b{color:var(--k-emerg)}
+.if td:first-child{white-space:nowrap;font-weight:700}
+@media (max-width:820px){.store{grid-template-columns:minmax(0,1fr)} .if td:first-child{white-space:normal}}
+/* 1장: 핵심 이점 세 가지 */
+.why{display:grid;gap:12px;margin:16px 0 24px}
+.why section{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px 6px 56px;position:relative}
+.why .num{position:absolute;left:16px;top:16px;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--paper);font-family:var(--f-mono);font-size:14px;display:grid;place-items:center}
+.why h3{margin:2px 0 8px}
+.why p{font-size:15px}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -96,12 +121,12 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
   <p>목차</p>
   <ol>
     <li><a href="#what">1. 무엇인가요</a></li>
-    <li><a href="#need">2. 필요한 것</a></li>
-    <li><a href="#install">3. 설치</a></li>
-    <li><a href="#signup">4. 가입</a></li>
-    <li><a href="#daily">5. 평소에 쓰기</a></li>
-    <li><a href="#phone">6. 휴대폰</a></li>
-    <li><a href="#data">7. 내 데이터</a></li>
+    <li><a href="#where">2. 어디에 무엇이 · 안전한 이유</a></li>
+    <li><a href="#need">3. 필요한 것</a></li>
+    <li><a href="#install">4. 설치</a></li>
+    <li><a href="#signup">5. 가입</a></li>
+    <li><a href="#daily">6. 평소에 쓰기</a></li>
+    <li><a href="#phone">7. 휴대폰</a></li>
     <li><a href="#lost">8. 잃어버렸을 때</a></li>
     <li><a href="#leave">9. 끊기·지우기</a></li>
     <li><a href="#faq">10. 자주 묻는 질문</a></li>
@@ -111,24 +136,97 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 
 <main>
 <h1>Ideatrail 사용 설명서</h1>
-<p class="lede">처음 쓰는 분을 위한 안내예요. 어려운 말은 맨 아래 <a href="#words">낱말 풀이</a>에 모아 두었어요. <span class="soon">곧 생겨요</span> 표시는 아직 준비 중인 기능이에요.</p>
+<p class="lede">처음 쓰는 분을 위한 안내예요. 어려운 말은 맨 아래 <a href="#words">낱말 풀이</a>에 모아 두었어요. <span class="soon">곧 생겨요</span> 표시는 아직 준비 중인 기능이에요.<br>이 설명서에서 <b>Ideatrail</b>은 서비스와 그 서버를, <b>사용자</b>는 이 설명서를 읽는 분을 뜻해요.</p>
 
 <h2 id="what">1. Ideatrail이 뭐예요?</h2>
-<ul>
-  <li>AI(Claude Code)와 아이디어를 다듬는 동안, <b>의미 있는 변화가 생길 때마다 저절로 기록</b>해 줘요.</li>
-  <li>기록마다 <b>날짜 증명</b>이 붙어요. "이 아이디어를 이날 이만큼 해 두었다"를 나중에 보여 줄 수 있어요.</li>
-  <li>기록의 <b>내용은 우리 서버에 두지 않아요.</b> 서버에는 날짜를 증명할 <b>파일 지문</b>(내용에서 뽑은 짧은 값)만 있어요. 내용은 잠긴 채 <b>내 GitHub와 내 컴퓨터</b>에 있고, 볼 때는 <b>내 열쇠로 내 기기에서</b> 열어요.</li>
-</ul>
+<p>AI(Claude Code)와 아이디어·메모·기록을 다듬는 과정을, <b>날짜 증명과 함께 저절로 남겨 주는 서비스</b>예요. 핵심은 세 가지예요.</p>
+<div class="why">
+  <section><span class="num">1</span><h3>기록은 AI가 알아서 해요</h3>
+    <p>문서에 <b>의미 있는 변화</b>(기획 확정, 기능 완성, 피드백 반영 등)가 생기면 AI가 <b>자동으로 기록</b>해요. 따로 저장하거나 정리할 일이 없어요.</p>
+    <p>기록마다 <b>날짜 증명</b>이 붙어서, "이 아이디어를 이날 이만큼 해 두었다"를 나중에 누구에게나 보여 줄 수 있어요.</p></section>
+  <section><span class="num">2</span><h3>밖에 드러나는 건 최소한, 해킹돼도 내용은 못 알아내요</h3>
+    <p>Ideatrail 서버에 남는 것은 <b>기록 일시와 파일 지문(기록마다 32바이트)</b>뿐이에요.</p>
+    <p>파일 지문은 내용에서 한 방향으로만 뽑은 값이라, <b>서버가 해킹돼도 지문으로 내용을 거꾸로 알아낼 수 없어요.</b> 기록 내용은 잠긴 채 사용자의 컴퓨터와 GitHub에 있고, 사용자의 열쇠로 사용자의 기기에서만 열려요.</p></section>
+  <section><span class="num">3</span><h3>언제 어디서든 사용자의 기록을 확인해요</h3>
+    <p>휴대폰이나 다른 기기에서도 아이디어별 <b>개요와 작업 순서</b>(어떤 단계를 언제 거쳤는지)를 볼 수 있어요.</p>
+    <p>원하면 그 기록의 <b>파일로 가는 경로</b>도 알려 줘요. 그 파일을 여는 순간부터는 사용자의 기기·GitHub 계정의 보안에 달려 있어요. <span class="soon">대시보드는 곧 생겨요</span></p></section>
+</div>
+<p>어디에 무엇이 저장되는지는 <a href="#where">2장</a>에 자세히 있어요.</p>
 
 <p>가입하면서 아래 네 가지를 만들어요. 이 설명서는 이 네 가지 이름으로 이야기해요.</p>
 <div class="keys" role="list">
-  <div class="key k1" role="listitem"><svg aria-hidden="true"><use href="#i-key"/></svg><b>열쇠</b><span class="where">이 컴퓨터 안</span><p>내용을 여는 열쇠. 컴퓨터 밖으로 나가지 않아요.</p></div>
-  <div class="key k2" role="listitem"><svg aria-hidden="true"><use href="#i-phone"/></svg><b>예비 열쇠</b><span class="where">휴대폰 안</span><p>휴대폰으로도 보고, 컴퓨터를 잃어도 열 수 있어요.</p></div>
-  <div class="key k3" role="listitem"><svg aria-hidden="true"><use href="#i-box"/></svg><b>증명 보관함</b><span class="where">내 GitHub</span><p>날짜 증명과 잠긴 원문. 우리 서비스가 없어져도 남아요.</p></div>
+  <div class="key k1" role="listitem"><svg aria-hidden="true"><use href="#i-key"/></svg><b>열쇠</b><span class="where">사용자의 컴퓨터 안</span><p>기록을 여는 열쇠. 컴퓨터 밖으로 나가지 않아요.</p></div>
+  <div class="key k2" role="listitem"><svg aria-hidden="true"><use href="#i-phone"/></svg><b>예비 열쇠</b><span class="where">사용자의 휴대폰 안</span><p>휴대폰으로도 보고, 컴퓨터를 잃어도 열 수 있어요.</p></div>
+  <div class="key k3" role="listitem"><svg aria-hidden="true"><use href="#i-box"/></svg><b>증명 보관함</b><span class="where">사용자의 GitHub</span><p>잠긴 기록 사본과 날짜 증명. Ideatrail이 없어져도 남아요.</p></div>
   <div class="key k4" role="listitem"><svg aria-hidden="true"><use href="#i-paper"/></svg><b>비상 열쇠</b><span class="where">종이·비밀번호 관리자</span><p>기기를 모두 잃었을 때 쓰는 마지막 열쇠예요.</p></div>
 </div>
 
-<h2 id="need">2. 무엇이 필요해요?</h2>
+<h2 id="where">2. 어디에 무엇이 저장되나요? — 그래서 안전해요</h2>
+<p>기록 내용과 열쇠는 모두 <b>사용자 쪽</b>에 있어요. Ideatrail 서버에는 날짜를 증명하는 데 필요한 아주 작은 값만 있어요.</p>
+
+<div class="store">
+  <section class="side user" aria-labelledby="sd-user">
+    <b id="sd-user">사용자 쪽 — 내용과 열쇠가 있는 곳</b>
+    <div class="place" style="--c:var(--k-key)"><b>사용자의 컴퓨터</b>
+      <p>평소 작업하던 파일 (원래 자리 그대로. Ideatrail은 옮기거나 바꾸지 않아요)</p>
+      <p><b style="display:inline">열쇠</b> — 기기 잠금 안에</p>
+      <p>증명 사본 <code>ideatrail-증명</code> — 파일 지문과 날짜 증명 (내용 없음)</p></div>
+    <div class="place" style="--c:var(--k-vault)"><b>사용자의 GitHub <span class="lock">잠긴 채</span></b>
+      <p>기록한 <b style="display:inline">그 순간의 원본 사본과 메모</b> · 날짜 증명</p>
+      <p class="who">사용자의 열쇠로만 열려요. GitHub도 Ideatrail도 못 열어요</p></div>
+    <div class="place" style="--c:var(--k-spare)"><b>사용자의 휴대폰</b><p>예비 열쇠</p></div>
+    <div class="place" style="--c:var(--k-emerg)"><b>종이·비밀번호 관리자</b><p>비상 열쇠</p></div>
+  </section>
+  <section class="side srv" aria-labelledby="sd-srv">
+    <b id="sd-srv">Ideatrail 서버 — 증명에 필요한 값만</b>
+    <ul>
+      <li>기록 일시</li>
+      <li>파일 지문 (기록마다 32바이트)</li>
+      <li>날짜 증명 영수증</li>
+      <li>Ideatrail도 풀 수 없게 <span class="lock">잠긴</span> 작은 정보 (아래)</li>
+    </ul>
+    <p class="none"><b>없는 것</b>: 메모·원본 파일 같은 기록 내용, 기록을 여는 열쇠, 이메일·이름(가입할 때 받지 않아요)</p>
+  </section>
+</div>
+
+<h3>컴퓨터와 GitHub은 무엇이 달라요?</h3>
+<div class="tbl"><table>
+<thead><tr><th></th><th>사용자의 컴퓨터</th><th>사용자의 GitHub</th></tr></thead>
+<tbody>
+<tr><td><b>무엇</b></td><td>지금 작업 중인 파일</td><td>기록한 순간의 모습</td></tr>
+<tr><td><b>바뀌나요</b></td><td>작업하면 계속 바뀌어요</td><td>한 번 쌓이면 바뀌지 않아요</td></tr>
+<tr><td><b>잠겨 있나요</b></td><td>평소 파일 그대로예요</td><td>잠긴 채로 쌓여요</td></tr>
+<tr><td><b>컴퓨터를 잃으면</b></td><td>함께 사라져요</td><td>그대로 남아요</td></tr>
+</tbody></table></div>
+<div class="note">원본 파일이 5MB를 넘거나 이미지·영상이면 GitHub에는 사본 없이 <b>파일 지문만</b> 남겨요. 날짜 증명은 똑같이 붙어요.</div>
+
+<h3>Ideatrail 서버에 잠긴 채로만 있는 것</h3>
+<p>화면을 그리려면 필요해서, 사용자의 기기가 잠가서 보내는 작은 정보예요. 셋 다 <b>사용자의 열쇠로만 풀려요. Ideatrail은 못 풀어요.</b></p>
+<ol>
+  <li><b>목록 이름표</b> — 목록에 보일 폴더 이름·파일 이름·단계</li>
+  <li><b>열쇠 상자</b> — 사용자의 컴퓨터·휴대폰·비상 열쇠가 같은 기록을 열 수 있게 해 주는 상자</li>
+  <li><b>GitHub 출입증</b> — 대시보드가 사용자의 증명 보관함을 읽을 때 써요</li>
+</ol>
+
+<h3>그래서 이런 일이 생겨도 괜찮아요</h3>
+<div class="tbl"><table class="if">
+<thead><tr><th>만약</th><th>어떻게 되나요</th></tr></thead>
+<tbody>
+<tr><td>Ideatrail 서버가 털리면</td><td>가져갈 내용이 없어요. 파일 지문으로는 내용을 되살리거나 짐작할 수 없고, 잠긴 정보는 열쇠가 없어 풀 수 없어요</td></tr>
+<tr><td>Ideatrail 직원이 보려고 해도</td><td>마찬가지예요. Ideatrail에는 열쇠가 없어요</td></tr>
+<tr><td>GitHub 계정이 털리거나 GitHub가 들여다봐도</td><td>잠긴 사본만 있어요. 사용자의 열쇠 없이는 못 열어요</td></tr>
+<tr><td>Ideatrail이 문을 닫아도</td><td>기록 사본은 사용자의 GitHub에, 작업 파일은 사용자의 컴퓨터에 그대로 있어요. 날짜 증명은 공개 블록체인에 새겨져서, Ideatrail 없이도 누구나 확인할 수 있어요</td></tr>
+<tr><td>컴퓨터를 잃어도</td><td>휴대폰(예비 열쇠)이나 비상 열쇠로 열고, GitHub의 사본으로 되찾아요 <span class="soon">되찾는 화면은 곧 생겨요</span></td></tr>
+<tr><td>AI가 마음대로 하려 해도</td><td>기록 도우미 폴더는 AI도 열지 못하게 막혀 있어요. 공개·삭제·공유는 AI가 쓰는 도구에 아예 없어요</td></tr>
+</tbody></table></div>
+
+<h3>기록을 볼 때는</h3>
+<p>사용자의 기기 브라우저가 사용자의 GitHub에서 잠긴 사본을 가져와 <b>그 자리에서 사용자의 열쇠로</b> 풀어요. 푼 내용은 Ideatrail 서버로 보내지 않아요. <span class="soon">대시보드는 곧 생겨요</span></p>
+
+<h3>잠그는 방식은요</h3>
+<p>Ideatrail이 새로 만든 방식이 아니에요. <b>공개되고 검증된 표준 암호 방식</b>을 써요(이름은 <a href="#words">낱말 풀이</a>에 있어요). 날짜는 기록 몇 시간 뒤 공개 블록체인에 새겨지고, 그 뒤에는 누구도 바꿀 수 없어요.</p>
+
+<h2 id="need">3. 무엇이 필요해요?</h2>
 <div class="tbl"><table>
 <thead><tr><th>필요한 것</th><th>왜 필요해요?</th></tr></thead>
 <tbody>
@@ -137,12 +235,12 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 <tr><td>Chrome 또는 Safari 최신 버전</td><td>가입 화면을 열어요</td></tr>
 <tr><td>Touch ID 또는 컴퓨터 로그인 암호</td><td>컴퓨터 안에 <b>열쇠</b>를 만들 때 써요</td></tr>
 <tr><td>휴대폰 (있으면 좋아요)</td><td><b>예비 열쇠</b>를 만들어요. 없으면 건너뛸 수 있어요</td></tr>
-<tr><td>GitHub 계정 (무료)</td><td>내 <b>증명 보관함</b>을 둘 곳이에요. 나중에 만들어도 돼요</td></tr>
+<tr><td>GitHub 계정 (무료)</td><td>사용자의 <b>증명 보관함</b>을 둘 곳이에요. 나중에 만들어도 돼요</td></tr>
 <tr><td>비밀번호 관리자나 프린터</td><td><b>비상 열쇠</b>를 보관해요</td></tr>
 </tbody></table></div>
 <p>가입은 <b>약 5분</b> 걸려요.</p>
 
-<h2 id="install">3. 설치하기 <span class="soon">곧 생겨요</span></h2>
+<h2 id="install">4. 설치하기 <span class="soon">곧 생겨요</span></h2>
 <p>플러그인으로 묶어 내놓는 일이 곧 끝나요. 아래는 그때의 설치 방법이에요.</p>
 <ol>
   <li>Claude Code를 열어요.</li>
@@ -151,16 +249,16 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 </ol>
 <div class="note">Claude Code가 처음부터 실행되지 않으면, Ideatrail 문제가 아니라 Claude Code 로그인 문제일 때가 많아요. Claude Code 안내대로 다시 로그인해 주세요.</div>
 
-<h2 id="signup">4. 가입하기 — 한 단계씩</h2>
+<h2 id="signup">5. 가입하기 — 한 단계씩</h2>
 <p>Claude Code에 이런 한 줄이 보이면 가입이 시작된 거예요.</p>
 <div class="say">가입하려고 브라우저 창을 열었어요. 약 5분이면 끝나요. 화면이 하라는 대로 마친 뒤 여기 Claude Code로 돌아와 주세요.</div>
-<p>브라우저에 <b>"시작하기 전에"</b> 화면이 열리고, 앞으로 만들 네 가지가 그림으로 나와요. 화면 위의 <b>"연결할 컴퓨터: (내 컴퓨터 이름)"</b>이 내 컴퓨터가 아니거나, Claude Code가 연 창이 아니라면 그냥 닫으세요.</p>
+<p>브라우저에 <b>"시작하기 전에"</b> 화면이 열리고, 앞으로 만들 네 가지와 Ideatrail 서버에 무엇이 남는지가 나와요. 화면 위의 <b>"연결할 컴퓨터: (컴퓨터 이름)"</b>이 사용자의 컴퓨터가 아니거나, Claude Code가 연 창이 아니라면 그냥 닫으세요.</p>
 <p>[시작하기]를 누르면 1단계부터 시작해요. 단계가 끝날 때마다 다음 화면 맨 위에 <b>"✓ 방금 한 일"</b>이 한 줄로 나와요.</p>
 
 <section class="step s1" aria-labelledby="st1">
 <header><span class="n">1 / 5</span><h3 id="st1">이 컴퓨터에 열쇠 만들기</h3></header>
 <dl>
-  <dt>하는 일</dt><dd>내용을 여는 열쇠를 이 컴퓨터 안에 만들어요.</dd>
+  <dt>하는 일</dt><dd>기록을 여는 열쇠를 이 컴퓨터 안에 만들어요. 열쇠는 Ideatrail 서버로 가지 않아요.</dd>
   <dt>누를 것</dt><dd>[열쇠 만들기]</dd>
   <dt>뜨는 창</dt><dd>브라우저가 "저장할까요?" 하고 작은 창을 띄워요. 창에 "패스키"라는 말이 보일 수 있어요.
     <ul>
@@ -170,7 +268,7 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
     </ul></dd>
   <dt>가끔</dt><dd>"한 번만 더 확인할게요"가 나오면 [확인]을 눌러요. 열쇠를 마무리하려고 한 번 더 묻는 거예요.</dd>
 </dl>
-<p class="done">✓ 이 컴퓨터에 열쇠를 만들었어요. 이 열쇠 없이는 우리도 못 열어요</p>
+<p class="done">✓ 이 컴퓨터에 열쇠를 만들었어요. 사용자의 기록은 이 열쇠로만 열려요</p>
 </section>
 
 <section class="step s2" aria-labelledby="st2">
@@ -183,16 +281,16 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
     <li>[이 기기 잠금으로 등록]을 누르고 휴대폰 잠금(얼굴·지문·PIN)을 한 번 풀어요.</li>
     <li>휴대폰에 "이 기기에서도 열려요"가 나오면 끝. 컴퓨터 화면은 저절로 넘어가요.</li>
   </ol></dd>
-  <dt>알아 둘 것</dt><dd>QR은 <b>2분</b>만 써요. 지나면 새 QR이 저절로 나와요. 찍을 수 없으면 [QR을 찍을 수 없어요] → [링크 복사]로 <b>내 휴대폰에만</b> 보내세요. 이 링크는 한 번만 쓰는 비밀이라 다른 사람에게 보내면 안 돼요.</dd>
+  <dt>알아 둘 것</dt><dd>QR은 <b>2분</b>만 써요. 지나면 새 QR이 저절로 나와요. 찍을 수 없으면 [QR을 찍을 수 없어요] → [링크 복사]로 <b>사용자의 휴대폰에만</b> 보내세요. 이 링크는 한 번만 쓰는 비밀이라 다른 사람에게 보내면 안 돼요.</dd>
   <dt>휴대폰이 없으면</dt><dd>[휴대폰이 지금 없어요]로 건너뛰어요. 이때는 4단계 비상 열쇠를 꼭 만들어야 해요.</dd>
 </dl>
 <p class="done">✓ 휴대폰에 예비 열쇠를 만들었어요. 이제 휴대폰으로도 볼 수 있어요</p>
 </section>
 
 <section class="step s3" aria-labelledby="st3">
-<header><span class="n">3 / 5</span><h3 id="st3">증명 보관함 만들기 (내 GitHub)</h3></header>
+<header><span class="n">3 / 5</span><h3 id="st3">증명 보관함 만들기 (사용자의 GitHub)</h3></header>
 <dl>
-  <dt>하는 일</dt><dd>내 GitHub에 <b>비공개</b> 보관함을 하나 만들어요. 날짜 증명과 잠긴 원문이 여기 쌓여요. 우리는 이 보관함 하나에만 들어갈 수 있어요.</dd>
+  <dt>하는 일</dt><dd>사용자의 GitHub에 <b>비공개</b> 보관함을 하나 만들어요. 잠긴 기록 사본과 날짜 증명이 여기 쌓여요. Ideatrail 앱은 이 보관함 하나에만 쓸 수 있어요.</dd>
   <dt>할 것</dt><dd><ol>
     <li>[GitHub에 보관함 만들기]를 눌러요.</li>
     <li><b>"ideatrail"</b> 작은 창에 8자리 코드(예: <code>ABCD-1234</code>)가 보여요. <b>이미 복사돼 있어요.</b></li>
@@ -203,13 +301,13 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
   </ol></dd>
   <dt>나중에 해도 돼요</dt><dd>[나중에]를 누르면 마지막 화면에서 [지금 만들기]로 다시 할 수 있어요.</dd>
 </dl>
-<p class="done">✓ 내 GitHub에 증명 보관함을 만들었어요. 우리 서비스가 없어져도 증명이 남아요</p>
+<p class="done">✓ 사용자의 GitHub에 증명 보관함을 만들었어요. Ideatrail이 없어져도 증명이 남아요</p>
 </section>
 
 <section class="step s4" aria-labelledby="st4">
 <header><span class="n">4 / 5</span><h3 id="st4">비상 열쇠 <span class="imp">중요</span></h3></header>
 <dl>
-  <dt>하는 일</dt><dd>컴퓨터와 휴대폰을 <b>모두</b> 잃었을 때 쓰는 마지막 열쇠예요. 우리도 대신 열어 드릴 수 없어서 꼭 보관해야 해요.</dd>
+  <dt>하는 일</dt><dd>컴퓨터와 휴대폰을 <b>모두</b> 잃었을 때 쓰는 마지막 열쇠예요. Ideatrail도 대신 열어 드릴 수 없어서 꼭 보관해야 해요.</dd>
   <dt>보관할 곳</dt><dd><b>비밀번호 관리자</b>(iCloud 키체인, 1Password 등)에 [비상 열쇠 복사]로 붙여 넣거나, <b>PDF·종이로 인쇄</b>해 서랍처럼 안전한 곳에 둬요.</dd>
   <dt>꼭 기억</dt><dd>비상 열쇠는 <b>딱 한 번만</b> 보여요. 4글자씩 끊어 천천히 확인하세요. [다 보관했어요] → 앞 4자리 입력 → [확인하고 저장](Touch ID·암호 한 번).</dd>
   <dt>건너뛰기</dt><dd>휴대폰을 등록했다면 [나중에]도 돼요. 휴대폰을 건너뛰었다면 지금 꼭 만들어야 해요.</dd>
@@ -228,7 +326,7 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 
 <p><b>마지막 화면 "준비됐어요"</b>에서 만든 네 가지가 어디 있는지 다시 보여 줘요. 건너뛴 것은 "아직 안 만들었어요"로 나와요. 그다음 [터미널로 돌아가기]를 누르거나 창을 닫고 Claude Code로 돌아가면 돼요.</p>
 
-<h2 id="daily">5. 평소에 쓰기</h2>
+<h2 id="daily">6. 평소에 쓰기</h2>
 <p>따로 할 일은 없어요. <b>평소처럼 Claude Code와 작업하세요.</b> 기획 확정, 기능 완성, 피드백 반영처럼 의미 있는 변화가 생기면 기록 도우미가 남기고 터미널에 한 줄로 알려 줘요. 오타 고치기 같은 작은 변화는 기록하지 않아요.</p>
 <div class="say">기록했어요 · 가계부 앱 · 단계: 기획 확정 (AI 추정)</div>
 <p><b>이렇게 말해 보세요</b></p>
@@ -237,39 +335,20 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 <tbody>
 <tr><td>"아이디어 상태 알려줘"</td><td>이 프로젝트의 지금 단계와 기록이 있는지 알려 줘요</td></tr>
 <tr><td>"지금 기록해 줘"</td><td>방금 바뀐 내용을 기록해요</td></tr>
-<tr><td>"기획 확정됐어. 기록해 줘"</td><td>단계를 '기획 확정'으로 남겨요. 내가 말했으니 "AI 추정"이 안 붙어요</td></tr>
+<tr><td>"기획 확정됐어. 기록해 줘"</td><td>단계를 '기획 확정'으로 남겨요. 사용자가 직접 말했으니 "AI 추정"이 안 붙어요</td></tr>
 <tr><td>"옆 폴더의 예전 노트도 가져와 줘"</td><td>그 폴더를 기록할지 묻는 요청을 보내요. 허락하는 화면은 <span class="soon">곧 생겨요</span></td></tr>
 </tbody></table></div>
 <ul>
   <li>작업을 마칠 때 아직 기록하지 않은 변경이 있으면 Claude가 <b>"ideatrail에 남길까요?"</b>라고 한 번 물어요.</li>
   <li>인터넷이 끊겨도 괜찮아요. 연결되면 저절로 올라가요.</li>
-  <li>공개로 바꾸기·지우기·공유는 <b>AI가 할 수 없어요.</b> 대시보드에서 본인만 할 수 있어요 <span class="soon">대시보드는 곧 생겨요</span></li>
+  <li>공개로 바꾸기·지우기·공유는 <b>AI가 할 수 없어요.</b> 대시보드에서 사용자만 할 수 있어요 <span class="soon">대시보드는 곧 생겨요</span></li>
 </ul>
 
-<h2 id="phone">6. 휴대폰으로 보기</h2>
+<h2 id="phone">7. 휴대폰으로 보기</h2>
 <ul>
   <li>2단계에서 예비 열쇠를 만들었다면 휴대폰으로 볼 준비가 된 거예요.</li>
   <li>휴대폰 브라우저 메뉴(⋮)에서 <b>"홈 화면에 추가"</b>를 누르면 앱처럼 열 수 있어요.</li>
   <li>기록을 둘러보는 대시보드 화면은 <span class="soon">곧 생겨요</span></li>
-</ul>
-
-<h2 id="data">7. 내 데이터는 어떻게 돼요?</h2>
-<ul>
-  <li>기록의 <b>내용(메모·원본 파일)은 우리 서버로 보내지 않아요.</b> 이 컴퓨터에서 잠근 뒤 <b>내 GitHub(증명 보관함)</b>로 바로 가요.</li>
-  <li>우리 서버에 있는 것은 세 가지뿐이에요.
-    <ol>
-      <li><b>파일 지문</b> — 내용에서 뽑은 짧은 값이에요. 이것만으로는 내용을 되살리거나 짐작할 수 없어요.</li>
-      <li><b>날짜 증명</b> — 그 지문이 언제 있었는지 보여 줘요.</li>
-      <li><b>잠긴 이름표</b> — 목록에 보일 폴더 이름·파일 이름이에요. 이것도 잠겨 있어서 우리는 못 봐요.</li>
-    </ol>
-  </li>
-  <li>볼 때는 내 기기의 브라우저가 내 GitHub에서 잠긴 기록을 가져와 <b>내 열쇠로 그 자리에서</b> 열어요(대시보드는 곧 생겨요).</li>
-  <li>잠그는 방식은 우리가 새로 만든 것이 아니라 <b>공개되고 검증된 표준 암호 방식</b>이에요.</li>
-  <li>여는 열쇠는 내 컴퓨터와 휴대폰 안에만 있어요. 우리 서버로 오지 않아요.</li>
-  <li><b>증명 보관함(내 GitHub)</b>에 날짜 증명과 잠긴 원문이 쌓여요. 이 보관함에는 내 컴퓨터의 기록 도우미만 써요. 우리 서버는 GitHub에 쓰지 않고, 다른 저장소에도 들어가지 못해요.</li>
-  <li>컴퓨터 홈 폴더의 <code>ideatrail-증명</code> 폴더에도 사본이 하나 더 남아요.</li>
-  <li>기록 도우미가 쓰는 폴더는 AI도 열지 못하게 막혀 있어요.</li>
-  <li>날짜 증명은 몇 시간 뒤 공개 블록체인에 새겨져요. 그 뒤에는 누구도 날짜를 바꿀 수 없어요.</li>
 </ul>
 
 <h2 id="lost">8. 기기를 잃어버렸다면</h2>
@@ -278,7 +357,7 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 <tbody>
 <tr><td><b>컴퓨터만</b></td><td>휴대폰(예비 열쇠)으로 계속 열 수 있어요. 새 컴퓨터는 휴대폰에서 [새 기기 추가]로 등록해요 <span class="soon">곧 생겨요</span></td></tr>
 <tr><td><b>휴대폰만</b></td><td>컴퓨터(열쇠)로 계속 열 수 있어요. 새 휴대폰은 컴퓨터에서 [새 기기 추가]로 등록해요 <span class="soon">곧 생겨요</span></td></tr>
-<tr><td><b>둘 다</b></td><td><b>비상 열쇠</b>로 새 기기에서 다시 열어요 <span class="soon">곧 생겨요</span> 비상 열쇠가 없으면 우리도 열어 드릴 수 없어요</td></tr>
+<tr><td><b>둘 다</b></td><td><b>비상 열쇠</b>로 새 기기에서 다시 열어요 <span class="soon">곧 생겨요</span> 비상 열쇠가 없으면 Ideatrail도 열어 드릴 수 없어요</td></tr>
 </tbody></table></div>
 <div class="note">그래서 비상 열쇠가 <b>중요</b>예요. 아직 안 만들었다면 설정에서 만들 수 있게 될 거예요 <span class="soon">곧 생겨요</span></div>
 
@@ -291,13 +370,13 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 
 <h2 id="faq">10. 자주 묻는 질문</h2>
 <div class="faq">
-<details><summary>우리 회사(서비스)가 내 아이디어를 볼 수 있나요?</summary><p>아니요. 내용은 당신 기기에서 잠긴 채로 와요. 우리에게는 여는 열쇠가 없어요.</p></details>
-<details><summary>AI가 내 기록을 마음대로 공개하거나 지울 수 있나요?</summary><p>아니요. 공개·삭제·공유는 AI 도구에 아예 없어요. 대시보드에서 본인이 기기 잠금을 풀어야만 할 수 있어요.</p></details>
+<details><summary>Ideatrail이 사용자의 아이디어를 볼 수 있나요?</summary><p>아니요. 기록 내용은 Ideatrail 서버로 오지 않아요. Ideatrail에는 기록 일시와 파일 지문만 있고, 여는 열쇠도 없어요. 자세한 것은 <a href="#where">2장</a>을 보세요.</p></details>
+<details><summary>AI가 사용자의 기록을 마음대로 공개하거나 지울 수 있나요?</summary><p>아니요. 공개·삭제·공유는 AI 도구에 아예 없어요. 대시보드에서 사용자가 기기 잠금을 풀어야만 할 수 있어요.</p></details>
 <details><summary>모든 변화가 기록되나요?</summary><p>아니요. 기획 확정, 기능 완성, 피드백 반영처럼 의미 있는 변화만 남겨요. 오타 수정은 기록하지 않아요.</p></details>
-<details><summary>"AI 추정"은 뭐예요?</summary><p>AI가 문서를 보고 "이제 기획 확정 단계 같아요"라고 짐작했다는 뜻이에요. 내가 직접 말하면 붙지 않아요.</p></details>
-<details><summary>GitHub를 안 쓰면 안 되나요?</summary><p>가입 때 [나중에]로 건너뛸 수 있어요. 다만 증명 보관함이 있어야 우리 서비스가 없어져도 증명이 내 손에 남아요.</p></details>
+<details><summary>"AI 추정"은 뭐예요?</summary><p>AI가 문서를 보고 "이제 기획 확정 단계 같아요"라고 짐작했다는 뜻이에요. 사용자가 직접 말하면 붙지 않아요.</p></details>
+<details><summary>GitHub를 안 쓰면 안 되나요?</summary><p>가입 때 [나중에]로 건너뛸 수 있어요. 다만 증명 보관함이 있어야 Ideatrail이 없어져도 기록 사본과 증명이 사용자 손에 남아요.</p></details>
 <details><summary>휴대폰 없이도 쓸 수 있나요?</summary><p>네. 대신 비상 열쇠는 꼭 만들어야 해요. 컴퓨터를 잃으면 비상 열쇠만 남거든요.</p></details>
-<details><summary>비상 열쇠를 잃어버렸어요.</summary><p>컴퓨터나 휴대폰이 남아 있다면 계속 쓸 수 있어요. 새 비상 열쇠를 만드는 화면은 곧 생겨요. 기기도 비상 열쇠도 모두 잃으면 우리도 열어 드릴 수 없어요.</p></details>
+<details><summary>비상 열쇠를 잃어버렸어요.</summary><p>컴퓨터나 휴대폰이 남아 있다면 계속 쓸 수 있어요. 새 비상 열쇠를 만드는 화면은 곧 생겨요. 기기도 비상 열쇠도 모두 잃으면 Ideatrail도 열어 드릴 수 없어요.</p></details>
 <details><summary>가입 링크가 "시간이 지났어요"라고 나와요.</summary><p>Claude Code에 "설치 링크 다시 줘"라고 말해 주세요. 새 가입 창이 열려요.</p></details>
 <details><summary>Windows에서도 되나요?</summary><p>곧 생겨요. 지금은 Mac에서 먼저 써 볼 수 있어요.</p></details>
 </div>
@@ -309,14 +388,15 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 <tr><td>열쇠</td><td>패스키(WebAuthn) + PRF</td><td>기기 잠금으로만 꺼낼 수 있는 비밀 값</td></tr>
 <tr><td>예비 열쇠</td><td>두 번째 기기의 패스키</td><td>휴대폰에 따로 만든 열쇠</td></tr>
 <tr><td>비상 열쇠</td><td>복구 키</td><td>종이·비밀번호 관리자에 두는 마지막 열쇠</td></tr>
-<tr><td>증명 보관함</td><td>내 GitHub 비공개 저장소</td><td>Ideatrail GitHub App이 이 저장소 하나에만 써요</td></tr>
-<tr><td>기록 도우미</td><td>엔진(플러그인의 MCP 서버·훅)</td><td>내 컴퓨터에서 기록을 잠가 보내요. 잠그기만 하고 열지는 못해요</td></tr>
+<tr><td>열쇠 상자</td><td>키 봉투(PRF로 감싼 계정 키)</td><td>여러 기기의 열쇠가 같은 기록을 열게 해 줘요. 사용자의 열쇠로만 풀려요</td></tr>
+<tr><td>증명 보관함</td><td>사용자의 GitHub 비공개 저장소</td><td>Ideatrail GitHub App이 이 저장소 하나에만 써요</td></tr>
+<tr><td>기록 도우미</td><td>엔진(플러그인의 MCP 서버·훅)</td><td>사용자의 컴퓨터에서 기록을 잠가 보내요. 잠그기만 하고 열지는 못해요</td></tr>
 <tr><td>잠긴 기록</td><td>봉인(HPKE)·암호화(XChaCha20-Poly1305)</td><td>열쇠가 있어야만 풀리는 상태. 누구나 확인할 수 있는 공개 표준 방식</td></tr>
 <tr><td>날짜 증명</td><td>타임스탬프(OpenTimestamps)</td><td>파일 지문을 공개 블록체인에 새겨 날짜를 증명</td></tr>
-<tr><td>파일 지문</td><td>해시(SHA-256)</td><td>내용이 한 글자만 바뀌어도 완전히 달라지는 값</td></tr>
+<tr><td>파일 지문</td><td>해시(SHA-256, 32바이트)</td><td>내용이 한 글자만 바뀌어도 완전히 달라지는 값. 무작위 값을 섞어 만들어 내용을 짐작할 수 없어요</td></tr>
 <tr><td>8자리 코드</td><td>GitHub 기기 인증 코드</td><td>GitHub에 "이 컴퓨터가 맞다"고 알려 주는 일회용 코드</td></tr>
 </tbody></table></div>
 
-<footer>Ideatrail 베타 안내 · 2026-11-18 기준. 화면 문구와 기능은 바뀔 수 있어요.</footer>
+<footer>Ideatrail 베타 안내 · 2026-11-19 기준. 화면 문구와 기능은 바뀔 수 있어요.</footer>
 </main>
 </div>

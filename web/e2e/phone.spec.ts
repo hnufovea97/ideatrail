@@ -77,7 +77,7 @@ test("QR을 찍을 수 없어요 → a one-time link to copy, never shown as tex
   const url = (await qrUrl(page))!;
   await page.getByText("QR을 찍을 수 없어요", { exact: true }).click();
   await expect(page.getByText("이 링크는 한 번만 쓰는 비밀 열쇠예요. 2분 동안만 쓸 수 있고, 다른 사람에게는 절대 보내지 마세요")).toBeVisible();
-  await page.getByRole("button", { name: "링크 복사 (내 휴대폰에서만 열기)" }).click();
+  await page.getByRole("button", { name: "링크 복사 (사용자의 휴대폰에서만 열기)" }).click();
   await expect(page.getByRole("status").filter({ hasText: "복사했어요" })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
   expect(await page.locator("body").innerText()).not.toContain(new URL(url).hash);

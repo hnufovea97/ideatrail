@@ -10,7 +10,7 @@ test("PRF authenticator: account confirmed, engine receives the account key, lis
   expect(engine.accountPub?.length).toBe(32);
   await expect(page.getByText("2/5")).toBeVisible();
   const h1 = page.getByRole("heading", { level: 1 });
-  await expect(h1).toHaveAccessibleDescription("✓ 이 컴퓨터에 열쇠를 만들었어요. 내 기록은 이 열쇠로만 열려요");
+  await expect(h1).toHaveAccessibleDescription("✓ 이 컴퓨터에 열쇠를 만들었어요. 사용자의 기록은 이 열쇠로만 열려요");
   await expect(h1).toBeFocused();
   const verify = w.requests.find((r) => r.url.endsWith("/v1/webauthn/register/verify"));
   expect(JSON.parse(verify!.body).response.clientExtensionResults).toEqual({});

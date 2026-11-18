@@ -7,7 +7,7 @@ import type { Checklist, SignupState } from "./signup/machine";
 export const CHECKLIST: readonly { key: keyof Checklist; label: string }[] = [
   { key: "pc", label: "열쇠 (이 컴퓨터)" },
   { key: "phone", label: "예비 열쇠 (휴대폰)" },
-  { key: "github", label: "증명 보관함 (내 GitHub)" },
+  { key: "github", label: "증명 보관함 (사용자의 GitHub)" },
   { key: "recovery", label: "비상 열쇠 [중요]" },
   { key: "folders", label: "기록할 폴더 고르기" },
 ];
@@ -18,34 +18,34 @@ export const CHECKLIST: readonly { key: keyof Checklist; label: string }[] = [
 export const COPY = {
   busy: "불러오고 있어요…", // 새 문구
   noscript: "이 페이지는 JavaScript를 켜야 열려요", // 새 문구
-  limit: "알아 둘 것: 내용은 우리 서버로 오지 않아요. 당신과, 함께 작업하는 AI만 봐요.",
+  limit: "알아 둘 것: 기록 내용은 Ideatrail 서버로 오지 않아요. 사용자와, 사용자가 함께 쓰는 AI만 봐요.",
   intro: {
     title: "시작하기 전에",
-    what: "AI와 작업하며 아이디어가 자라는 과정을 날짜 증명과 함께 남겨 두는 서비스예요. 내용은 우리 서버로 보내지 않고 당신 쪽에만 둬요.", // 새 문구
+    what: "AI와 아이디어·메모·기록을 다듬는 동안, 자라는 과정을 날짜 증명과 함께 남겨 두는 서비스예요.", // 새 문구
     time: "약 5분 걸려요. 화면이 하라는 대로 누르면 돼요.", // 새 문구
     mapTitle: "만들게 될 4가지와 있는 곳", // 새 문구
     map: [
       { key: "pc", name: "열쇠", where: "이 컴퓨터", note: "내용을 여는 열쇠가 이 컴퓨터 안에 생겨요" },
       { key: "phone", name: "예비 열쇠", where: "휴대폰", note: "휴대폰으로도 보고, 컴퓨터를 잃어도 열 수 있어요" },
-      { key: "github", name: "증명 보관함", where: "내 GitHub", note: "우리 서비스가 없어져도 당신 손에 남아요" },
+      { key: "github", name: "증명 보관함", where: "사용자의 GitHub", note: "Ideatrail이 없어져도 사용자 손에 남아요" },
       { key: "recovery", name: "비상 열쇠", where: "종이·비밀번호 관리자", note: "기기를 모두 잃었을 때 쓰는 마지막 열쇠예요" },
     ],
-    server: "우리 서버에는 내용이 없어요. 날짜를 증명할 파일 지문과, 목록에 보일 잠긴 이름표만 있어요. 내용은 잠긴 채 내 GitHub와 이 컴퓨터에 있고, 볼 때는 내 열쇠로 내 기기에서 열어요.", // 새 문구(founder 지적: '우리도 못 연다'는 서버에 내용이 있다는 오해를 줌)
+    server: "Ideatrail 서버에는 기록 일시와 파일 지문(기록마다 32바이트), 그리고 Ideatrail도 풀 수 없게 잠긴 이름표뿐이에요. 기록 내용은 잠긴 채 사용자의 컴퓨터와 GitHub에 있고, 사용자의 열쇠로 사용자의 기기에서만 열려요. 그래서 Ideatrail 서버가 털리거나 문을 닫아도 내용은 새지 않아요.", // 새 문구(founder 지적: '우리도 못 연다'는 서버에 내용이 있다는 오해를 줌)
     computer: (name: string) => `연결할 컴퓨터: ${name}`,
     warn: "Claude Code가 직접 연 링크가 아니라면 닫으세요",
     action: "시작하기",
   },
   /** "방금 한 일": shown once at the top of the next screen. */
   did: {
-    pc: "✓ 이 컴퓨터에 열쇠를 만들었어요. 내 기록은 이 열쇠로만 열려요",
+    pc: "✓ 이 컴퓨터에 열쇠를 만들었어요. 사용자의 기록은 이 열쇠로만 열려요",
     phone: "✓ 휴대폰에 예비 열쇠를 만들었어요. 이제 휴대폰으로도 볼 수 있어요",
-    github: "✓ 내 GitHub에 증명 보관함을 만들었어요. 우리 서비스가 없어져도 증명이 남아요",
+    github: "✓ 사용자의 GitHub에 증명 보관함을 만들었어요. Ideatrail이 없어져도 증명이 남아요",
     recovery: "✓ 비상 열쇠를 보관했어요. 기기를 모두 잃어도 이걸로 다시 열 수 있어요",
     folders: "✓ 고른 폴더를 기록하기 시작했어요. 몇 분 걸릴 수 있어요",
   },
   pc: {
     title: "이 컴퓨터에 열쇠 만들기",
-    why: "내용을 여는 열쇠가 이 컴퓨터 안에 생겨요. 열쇠는 우리 서버로 오지 않아요.",
+    why: "기록을 여는 열쇠가 이 컴퓨터 안에 생겨요. 열쇠는 Ideatrail 서버로 오지 않아요.",
     ahead: "버튼을 누르면 Touch ID나 컴퓨터 암호를 한 번 묻는 창이 떠요. 브라우저가 저장할지 물으면 [계속]을 눌러 주세요", // 새 문구
     noSensor: "Touch ID가 없어도 돼요. 이 컴퓨터의 PIN이나 로그인 암호로 만들어져요", // UX 문장에서 "지문" 뺌(founder 결정)
     windows: "Windows에서는 Chrome으로 열고, 저장할 곳을 물으면 Google 비밀번호 관리자를 골라 주세요", // 새 문구(UX ⑥ 안내를 문장으로)
@@ -61,14 +61,14 @@ export const COPY = {
     scan: "휴대폰 카메라로 찍으세요",
     qrLabel: "휴대폰으로 찍을 QR 코드 (2분 유효). 찍을 수 없으면 아래 'QR을 찍을 수 없어요'에서 링크를 복사하세요",
     noScan: "QR을 찍을 수 없어요", // 새 문구
-    copyLink: "링크 복사 (내 휴대폰에서만 열기)", // 새 문구
+    copyLink: "링크 복사 (사용자의 휴대폰에서만 열기)", // 새 문구
     linkWarn: "이 링크는 한 번만 쓰는 비밀 열쇠예요. 2분 동안만 쓸 수 있고, 다른 사람에게는 절대 보내지 마세요", // 새 문구
     sent: "휴대폰 화면에서 [이 기기 잠금으로 등록]을 누르고 휴대폰 잠금을 풀어 주세요", // 새 문구
     skip: "휴대폰이 지금 없어요",
   },
   github: {
     title: "증명 보관함 만들기",
-    why: "내 GitHub에 비공개 보관함을 하나 만들어 날짜 증명과 잠긴 원문을 둬요. 우리 서비스가 없어져도 당신 손에 남아요. 우리는 이 보관함 하나에만 들어갈 수 있어요.",
+    why: "사용자의 GitHub에 비공개 보관함을 하나 만들어, 잠긴 기록 사본과 날짜 증명을 둬요. Ideatrail이 없어져도 사용자 손에 남아요. Ideatrail 앱은 이 보관함 하나에만 쓸 수 있어요.",
     steps: [
       "버튼을 누르면 'ideatrail' 작은 창에 8자리 코드가 보여요. 코드는 이미 복사돼 있어요",
       "이어서 열리는 GitHub 화면의 칸에 붙여 넣고(Mac은 Cmd+V, Windows는 Ctrl+V) [Continue]를 눌러요",
@@ -77,13 +77,13 @@ export const COPY = {
     action: "GitHub에 보관함 만들기",
     later: "나중에",
     waiting: "GitHub 화면에서 코드를 붙여 넣고 [Authorize]까지 눌러 주세요. 끝나면 이 화면이 저절로 넘어가요.", // 새 문구
-    banner: "증명 보관함을 아직 안 만들었어요. 만들어 두면 증명이 내 GitHub에도 남아요", // 새 문구
+    banner: "증명 보관함을 아직 안 만들었어요. 만들어 두면 증명이 사용자의 GitHub에도 남아요", // 새 문구
     bannerAction: "지금 만들기",
   },
   recovery: {
     badge: "중요",
     title: "비상 열쇠",
-    why: "컴퓨터와 휴대폰을 모두 잃었을 때 쓰는 마지막 열쇠예요. 우리도 대신 열어 드릴 수 없어서 꼭 보관해 주세요",
+    why: "컴퓨터와 휴대폰을 모두 잃었을 때 쓰는 마지막 열쇠예요. Ideatrail도 대신 열어 드릴 수 없어서 꼭 보관해 주세요",
     method: "어디에 보관할까요?", // 새 문구
     manager: "비밀번호 관리자에 저장",
     managerHelp: "iCloud 키체인, 1Password 같은 곳에 새 항목으로 붙여 넣어요", // 새 문구
@@ -127,7 +127,7 @@ export const COPY = {
     made: [
       { key: "pc", name: "열쇠", where: "이 컴퓨터", when: "평소에 기록을 열 때 써요" },
       { key: "phone", name: "예비 열쇠", where: "휴대폰", when: "휴대폰으로 볼 때, 컴퓨터를 잃었을 때 써요" },
-      { key: "github", name: "증명 보관함", where: "내 GitHub", when: "우리 서비스가 없어져도 증명을 꺼낼 때 써요" },
+      { key: "github", name: "증명 보관함", where: "사용자의 GitHub", when: "Ideatrail이 없어져도 증명을 꺼낼 때 써요" },
       { key: "recovery", name: "비상 열쇠", where: "종이·비밀번호 관리자", when: "컴퓨터와 휴대폰을 모두 잃었을 때만 써요" },
     ],
     notYet: "아직 안 만들었어요", // 새 문구
@@ -135,7 +135,7 @@ export const COPY = {
     lines: [
       "AI와 작업하면 의미 있는 변화만 저절로 기록해요. 터미널에 한 줄로 알려 드려요",
       "기록은 몇 시간 뒤 블록체인에 날짜가 새겨져요",
-      "공개로 바꾸기·지우기는 이 대시보드에서 당신만 할 수 있어요",
+      "공개로 바꾸기·지우기는 대시보드에서 사용자만 할 수 있어요",
     ],
     nextTitle: "이제 Claude Code로 돌아가세요", // 새 문구
     next: [
