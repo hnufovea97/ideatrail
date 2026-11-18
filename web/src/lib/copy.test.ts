@@ -27,7 +27,7 @@ describe("screen copy", () => {
   it("tells, before each action, what will pop up, and after it, what was just made", () => {
     for (const k of ["pc", "phone", "github", "recovery", "folders"] as const) expect(COPY.did[k]).toMatch(/^✓ /);
     expect(COPY.pc.ahead).toContain("Touch ID");
-    expect(didLine({ ...initialState, justDid: "pc" })).toBe("✓ 이 컴퓨터에 열쇠를 만들었어요. 이 열쇠 없이는 우리도 못 열어요");
+    expect(didLine({ ...initialState, justDid: "pc" })).toBe("✓ 이 컴퓨터에 열쇠를 만들었어요. 내 기록은 이 열쇠로만 열려요");
     expect(didLine(initialState)).toBeNull();
     expect(COPY.intro.time).toContain("5분");
   });
@@ -36,6 +36,12 @@ describe("screen copy", () => {
     expect(COPY.errors.qr_expired).toBe("2분이 지나서 새로 만들었어요");
     expect(COPY.pc.retryPrf).toBe("한 번만 더 확인할게요");
   });
+  it("never implies the server holds the content (founder: '우리도 못 연다' reads as 'we keep it, locked')", () => {
+    for (const s of allStrings(COPY)) expect(s).not.toMatch(/우리도 못 열|우리 서버도 열지 못|우리는 못 열어/);
+    expect(COPY.intro.server).toContain("내용이 없어요");
+    expect(COPY.intro.server).toContain("파일 지문");
+  });
+
   it("maps failures to fixed sentences and never echoes server text", () => {
     expect(errorMessage(new ApiFailure(0, "offline"))).toBe(COPY.errors.offline);
     expect(errorMessage(new DOMException("x", "NotAllowedError"))).toBe(COPY.errors.passkey_cancel);

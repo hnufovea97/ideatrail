@@ -15,7 +15,7 @@ test("shows the computer name from the link and removes the secret from the addr
   await expect(map.getByRole("listitem")).toHaveCount(4);
   await expect(map.getByRole("listitem").nth(0)).toContainText("열쇠이 컴퓨터");
   await expect(map.getByRole("listitem").nth(3)).toContainText("비상 열쇠종이·비밀번호 관리자");
-  await expect(map).toContainText("우리 서버에는 잠긴 기록과 날짜 증명만 있어요. 우리는 못 열어요.");
+  await expect(map).toContainText("우리 서버에는 내용이 없어요");
   expect(new URL(page.url()).hash).toBe("");
   await expectClean(page, w);
 });
