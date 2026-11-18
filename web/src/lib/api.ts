@@ -22,7 +22,16 @@ function errorCode(data: unknown): string {
   return typeof code === "string" && CODE.test(code) ? code : "unknown";
 }
 
-async function call<T>(f: Fetch, base: string, method: string, path: string, body?: unknown, headers: Record<string, string> = {}): Promise<T> {
+/** Only "no answer" (offline, timeout) and 5xx may go away by trying again; 4xx and bad data will not. */
+export const isRetryable = (e: unknown): boolean =>
+  e instanceof ApiFailure && e.code !== "bad_id" && (e.status === 0 || e.status >= 500);
+
+type Fields = Record<string, unknown>;
+type Check = (d: Fields) => boolean;
+const isObject = (d: unknown): d is Fields => typeof d === "object" && d !== null && !Array.isArray(d);
+const isCount = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
+
+async function call<T>(f: Fetch, base: string, method: string, path: string, body?: unknown, headers: Record<string, string> = {}, check?: Check): Promise<T> {
   let res: Response;
   try {
     res = await f(base + path, {
@@ -43,6 +52,7 @@ async function call<T>(f: Fetch, base: string, method: string, path: string, bod
     data = null;
   }
   if (!res.ok) throw new ApiFailure(res.status, errorCode(data));
+  if (!isObject(data) || (check && !check(data))) throw new ApiFailure(res.status, "bad_response");
   return data as T;
 }
 
@@ -90,19 +100,19 @@ export interface DeviceAddState { joined: boolean; t_pub: string | null; join_ma
 export interface SealedMessage { msg_id: string; sealed: string }
 export interface ApprovalRow { approval_id: string; engine_id: string; kind: string; summary: string; appr_seq: string; engine_sig: string; created_at: string; expires_at: string }
 export interface StorageLinkRow { link_id: string; engine_id: string; provider: string; enc_token: string | null; engine_sig: string; created_at: string; revoked_at: string | null }
-export interface SyncResponse { changes: { storage_links?: StorageLinkRow[] } & Record<string, unknown>; cursor: number; next_cursor: number | null }
+export interface SyncResponse { changes: { storage_links?: StorageLinkRow[] | null } & Record<string, unknown>; cursor: number; next_cursor?: number | null }
 
 export function createApi(base: string, f: Fetch = (input, init) => fetch(input, init)) {
-  const get = <T>(path: string, headers?: Record<string, string>) => call<T>(f, base, "GET", path, undefined, headers);
+  const get = <T>(path: string, headers?: Record<string, string>, check?: Check) => call<T>(f, base, "GET", path, undefined, headers, check);
   const send = <T>(method: "POST" | "PUT", path: string, body: unknown) => call<T>(f, base, method, path, body);
   // Methods that take an id are async so a bad id rejects (like any other ApiFailure) instead of throwing.
   return {
-    pairing: async (s: string) => get<PairingInfo>(`/v1/pairing/${id(s)}`),
+    pairing: async (s: string) => get<PairingInfo>(`/v1/pairing/${id(s)}`, undefined, (d) => typeof d.delivered === "boolean"),
     registerOptions: (body: { pairing_session_id: string } | { device_add_session_id: string; join_secret: string }) =>
       send<RegisterOptions>("POST", "/v1/webauthn/register/options", body),
     registerVerify: (body: RegisterVerifyBody) => send<{ user_id: string }>("POST", "/v1/webauthn/register/verify", body),
     confirm: () => send<{ confirmed: true }>("POST", "/v1/account/confirm", {}),
-    account: () => get<AccountInfo>("/v1/account"),
+    account: () => get<AccountInfo>("/v1/account", undefined, (d) => isCount(d.engine_list_version)),
     deliver: async (s: string, body: DeliverBody) => send<{ engine_id: string; engine_list_version: number }>("POST", `/v1/pairing/${id(s)}/deliver`, body),
     stepupOptions: (method: "POST" | "PUT", path: string) => send<{ challenge_id: string; options: RequestOptionsJSON }>("POST", "/v1/webauthn/stepup/options", { method, path }),
     putRecovery: (body: RecoveryBody & { assertion: StepupAssertion }) => send<{ envelope_id: string }>("PUT", "/v1/envelopes", body),
@@ -112,10 +122,12 @@ export function createApi(base: string, f: Fetch = (input, init) => fetch(input,
     deviceAddJoin: async (d: string, body: { t_pub: string; mac: string }) => send<{ join_secret: string }>("POST", `/v1/device-add/${id(d)}/join`, body),
     deviceAddFetchKey: async (d: string, joinSecret: string) => get<{ user_id: string; sealed_mk: string; mac: string }>(`/v1/device-add/${id(d)}/key`, { "x-it-join-secret": joinSecret }),
     inbox: (body: { engine_id: string } & SealedMessage) => send<{ msg_id: string }>("POST", "/v1/inbox", body),
-    approvals: () => get<{ approvals: ApprovalRow[] }>("/v1/approvals"),
+    approvals: () => get<{ approvals: ApprovalRow[] }>("/v1/approvals", undefined, (d) => Array.isArray(d.approvals)),
     decide: async (approvalId: string, body: { decision: "approved" | "rejected"; message: SealedMessage; assertion: StepupAssertion }) =>
       send<{ approval_id: string; status: string }>("POST", `/v1/approvals/${id(approvalId)}/decide`, body),
-    sync: (cursor: number) => get<SyncResponse>(`/v1/sync?cursor=${Math.max(0, Math.floor(cursor))}`),
+    sync: (cursor: number) => get<SyncResponse>(`/v1/sync?cursor=${Math.max(0, Math.floor(cursor))}`, undefined, (d) =>
+      isObject(d.changes) && (d.changes.storage_links == null || Array.isArray(d.changes.storage_links))
+      && isCount(d.cursor) && (d.next_cursor == null || isCount(d.next_cursor))),
   };
 }
 

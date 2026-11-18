@@ -25,7 +25,7 @@ export async function findStorageLink(api: Api, cursor: number, engine: EngineEn
     const r = await api.sync(c);
     if ((r.changes.storage_links ?? []).some((row) => storageLinkValid(row, engine, userId))) linked = true;
     c = r.cursor;
-    if (r.next_cursor === null) break;
+    if (r.next_cursor == null) break;
   }
   return { linked, cursor: c };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiFailure, createApi, type Fetch } from "./api";
+import { ApiFailure, createApi, isRetryable, type Fetch } from "./api";
 
 const SID = "01jcm3v8q7s2kx4f9d6b5n0tqw";
 const reply = (status: number, body: unknown): Fetch => async () => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -44,5 +44,36 @@ describe("api client", () => {
     await createApi("http://api.test", f).deviceAddFetchKey(SID, "s3cret");
     expect((seen?.headers as Record<string, string>)["x-it-join-secret"]).toBe("s3cret");
     expect(seen?.body).toBeUndefined();
+  });
+  it("rejects a 2xx answer whose JSON is not an object", async () => {
+    for (const body of ["[1]", '"x"', "null", "7", ""]) {
+      const api = createApi("http://api.test", async () => new Response(body, { status: 200 }));
+      const err = await api.approvals().catch((e) => e);
+      expect(err).toBeInstanceOf(ApiFailure);
+      expect(err.code).toBe("bad_response");
+    }
+  });
+  it("checks the fields the pages decide on", async () => {
+    const ok = (body: unknown) => createApi("http://api.test", reply(200, body));
+    const bad = async (p: Promise<unknown>) => expect(((await p.catch((e: unknown) => e)) as ApiFailure).code).toBe("bad_response");
+    await bad(ok({ engine_id: "e" }).pairing(SID)); // delivered missing
+    await bad(ok({ delivered: "no" }).pairing(SID));
+    expect((await ok({ delivered: false }).pairing(SID)).delivered).toBe(false);
+    await bad(ok({ engine_list: null }).account()); // engine_list_version missing
+    await bad(ok({ engine_list_version: 1.5 }).account());
+    expect((await ok({ engine_list_version: 0 }).account()).engine_list_version).toBe(0);
+    await bad(ok({ cursor: 1, next_cursor: null }).sync(0)); // changes missing
+    await bad(ok({ changes: {}, next_cursor: null }).sync(0)); // cursor missing
+    await bad(ok({ changes: {}, cursor: 1, next_cursor: "2" }).sync(0));
+    await bad(ok({ changes: { storage_links: {} }, cursor: 1, next_cursor: null }).sync(0));
+    expect((await ok({ changes: {}, cursor: 1 }).sync(0)).cursor).toBe(1); // next_cursor absent == null
+    await bad(ok({ approvals: null }).approvals());
+  });
+  it("only offline and 5xx are worth retrying", () => {
+    expect(isRetryable(new ApiFailure(0, "offline"))).toBe(true);
+    expect(isRetryable(new ApiFailure(503, "unknown"))).toBe(true);
+    expect(isRetryable(new ApiFailure(404, "not_found"))).toBe(false);
+    expect(isRetryable(new ApiFailure(0, "bad_id"))).toBe(false);
+    expect(isRetryable(new Error("device_key_mismatch"))).toBe(false);
   });
 });
