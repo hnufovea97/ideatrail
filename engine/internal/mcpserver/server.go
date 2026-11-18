@@ -42,11 +42,16 @@ type Engine struct {
 	Inbox      inbox.Deps
 	Pairing    pairing.Deps
 	Computer   string
+	Home       func() (string, error) // the person's home folder; default os.UserHomeDir (tests inject a temp one)
 
+	timing      signupTiming // zero: defaultSignupTiming
 	bg          sync.Mutex
 	pairMu      sync.Mutex
 	lastPairing time.Time
 	connecting  atomic.Bool
+	importing   atomic.Bool
+	life        sync.Mutex // guards closing and wg.Add against Close
+	closing     bool
 	wg          sync.WaitGroup
 	baseOnce    sync.Once
 	base        context.Context
@@ -59,19 +64,41 @@ func (e *Engine) ctxBase() context.Context {
 	return e.base
 }
 
-// goSafe runs fn in a tracked goroutine; a panic there must not take the MCP server down.
-func (e *Engine) goSafe(fn func()) {
+func (e *Engine) home() (string, error) {
+	if e.Home != nil {
+		return e.Home()
+	}
+	return os.UserHomeDir()
+}
+
+// goSafe runs fn in a tracked goroutine; a panic there must not take the MCP server down and is
+// journaled as a fixed line (the panic value could carry a path or a secret). Once Close has
+// started it refuses new work and reports false.
+func (e *Engine) goSafe(fn func()) bool {
+	e.life.Lock()
+	defer e.life.Unlock()
+	if e.closing {
+		return false
+	}
 	e.wg.Add(1)
 	go func() {
 		defer e.wg.Done()
-		defer func() { _ = recover() }()
+		defer func() {
+			if recover() != nil {
+				record.Journal(e.StateDir, "panic_recovered")
+			}
+		}()
 		fn()
 	}()
+	return true
 }
 
 // Close cancels background work and waits for it (up to wait) so files are not left half-written.
 func (e *Engine) Close(wait time.Duration) {
 	e.ctxBase()
+	e.life.Lock()
+	e.closing = true
+	e.life.Unlock()
 	e.stop()
 	done := make(chan struct{})
 	go func() { e.wg.Wait(); close(done) }()
@@ -223,18 +250,18 @@ func (e *Engine) ensurePaired(ctx context.Context) (string, bool) {
 	}
 	e.lastPairing = time.Now()
 	e.goSafe(func() {
+		t := e.signupTiming()
 		wctx, cancel := context.WithTimeout(e.ctxBase(), 11*time.Minute)
 		defer cancel()
-		if pairing.Wait(wctx, e.Pairing, sess, 3*time.Second) != nil {
+		if pairing.Wait(wctx, e.Pairing, sess, t.pairPoll) != nil {
 			return
 		}
+		sctx, scancel := context.WithTimeout(e.ctxBase(), t.total)
+		defer scancel()
 		// signup step 5: this project (current) + up to 4 idea-looking siblings, all off but the first.
 		// Posted even when empty, so the browser does not wait for a list that never comes.
-		home, _ := os.UserHomeDir()
-		_, _ = inbox.RequestImport(wctx, e.Inbox, "signup_select", signupFolders(e.ProjectDir, e.StateDir, home))
-		sctx, scancel := context.WithTimeout(e.ctxBase(), signupWatchFor)
-		defer scancel()
-		watchSignup(sctx, signupWatchEvery, e.tickOnce)
+		id := e.postSignupList(sctx)
+		watchSignup(sctx, t, e.pollOnce, e.tickOnce, func() bool { return e.signupDone(id) })
 	})
 	return msgPairingOpened, false
 }
@@ -244,41 +271,69 @@ func (e *Engine) background() {
 	if !e.bg.TryLock() {
 		return
 	}
-	e.goSafe(func() {
+	if !e.goSafe(func() {
 		defer e.bg.Unlock()
 		ctx, cancel := context.WithTimeout(e.ctxBase(), backgroundBudget)
 		defer cancel()
 		e.Tick(ctx)
-	})
+	}) {
+		e.bg.Unlock()
+	}
 }
 
 // Tick is one round of background work (exported for tests and the session-start path).
 func (e *Engine) Tick(ctx context.Context) {
-	inbox.SendPending(ctx, e.Inbox)
-	if events, err := inbox.Process(ctx, e.Inbox); err == nil {
-		for _, ev := range events {
-			if ev.Kind == "connect_github" && e.connecting.CompareAndSwap(false, true) { // one GitHub login at a time
-				e.goSafe(func() {
-					defer e.connecting.Store(false)
-					cctx, cancel := context.WithTimeout(e.ctxBase(), 16*time.Minute)
-					defer cancel()
-					_ = repo.Connect(cctx, e.Repo)
-					_, _ = repo.PushOutbox(cctx, e.Repo) // the token may be saved even if the link upload failed
-				})
-			}
-			if paths := firstImportPaths(ev); len(paths) > 0 {
-				e.goSafe(func() {
-					ictx, cancel := context.WithTimeout(e.ctxBase(), importBudget)
-					defer cancel()
-					_, _ = record.ImportFolders(ictx, e.Record, paths, record.ImportLimit)
-				})
-			}
-		}
-	}
+	e.inboxRound(ctx)
+	e.resumeImport()
 	record.Flush(ctx, e.Record)
 	_, _ = record.SyncAnchors(ctx, e.Record)
 	_ = repo.RetryStorageLink(ctx, e.Repo)
 	_, _ = repo.PushOutbox(ctx, e.Repo)
+}
+
+// inboxRound sends pending approval requests and acts on the inbox; it returns the event count.
+func (e *Engine) inboxRound(ctx context.Context) int {
+	inbox.SendPending(ctx, e.Inbox)
+	events, err := inbox.Process(ctx, e.Inbox)
+	if err != nil {
+		return 0
+	}
+	for _, ev := range events {
+		if ev.Kind == "connect_github" && e.connecting.CompareAndSwap(false, true) { // one GitHub login at a time
+			if !e.goSafe(func() {
+				defer e.connecting.Store(false)
+				cctx, cancel := context.WithTimeout(e.ctxBase(), 16*time.Minute)
+				defer cancel()
+				_ = repo.Connect(cctx, e.Repo)
+				_, _ = repo.PushOutbox(cctx, e.Repo) // the token may be saved even if the link upload failed
+			}) {
+				e.connecting.Store(false)
+			}
+		}
+		if paths := firstImportPaths(ev); len(paths) > 0 {
+			if record.StartImport(e.Record, paths) != nil {
+				record.Journal(e.StateDir, "import_not_saved")
+			}
+			e.resumeImport()
+		}
+	}
+	return len(events)
+}
+
+// resumeImport runs the saved signup first import (new or interrupted), one at a time. The import
+// journals its own skips and stops; what is left resumes on a later round.
+func (e *Engine) resumeImport() {
+	if !record.ImportPending(e.Record) || !e.importing.CompareAndSwap(false, true) {
+		return
+	}
+	if !e.goSafe(func() {
+		defer e.importing.Store(false)
+		ictx, cancel := context.WithTimeout(e.ctxBase(), importBudget)
+		defer cancel()
+		_, _ = record.ResumeImport(ictx, e.Record, record.ImportLimit)
+	}) {
+		e.importing.Store(false)
+	}
 }
 
 func isOTS(err error) bool { return errors.Is(err, ots.ErrTooFewReceipts) }

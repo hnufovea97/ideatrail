@@ -131,3 +131,12 @@ func sweepOrphans(d Deps, st *state.State) {
 		}
 	}
 }
+
+// Journal appends one fixed status line for callers outside this package (no paths, names or
+// error text). No engine folder means nowhere to write.
+func Journal(stateDir, status string) {
+	if stateDir == "" {
+		return
+	}
+	_ = journalLine(stateDir, map[string]string{"status": status})
+}

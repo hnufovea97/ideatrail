@@ -31,8 +31,10 @@ import (
 type env struct {
 	e      *Engine
 	cs     *mcp.ClientSession
+	srv    *testsrv.Server
 	folder string
 	opened []string
+	akPub  []byte // account key the test browser pins when pairing
 }
 
 func newEnv(t *testing.T, paired bool) *env {
@@ -70,14 +72,16 @@ func newEnv(t *testing.T, paired bool) *env {
 			return nil
 		})
 	}
-	env := &env{folder: folder}
+	_, akPub, _ := ic.GenerateKEMKey(rand.Reader)
+	akRaw, _ := akPub.MarshalBinary()
+	env := &env{folder: folder, srv: srv, akPub: akRaw}
 	cals := calendars(t)
 	rd := record.Deps{API: c, Keys: k, StateDir: engine, ProofDir: filepath.Join(base, "proofs"), OutboxDir: filepath.Join(base, "outbox"), Calendars: cals}
 	env.e = &Engine{Version: "test", Keys: k, API: c, StateDir: engine, ProjectDir: folder, Record: rd,
 		Repo:     repo.Deps{API: c, Keys: k, StateDir: engine, OutboxDir: rd.OutboxDir},
 		Inbox:    inbox.Deps{API: c, Keys: k, StateDir: engine},
 		Pairing:  pairing.Deps{API: c, Keys: k, StateDir: engine, AppBase: "https://app.example", Open: func(l string) error { env.opened = append(env.opened, l); return nil }},
-		Computer: "pc"}
+		Computer: "pc", Home: func() (string, error) { return base, nil }}
 	t.Cleanup(func() { env.e.Close(10 * time.Second) }) // background work must finish before TempDir cleanup
 	st, ct := mcp.NewInMemoryTransports()
 	ctx := context.Background()
