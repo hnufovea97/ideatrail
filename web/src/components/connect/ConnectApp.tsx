@@ -134,14 +134,14 @@ export default function ConnectApp() {
   if (phase === "register" && unsent) {
     const again = () => { setBusy(true); setError(null); void submit(unsent.created, unsent.body, true); };
     return (
-      <Screen title={COPY.connect.title} error={error}>
+      <Screen title={COPY.connect.title} focusKey="unsent" error={error}>
         <button type="button" class="primary" onClick={again} disabled={busy}>{COPY.actions.retry}</button>
       </Screen>
     );
   }
   if (phase === "register") {
     return (
-      <Screen title={COPY.connect.title} why={COPY.phone.why} error={error}>
+      <Screen title={COPY.connect.title} focusKey="register" why={COPY.phone.why} error={error}>
         <button type="button" class="primary" onClick={start} disabled={!opts || busy}>{COPY.connect.action}</button>
       </Screen>
     );

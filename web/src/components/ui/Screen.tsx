@@ -3,12 +3,15 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Checklist as Done } from "../../lib/signup/machine";
 import { Checklist } from "./Checklist";
 
-interface Props { step?: number | null; title: string; badge?: string; why?: string; done?: Done; error?: string | null; children?: ComponentChildren }
+interface Props { step?: number | null; title: string; focusKey?: string; badge?: string; why?: string; done?: Done; error?: string | null; children?: ComponentChildren }
 
-/** One screen = one title (focused on change, for screen readers), one "why" line, one action. */
-export function Screen({ step, title, badge, why, done, error, children }: Props) {
+/**
+ * One screen = one title, one "why" line, one action. The title gets focus when it changes or when
+ * `focusKey` does (a new phase inside one step), so screen readers land on the new content.
+ */
+export function Screen({ step, title, focusKey, badge, why, done, error, children }: Props) {
   const h1 = useRef<HTMLHeadingElement>(null);
-  useEffect(() => h1.current?.focus(), [title]);
+  useEffect(() => h1.current?.focus(), [title, focusKey]);
   return (
     <main class="screen">
       {done ? <Checklist done={done} /> : null}

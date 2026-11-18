@@ -39,3 +39,17 @@ test("a wrong first four is caught in the browser with zero requests", async ({ 
   await expect(page.getByRole("alert")).toHaveText("앞 4자리가 달라요. 보관한 복구 키를 다시 확인해 주세요");
   expect(w.requests.length).toBe(before);
 });
+
+test("each phase inside the step moves focus to its title (choose → show → check)", async ({ page }) => {
+  const { engine } = await openSignup(page);
+  await passStepOne(page, engine);
+  await skipPhone(page);
+  await githubLater(page);
+  const h1 = page.getByRole("heading", { level: 1 });
+  await page.getByRole("button", { name: "지금 만들기" }).click();
+  await expect(page.getByTestId("recovery-key")).toBeVisible();
+  await expect(h1).toBeFocused();
+  await page.getByRole("button", { name: "다 적었어요" }).click();
+  await expect(page.getByLabel("앞 4자리")).toBeVisible();
+  await expect(h1).toBeFocused();
+});

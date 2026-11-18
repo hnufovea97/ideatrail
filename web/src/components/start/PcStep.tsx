@@ -108,7 +108,7 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
   if (unsent) {
     const retry = () => { setBusy(true); setError(null); void submit(unsent.created, unsent.prepared, true).finally(() => setBusy(false)); };
     return (
-      <Screen step={stepNumber(state.step)} title={COPY.pc.title} done={state.done} error={error}>
+      <Screen step={stepNumber(state.step)} title={COPY.pc.title} focusKey="unsent" done={state.done} error={error}>
         <button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.actions.retry}</button>
       </Screen>
     );
@@ -116,7 +116,7 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
   if (undelivered) {
     const retry = () => { setBusy(true); void deliver(undelivered).finally(() => setBusy(false)); };
     return (
-      <Screen step={stepNumber(state.step)} title={COPY.pc.title} done={state.done} error={error}>
+      <Screen step={stepNumber(state.step)} title={COPY.pc.title} focusKey="undelivered" done={state.done} error={error}>
         <button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.actions.retry}</button>
       </Screen>
     );

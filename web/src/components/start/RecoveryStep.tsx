@@ -31,7 +31,7 @@ export function RecoveryStep({ api, ctx, state, dispatch }: StepProps) {
 
   const vault = ctx.vault;
   if (!vault) return null;
-  const head = { step: stepNumber(state.step), title: COPY.recovery.title, badge: COPY.recovery.badge, done: state.done, error };
+  const head = { step: stepNumber(state.step), title: COPY.recovery.title, focusKey: phase, badge: COPY.recovery.badge, done: state.done, error };
 
   function save() {
     if (!plan || !prepared || busy) return;

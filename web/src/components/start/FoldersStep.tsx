@@ -52,7 +52,7 @@ export function FoldersStep({ api, ctx, state, dispatch }: StepProps) {
   }, [row, api]);
 
   if (!vault || !engine) return null;
-  const head = { step: stepNumber(state.step), title: COPY.folders.title, why: COPY.folders.why, done: state.done, error };
+  const head = { step: stepNumber(state.step), title: COPY.folders.title, focusKey: phase, why: COPY.folders.why, done: state.done, error };
 
   const toggle = (path: string) => setSelected((prev) => {
     const next = new Set(prev);
