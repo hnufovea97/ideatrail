@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { API_BASE } from "../../config";
-import { createApi, type RegisterOptions, type RegisterVerifyBody } from "../../lib/api";
+import { createApi, isRetryable, type RegisterOptions, type RegisterVerifyBody } from "../../lib/api";
 import { prfSupport, type CapabilityEnv } from "../../lib/capability";
 import { COPY, errorMessage } from "../../lib/copy";
 import { joinOffer, prepareDevice, receiveMasterKey, submitDevice, type Joined } from "../../lib/device-add";
@@ -39,23 +39,32 @@ export default function ConnectApp() {
       } catch (e) {
         halt(errorMessage(e));
       }
-    })();
+    })().catch(() => halt(COPY.errors.generic)); // anything unexpected stops here, never a half-open page
   }, [api]);
 
   usePolling(phase === "waiting" && !!joined, POLL_MS, async () => {
     if (!joined) return true;
     try {
-      const k = await receiveMasterKey(api, joined);
-      if (!k) return false;
-      setKey(k);
+      let k = key;
+      if (!k) {
+        k = await receiveMasterKey(api, joined);
+        setError(null);
+        if (!k) return false;
+        setKey(k); // fetched once; a retry only asks for options again
+      }
       setOpts(await api.registerOptions({ device_add_session_id: joined.d, join_secret: joined.joinSecret }));
+      setError(null);
       setPhase("register");
       return true;
     } catch (e) {
-      halt(errorMessage(e));
+      if (isRetryable(e)) {
+        setError(errorMessage(e)); // offline or 5xx: keep waiting
+        return false;
+      }
+      halt(errorMessage(e)); // MAC mismatch, 4xx or a bad answer
       return true;
     }
-  }, [joined]);
+  }, [joined], (e) => setError(errorMessage(e)));
 
   const rpId = () => opts?.options.rp.id ?? location.hostname;
 
@@ -148,5 +157,5 @@ export default function ConnectApp() {
       </Screen>
     );
   }
-  return <Screen title={COPY.connect.title}><p aria-live="polite">{COPY.connect.waiting}</p></Screen>;
+  return <Screen title={COPY.connect.title} error={error}><p aria-live="polite">{COPY.connect.waiting}</p></Screen>;
 }

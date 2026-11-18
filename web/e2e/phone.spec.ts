@@ -16,6 +16,12 @@ test("phone joins with the QR secret, registers its own passkey, PC moves on", a
   const phone = await phoneCtx.newPage();
   const w = await watch(phone);
   await addAuthenticator(phone, { prf: true });
+  let flaky = true; // one 5xx while waiting for the key is retried, not a stop
+  await phone.route("**/v1/device-add/*/key", (route) => {
+    if (route.request().method() !== "GET" || !flaky) return route.fallback();
+    flaky = false;
+    return route.fulfill({ status: 503, json: { error: { code: "unavailable" } } });
+  });
   await phone.goto(url!);
   await phone.getByRole("button", { name: "이 기기 잠금으로 등록" }).click();
   await confirmPasskey(phone, "이 기기에서도 열려요 ✓");

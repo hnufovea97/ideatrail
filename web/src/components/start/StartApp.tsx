@@ -48,7 +48,7 @@ export default function StartApp() {
       if (!keys) return dispatch({ type: "stop", reason: "link_mismatch" }); // spec §9-3: nothing else is sent
       setCtx({ link, href: original, info, signPub: keys.signPub, kemPub: keys.kemPub, vault: null, engine: null });
       dispatch({ type: "checked" });
-    })();
+    })().catch(() => dispatch({ type: "stop", reason: "failed" })); // anything unexpected stops here
   }, [api]);
 
   useEffect(() => {

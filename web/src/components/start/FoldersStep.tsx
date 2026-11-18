@@ -41,7 +41,7 @@ export function FoldersStep({ api, ctx, state, dispatch }: StepProps) {
       setError(errorMessage(e));
       return false;
     }
-  }, [phase]);
+  }, [phase], (e) => setError(errorMessage(e)));
 
   useEffect(() => {
     if (!row) return;

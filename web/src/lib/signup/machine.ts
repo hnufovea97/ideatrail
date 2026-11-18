@@ -1,7 +1,7 @@
 // The signup flow as a pure reducer: screens dispatch events, this decides the next step.
 
 export type Step = "check" | "intro" | "pc" | "phone" | "github" | "recovery" | "folders" | "done" | "stopped";
-export type StopReason = "no_link" | "link_mismatch" | "link_expired" | "link_used" | "no_prf" | "prf_missing" | "offline";
+export type StopReason = "no_link" | "link_mismatch" | "link_expired" | "link_used" | "no_prf" | "prf_missing" | "offline" | "failed";
 export interface Checklist { pc: boolean; phone: boolean; github: boolean; recovery: boolean; folders: boolean }
 
 export interface SignupState {

@@ -111,6 +111,7 @@ export const COPY = {
     prf_missing: "이 브라우저에선 내용을 풀 수 없어요. Chrome(Google 계정 패스키)이나 Safari 최신 버전으로 열어 주세요",
     offline: "인터넷이 끊겼어요. 연결되면 다시 불러올게요",
     not_registered: "이 기기는 아직 등록 안 됐어요. 쓰던 기기에서 '기기 추가'를 눌러 주세요",
+    failed: "잠시 문제가 생겼어요. Claude Code에서 설치 링크를 다시 받아 주세요", // 새 문구
   },
   actions: { copy: "복사", copyCommand: "명령 복사", copyLink: "링크 복사", copied: "복사했어요", copyFailed: "복사하지 못했어요. 직접 선택해서 복사하세요", retry: "다시" },
   errors: {

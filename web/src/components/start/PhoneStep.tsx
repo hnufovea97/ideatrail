@@ -42,7 +42,7 @@ export function PhoneStep({ api, ctx, state, dispatch }: StepProps) {
       setError(errorMessage(e));
       return false;
     }
-  }, [offer, progress]);
+  }, [offer, progress], (e) => setError(errorMessage(e)));
 
   return (
     <Screen step={stepNumber(state.step)} title={COPY.phone.title} why={COPY.phone.why} done={state.done} error={error}>

@@ -46,7 +46,7 @@ export function useGithubLink(api: Api, ctx: SignupContext, onLinked: () => void
       setError(errorMessage(e));
       return false;
     }
-  }, [phase]);
+  }, [phase], (e) => setError(errorMessage(e)));
 
   return { phase, error, start };
 }
