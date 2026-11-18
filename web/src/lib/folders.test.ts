@@ -14,11 +14,11 @@ const engine = { engine_id: ENGINE, sign_pubkey: toB64u(signPublicKey(seed)), ke
 const ak = newKemKeyPair();
 const vault = { userId: USER, mk: randomKey(), akPriv: ak.priv, akPub: ak.pub };
 
-async function approval(folders: unknown[], signer = seed, kind = "signup_select"): Promise<ApprovalRow> {
+async function approval(folders: unknown[], signer = seed, kind = "signup_select", apprSeq = 1n): Promise<ApprovalRow> {
   const id = newId();
   const summary = await seal(KIND.folder_suggestions, ak.pub, { userId: USER, rootId: id, version: "0" }, utf8(JSON.stringify({ v: 1, folders })));
-  const engine_sig = sign(signer, messageFor({ type: "approval", userId: USER, approvalId: id, kind, summarySealed: summary, apprSeq: 1n }));
-  return { approval_id: id, engine_id: ENGINE, kind, summary: toB64u(summary), appr_seq: "1", engine_sig, created_at: "x", expires_at: "y" };
+  const engine_sig = sign(signer, messageFor({ type: "approval", userId: USER, approvalId: id, kind, summarySealed: summary, apprSeq }));
+  return { approval_id: id, engine_id: ENGINE, kind, summary: toB64u(summary), appr_seq: apprSeq.toString(), engine_sig, created_at: "x", expires_at: "y" };
 }
 
 describe("signup step 5 folders (spec §4 kind 11, §15)", () => {
@@ -32,6 +32,15 @@ describe("signup step 5 folders (spec §4 kind 11, §15)", () => {
     expect(signupApproval([{ ...good, summary: other.summary }], engine, USER)).toBeNull(); // server swapped the sealed list
     expect(signupApproval([{ ...good, kind: "import" }], engine, USER)).toBeNull();
     expect(signupApproval([{ ...good, appr_seq: "x" }], engine, USER)).toBeNull();
+  });
+  it("picks the valid one with the highest appr_seq, not the last row (created_at ties at one second)", async () => {
+    const newer = await approval([{ path: "/a", name: "a", files: 1 }], seed, "signup_select", 3n);
+    const older = await approval([{ path: "/b", name: "b", files: 1 }], seed, "signup_select", 2n);
+    const forgedHigh = await approval([{ path: "/etc", name: "x", files: 1 }], randomKey(), "signup_select", 9n);
+    expect(signupApproval([newer, older, forgedHigh], engine, USER)?.approval_id).toBe(newer.approval_id);
+    expect(signupApproval([older, newer], engine, USER)?.approval_id).toBe(newer.approval_id);
+    const big = await approval([{ path: "/c", name: "c", files: 1 }], seed, "signup_select", 2n ** 60n);
+    expect(signupApproval([big, newer], engine, USER)?.approval_id).toBe(big.approval_id); // compared as BigInt, not Number
   });
   it("opens the sealed list; current project on, suggestions off; first is current when none is marked", async () => {
     const marked = await openSuggestions(vault, await approval([{ path: "/a", name: "아이디어 로그", files: 18, current: true }, { path: "/b", name: "가계부 앱", files: 12, current: false }]));

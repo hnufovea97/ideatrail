@@ -23,11 +23,12 @@ function signedByEngine(r: ApprovalRow, pub: Uint8Array, userId: string): boolea
   }
 }
 
-/** The newest signup_select from THIS engine with a valid engine signature (spec §8 browser rule). */
+/** The newest signup_select from THIS engine with a valid engine signature (spec §8 browser rule).
+ *  "Newest" = highest engine-signed appr_seq: the server's created_at order ties at one second. */
 export function signupApproval(rows: ApprovalRow[], engine: EngineEntry, userId: string): ApprovalRow | null {
   const pub = fromB64u(engine.sign_pubkey);
   const valid = rows.filter((r) => r.kind === "signup_select" && r.engine_id === engine.engine_id && signedByEngine(r, pub, userId));
-  return valid.at(-1) ?? null;
+  return valid.reduce<ApprovalRow | null>((best, r) => (best === null || BigInt(r.appr_seq) > BigInt(best.appr_seq) ? r : best), null);
 }
 
 function toFolder(x: unknown): SuggestedFolder[] {
