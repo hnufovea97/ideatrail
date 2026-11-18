@@ -129,17 +129,17 @@ func (e *Engine) Run(ctx context.Context) error {
 	return e.Server().Run(ctx, &mcp.StdioTransport{})
 }
 
-type empty struct{}
-
 // safe never lets an error or panic text reach the client: every outcome is a fixed sentence.
-func safe[In any](h func(context.Context, In) string) mcp.ToolHandlerFor[In, empty] {
-	return func(ctx context.Context, _ *mcp.CallToolRequest, in In) (res *mcp.CallToolResult, out empty, err error) {
+// Out is `any` and the output nil, so the SDK declares no outputSchema and sends no
+// structuredContent: Claude Code shows structuredContent instead of the text when it is present.
+func safe[In any](h func(context.Context, In) string) mcp.ToolHandlerFor[In, any] {
+	return func(ctx context.Context, _ *mcp.CallToolRequest, in In) (res *mcp.CallToolResult, out any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				res, err = text(msgFailed), nil
+				res, out, err = text(msgFailed), nil, nil
 			}
 		}()
-		return text(h(ctx, in)), empty{}, nil
+		return text(h(ctx, in)), nil, nil
 	}
 }
 
