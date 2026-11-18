@@ -25,3 +25,13 @@ test("[나중에] moves on without contacting the engine", async ({ page }) => {
   await githubLater(page);
   expect(w.requests.filter((r) => r.url.endsWith("/v1/inbox"))).toEqual([]);
 });
+
+test("[나중에] stays available while waiting for GitHub", async ({ page }) => {
+  const { engine } = await openSignup(page);
+  await passStepOne(page, engine);
+  await skipPhone(page);
+  await page.getByRole("button", { name: "GitHub에 보관하기" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "GitHub 승인 페이지에서" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "GitHub에 보관하기" })).toHaveCount(0);
+  await githubLater(page);
+});

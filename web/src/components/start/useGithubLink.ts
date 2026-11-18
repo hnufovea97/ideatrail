@@ -13,9 +13,11 @@ export function useGithubLink(api: Api, ctx: SignupContext, onLinked: () => void
   const [error, setError] = useState<string | null>(null);
   const cursor = useRef(0);
   const started = useRef(0);
+  const sending = useRef(false);
 
   async function start() {
-    if (!ctx.vault || !ctx.engine) return;
+    if (!ctx.vault || !ctx.engine || sending.current || phase === "waiting") return; // one request at a time
+    sending.current = true;
     setError(null);
     try {
       const m = await sealInbox(ctx.vault, ctx.kemPub, { type: "connect_github" });
@@ -24,21 +26,24 @@ export function useGithubLink(api: Api, ctx: SignupContext, onLinked: () => void
       setPhase("waiting");
     } catch (e) {
       setError(errorMessage(e));
+    } finally {
+      sending.current = false;
     }
   }
 
   usePolling(phase === "waiting", POLL_MS, async () => {
     if (!ctx.vault || !ctx.engine) return true;
+    if (Date.now() - started.current > GITHUB_WAIT_MS) { // checked before trying, so a slow error loop still ends
+      setPhase("idle");
+      setError(COPY.errors.github_not_done);
+      return true;
+    }
     try {
       const r = await findStorageLink(api, cursor.current, ctx.engine, ctx.vault.userId);
       cursor.current = r.cursor;
+      setError(null);
       if (r.linked) {
         onLinked();
-        return true;
-      }
-      if (Date.now() - started.current > GITHUB_WAIT_MS) {
-        setPhase("idle");
-        setError(COPY.errors.github_not_done);
         return true;
       }
       return false;

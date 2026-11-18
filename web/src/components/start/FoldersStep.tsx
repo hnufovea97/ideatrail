@@ -22,18 +22,19 @@ export function FoldersStep({ api, ctx, state, dispatch }: StepProps) {
 
   usePolling(phase === "waiting" && !!vault && !!engine, POLL_MS, async () => {
     if (!vault || !engine) return true;
+    if (Date.now() - started.current > FOLDERS_WAIT_MS) { // checked before trying, so a slow error loop still ends
+      setPhase("timeout");
+      return true;
+    }
     try {
       const found = signupApproval((await api.approvals()).approvals, engine, vault.userId);
+      setError(null);
       if (found) {
         const fs = await openSuggestions(vault, found);
         setRow(found);
         setFolders(fs);
         setSelected(initialSelection(fs));
         setPhase("choose");
-        return true;
-      }
-      if (Date.now() - started.current > FOLDERS_WAIT_MS) {
-        setPhase("timeout");
         return true;
       }
       return false;
