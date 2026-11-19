@@ -91,7 +91,8 @@ type State struct {
 	BlockedVersion string              `json:"blocked_version,omitempty"` // engine version that hit the block (a new version retries)
 	AnchorsCursor  Seq                 `json:"anchors_cursor"`
 	Approvals      map[string]Approval `json:"approvals,omitempty"`
-	Import         *ImportJob          `json:"import,omitempty"` // signup first import not finished yet
+	Import         *ImportJob          `json:"import,omitempty"`       // signup first import not finished yet
+	RecordWords    []string            `json:"record_words,omitempty"` // the user's own "record this" words; local only, never uploaded
 }
 
 // ImportJob is the signup first import's progress, kept so an interrupted import resumes where it

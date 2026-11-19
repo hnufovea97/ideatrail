@@ -1,4 +1,5 @@
-// Package mcpserver is the engine's MCP interface for Claude Code: record, status, request_import
+// Package mcpserver is the engine's MCP interface for Claude Code: record, status, request_import,
+// set_record_words
 // (plugin draft §4). It answers with one fixed Korean sentence; background work (inbox, GitHub
 // push, uploads, receipts) runs after answering, one at a time, time-boxed.
 package mcpserver
@@ -117,9 +118,10 @@ func tool(name, desc string, schema map[string]any, readOnly bool) *mcp.Tool {
 // Server builds the MCP server (exported for tests).
 func (e *Engine) Server() *mcp.Server {
 	s := mcp.NewServer(&mcp.Implementation{Name: "ideatrail", Version: e.Version}, nil)
-	mcp.AddTool(s, tool("record", recordDescription, recordSchema, false), safe(e.recordTool))
+	mcp.AddTool(s, tool("record", e.recordToolDescription(), recordSchema, false), safe(e.recordTool))
 	mcp.AddTool(s, tool("status", statusDescription, map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}, true), safe(e.statusTool))
 	mcp.AddTool(s, tool("request_import", importDescription, importSchema, false), safe(e.importTool))
+	mcp.AddTool(s, tool("set_record_words", wordsDescription, wordsSchema, false), safe(e.setRecordWordsTool))
 	return s
 }
 

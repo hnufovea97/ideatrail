@@ -30,6 +30,7 @@ func TestToolsAnswerOnlyOneFixedTextContent(t *testing.T) {
 		{"record", map[string]any{"paths": []string{"/etc/passwd"}, "note": "x"}, msgNotAllowed},
 		{"status", map[string]any{}, cleanName(filepath.Base(e.folder)) + " · 지금 단계: " + stageLabel("") + " · 아직 기록이 없어요"},
 		{"request_import", map[string]any{"folders": []string{"/"}}, msgImportBad},
+		{"set_record_words", map[string]any{"words": []string{"박제해"}}, wordsSetMsg([]string{"박제해"})},
 	}
 	for _, c := range cases {
 		res, err := e.cs.CallTool(ctx, &mcp.CallToolParams{Name: c.name, Arguments: c.args})

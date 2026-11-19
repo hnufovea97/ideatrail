@@ -59,7 +59,7 @@ describe("screen copy", () => {
     expect(COPY.done.next[0]).toContain("기록해 줘");
     // "기억해 줘" reads as setting the AI's memory (founder); the record words are the user's own
     for (const s of allStrings(COPY)) expect(s).not.toContain("기억해");
-    expect(COPY.intro.benefits[0].body).toContain("편한 말");
+    expect(COPY.intro.benefits[0].body).toContain("기록 말");
   });
   it("maps failures to fixed sentences and never echoes server text", () => {
     expect(errorMessage(new ApiFailure(0, "offline"))).toBe(COPY.errors.offline);

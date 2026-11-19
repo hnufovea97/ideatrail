@@ -129,7 +129,7 @@ func (e *env) call(t *testing.T, name string, args any) (string, bool) {
 	return b.String(), res.IsError
 }
 
-func TestOnlyThreeToolsAndNoPublishOrDelete(t *testing.T) {
+func TestOnlyFourToolsAndNoPublishOrDelete(t *testing.T) {
 	e := newEnv(t, true)
 	res, err := e.cs.ListTools(context.Background(), nil)
 	if err != nil {
@@ -140,7 +140,7 @@ func TestOnlyThreeToolsAndNoPublishOrDelete(t *testing.T) {
 		names = append(names, tl.Name)
 	}
 	sort.Strings(names)
-	if strings.Join(names, ",") != "record,request_import,status" {
+	if strings.Join(names, ",") != "record,request_import,set_record_words,status" {
 		t.Fatalf("tools %v", names)
 	}
 }
