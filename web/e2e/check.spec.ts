@@ -47,9 +47,21 @@ test("guides to another browser when PRF is not supported", async ({ page }) => 
   await expect(page.getByRole("button", { name: "링크 복사" })).toBeVisible();
 });
 
-test("without a link: tells you the one line to paste into Claude Code", async ({ page }) => {
+test("without a link: says why and how to get a new one, install line only as a fallback", async ({ page }) => {
   await page.goto("/start");
-  await expect(page.getByRole("heading", { name: "이 한 줄을 Claude Code에 붙여넣어 주세요: /plugin install ideatrail" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "이 창에는 가입 링크가 없어요" })).toBeVisible();
+  await expect(page.getByText("새로고침하면 보안을 위해 링크가 지워져요", { exact: false })).toBeVisible();
+  await expect(page.getByText("아직 설치하지 않았다면", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "명령 복사" })).toBeVisible();
+});
+
+test("refreshing the signup page (G1: the secret is gone from the address bar) shows the new-link guidance, not 'install'", async ({ page }) => {
+  const engine = new FakeEngine();
+  await page.goto(await engine.start());
+  await expect(page.getByText("연결할 컴퓨터", { exact: false })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "이 창에는 가입 링크가 없어요" })).toBeVisible();
+  await expect(page.getByText("“이 기획 기록해줘”", { exact: false })).toBeVisible();
 });
 
 test("an expired or unknown session says the link timed out", async ({ page }) => {

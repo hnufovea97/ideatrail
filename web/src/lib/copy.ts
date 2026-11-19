@@ -178,7 +178,7 @@ export const COPY = {
     expired: "QR이 만료됐어요. 컴퓨터 화면의 새 QR을 다시 찍어 주세요", // 새 문구
   },
   stop: {
-    no_link: "이 한 줄을 Claude Code에 붙여넣어 주세요: /plugin install ideatrail",
+    no_link: "이 창에는 가입 링크가 없어요", // G1: 새로고침하면 링크가 지워지는데 '설치하세요'로 안내돼 헷갈림
     link_mismatch: "이 링크는 이 컴퓨터의 설치와 맞지 않아 멈췄어요. Claude Code에서 설치 링크를 다시 받아 주세요",
     link_expired: "이 링크는 시간이 지났어요. Claude Code에 \"설치 링크 다시 줘\"라고 말해 주세요",
     link_used: "이 링크는 이미 쓰였어요. Claude Code에서 설치 링크를 다시 받아 주세요", // 새 문구
@@ -187,6 +187,10 @@ export const COPY = {
     offline: "인터넷이 끊겼어요. 연결되면 다시 불러올게요",
     not_registered: "이 기기는 아직 등록 안 됐어요. 쓰던 기기에서 '기기 추가'를 눌러 주세요",
     failed: "잠시 문제가 생겼어요. Claude Code에서 설치 링크를 다시 받아 주세요", // 새 문구
+  },
+  noLink: {
+    why: "새로고침하면 보안을 위해 링크가 지워져요. Claude Code를 닫았다가 다시 켜고 “이 기획 기록해줘”라고 말하면 새 링크로 열려요. 새 창에서는 새로고침하지 말고 그대로 진행해 주세요.", // 새 문구
+    install: "아직 설치하지 않았다면 이 한 줄을 Claude Code에 붙여 넣어 주세요: /plugin install ideatrail", // 새 문구
   },
   actions: { copy: "복사", copyCommand: "명령 복사", copyLink: "링크 복사", copied: "복사했어요", copyFailed: "복사하지 못했어요. 직접 선택해서 복사하세요", retry: "다시" },
   errors: {
