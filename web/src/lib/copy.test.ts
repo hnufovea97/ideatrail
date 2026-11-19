@@ -49,6 +49,15 @@ describe("screen copy", () => {
     }
   });
 
+  it("opens with the user's own moment, then what they get — benefits before setup (founder: marketer view)", () => {
+    expect(COPY.intro.title).toContain("이거 괜찮은데?");
+    expect(COPY.intro.what).toContain("기억해 줘");
+    expect(COPY.intro.benefits.map((b) => b.key)).toEqual(["say", "find", "safe"]);
+    // the not-yet-built overview is always marked, never promised as if it exists
+    expect(COPY.intro.example.laterTitle).toContain("곧 생겨요");
+    expect(COPY.intro.benefits[1].body).toContain("곧");
+    expect(COPY.done.next[0]).toContain("기억해 줘");
+  });
   it("maps failures to fixed sentences and never echoes server text", () => {
     expect(errorMessage(new ApiFailure(0, "offline"))).toBe(COPY.errors.offline);
     expect(errorMessage(new DOMException("x", "NotAllowedError"))).toBe(COPY.errors.passkey_cancel);

@@ -50,3 +50,19 @@ input[type="text"] { font: inherit; padding: 10px; border-radius: 8px; border: 1
 .made-name { font-weight: 600; }
 .made-when { color: var(--muted); font-size: 0.875rem; }
 @media (max-width: 360px) { .map ul { grid-template-columns: 1fr; } }
+/* Step 0 pitch: scene → result → benefits (founder: "나한테 뭐가 좋은지 한 번에") */
+.lead { font-size: 1.05rem; }
+.bubble { border-radius: 14px; padding: 10px 14px; margin: 6px 0; max-width: 90%; }
+.bubble.say { margin-left: auto; background: var(--accent); color: var(--accent-fg); border-bottom-right-radius: 4px; }
+.bubble.reply { border: 1px solid var(--line); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; border-bottom-left-radius: 4px; }
+.later-title { color: var(--muted); font-size: 0.85rem; margin: 14px 0 4px; }
+.later { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--accent); display: grid; gap: 8px; }
+.later li { display: grid; gap: 2px; }
+.later-stage { font-weight: 700; }
+.later-when { color: var(--muted); font-size: 0.85rem; }
+.later-chose { font-size: 0.85rem; }
+.benefits ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.benefits li { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 10px; }
+.benefit-icon { width: 28px; height: 28px; color: var(--accent); grid-row: span 2; }
+.benefit-head { font-weight: 700; }
+.benefit-body { color: var(--muted); font-size: 0.9rem; }

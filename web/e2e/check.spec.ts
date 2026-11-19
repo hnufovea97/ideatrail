@@ -11,7 +11,10 @@ test("shows the computer name from the link and removes the secret from the addr
   await expect(page.getByText("연결할 컴퓨터: Steven의 MacBook Air")).toBeVisible();
   await expect(page.getByText("Claude Code가 직접 연 링크가 아니라면 닫으세요")).toBeVisible();
   await expect(page.getByText("약 5분 걸려요", { exact: false })).toBeVisible();
-  const map = page.getByRole("region", { name: "만들게 될 4가지와 있는 곳" });
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("이거 괜찮은데?");
+  await expect(page.getByRole("region", { name: "이렇게 써요" })).toContainText("기억해 줘");
+  await expect(page.getByRole("region", { name: "써 보면 좋은 점" }).getByRole("listitem")).toHaveCount(3);
+  const map = page.getByRole("region", { name: "안심하고 쓰는 이유: 무엇이 어디에 생기나요" });
   await expect(map.getByRole("listitem")).toHaveCount(4);
   await expect(map.getByRole("listitem").nth(0)).toContainText("열쇠이 컴퓨터");
   await expect(map.getByRole("listitem").nth(3)).toContainText("비상 열쇠종이·비밀번호 관리자");

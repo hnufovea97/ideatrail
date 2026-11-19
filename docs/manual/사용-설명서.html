@@ -107,6 +107,17 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 .why .num{position:absolute;left:16px;top:16px;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--paper);font-family:var(--f-mono);font-size:14px;display:grid;place-items:center}
 .why h3{margin:2px 0 8px}
 .why p{font-size:15px}
+/* 1장 첫머리: 장면 → 한마디 → 나중에 보이는 모습 */
+.hero{font-family:var(--f-head);font-size:clamp(22px,4vw,30px);line-height:1.35;margin:8px 0 10px}
+.chat{display:grid;gap:8px;margin:14px 0}
+.chat p{margin:0;max-width:88%;padding:10px 14px;border-radius:14px;font-size:15px}
+.chat .u{justify-self:end;background:var(--accent);color:var(--paper);border-bottom-right-radius:4px}
+.chat .t{justify-self:start;border:1px solid var(--line);background:var(--paper);font-family:var(--f-mono);font-size:13px;border-bottom-left-radius:4px}
+.trail{list-style:none;margin:8px 0 20px;padding:0 0 0 16px;border-left:3px solid var(--accent)}
+.trail li{margin:0 0 12px}
+.trail .st{font-family:var(--f-head);font-weight:700}
+.trail .dt{color:var(--muted);font-size:13px;margin-left:6px}
+.trail .ch{display:block;font-size:14px}
 </style>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -139,19 +150,31 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 <p class="lede">처음 쓰는 분을 위한 안내예요. 어려운 말은 맨 아래 <a href="#words">낱말 풀이</a>에 모아 두었어요. <span class="soon">곧 생겨요</span> 표시는 아직 준비 중인 기능이에요.<br>이 설명서에서 <b>Ideatrail</b>은 서비스와 그 서버를, <b>사용자</b>는 이 설명서를 읽는 분을 뜻해요.</p>
 
 <h2 id="what">1. Ideatrail이 뭐예요?</h2>
-<p>AI(Claude Code)와 아이디어·메모·기록을 다듬는 과정을, <b>날짜 증명과 함께 저절로 남겨 주는 서비스</b>예요. 핵심은 세 가지예요.</p>
-<div class="why">
-  <section><span class="num">1</span><h3>기록은 AI가 알아서 해요</h3>
-    <p>문서에 <b>의미 있는 변화</b>(기획 확정, 기능 완성, 피드백 반영 등)가 생기면 AI가 <b>자동으로 기록</b>해요. 따로 저장하거나 정리할 일이 없어요.</p>
-    <p>기록마다 <b>날짜 증명</b>이 붙어서, "이 아이디어를 이날 이만큼 해 두었다"를 나중에 누구에게나 보여 줄 수 있어요.</p></section>
-  <section><span class="num">2</span><h3>밖에 드러나는 건 최소한, 해킹돼도 내용은 못 알아내요</h3>
-    <p>Ideatrail 서버에 남는 것은 <b>기록 일시와 파일 지문(기록마다 32바이트)</b>뿐이에요.</p>
-    <p>파일 지문은 내용에서 한 방향으로만 뽑은 값이라, <b>서버가 해킹돼도 지문으로 내용을 거꾸로 알아낼 수 없어요.</b> 기록 내용은 잠긴 채 사용자의 컴퓨터와 GitHub에 있고, 사용자의 열쇠로 사용자의 기기에서만 열려요.</p></section>
-  <section><span class="num">3</span><h3>언제 어디서든 사용자의 기록을 확인해요</h3>
-    <p>휴대폰이나 다른 기기에서도 아이디어별 <b>개요와 작업 순서</b>(어떤 단계를 언제 거쳤는지)를 볼 수 있어요.</p>
-    <p>원하면 그 기록의 <b>파일로 가는 경로</b>도 알려 줘요. 그 파일을 여는 순간부터는 사용자의 기기·GitHub 계정의 보안에 달려 있어요. <span class="soon">대시보드는 곧 생겨요</span></p></section>
+<p class="hero">AI와 이야기하다 “이거 괜찮은데?” 싶으면, 한마디면 돼요.</p>
+<p>AI와 이야기하다 보면 좋은 생각이 나와요. 그런데 대화가 길어지면 묻혀서, 며칠 뒤엔 무엇을 왜 골랐는지 다시 찾기 어렵죠. Ideatrail을 쓰면 <b>“기억해 줘”</b> 한마디로 AI가 그 순간을 정리해서, <b>날짜 증명과 함께</b> 남겨요.</p>
+<p><b>이렇게 써요</b></p>
+<div class="chat" aria-label="대화 예시">
+  <p class="u">좋아, 이 방향으로 가자. 왜 이걸 골랐는지까지 기억해 줘</p>
+  <p class="t">기록했어요 · 가계부 앱 · 단계: 기획 확정 (AI 추정)</p>
 </div>
-<p>어디에 무엇이 저장되는지는 <a href="#where">2장</a>에 자세히 있어요.</p>
+<p><b>나중엔 이렇게 한눈에 봐요</b> <span class="soon">한눈에 보는 화면은 곧 생겨요</span></p>
+<ol class="trail">
+  <li><span class="st">아이디어</span><span class="dt">11월 3일</span><span class="ch">처음 떠올린 생각</span></li>
+  <li><span class="st">기획 확정</span><span class="dt">11월 18일</span><span class="ch"><b>고른 것</b> 카드 연동 없이 직접 입력 · <b>이유</b> 금융 정보를 넘기기 싫어서 · <b>안 하기로 한 것</b> 가족 공유</span></li>
+</ol>
+<h3>써 보면 좋은 점 세 가지</h3>
+<div class="why">
+  <section><span class="num">1</span><h3>말 한마디로 정리돼요</h3>
+    <p>“기억해 줘”라고 하면 AI가 대화에서 <b>무엇을 골랐고, 왜 골랐고, 무엇을 안 하기로 했는지</b>를 짧은 메모로 정리해 기록해요.</p>
+    <p>말하지 않아도 문서에 <b>의미 있는 변화</b>(기획 확정, 기능 완성, 피드백 반영 등)가 생기면 알아서 기록해요. 오타 고치기 같은 작은 변화는 남기지 않아요.</p></section>
+  <section><span class="num">2</span><h3>나중에 찾기 쉬워요</h3>
+    <p>아이디어마다 <b>어느 단계까지 왔는지</b>(아이디어 → 기획 확정 → MVP 완료 → 기능 완성), 그때그때 <b>고른 것과 그 이유</b>가 순서대로 쌓여요.</p>
+    <p>지금은 Claude Code에 <b>“아이디어 상태 알려줘”</b>라고 물으면 알려 줘요. 휴대폰·다른 기기에서 한눈에 보는 화면은 <span class="soon">곧 생겨요</span></p>
+    <p>원하면 그 기록의 <b>파일로 가는 경로</b>도 알려 줘요. 그 파일을 여는 순간부터는 사용자의 기기·GitHub 계정의 보안에 달려 있어요. 기록마다 날짜 증명이 붙어서 “이 생각을 이날 이만큼 해 두었다”를 누구에게나 보여 줄 수 있어요.</p></section>
+  <section><span class="num">3</span><h3>안심하고 맡겨요</h3>
+    <p>기록 내용은 잠긴 채 <b>사용자의 컴퓨터와 사용자의 GitHub</b>에만 있고, <b>사용자의 열쇠로 사용자의 기기에서만</b> 열려요.</p>
+    <p>Ideatrail 서버에 남는 것은 <b>기록 일시와 파일 지문(기록마다 32바이트)</b>뿐이에요. 지문은 내용에서 한 방향으로만 뽑은 값이라 <b>서버가 해킹돼도 내용을 거꾸로 알아낼 수 없어요.</b> 자세한 건 <a href="#where">2장</a>에 있어요.</p></section>
+</div>
 
 <p>가입하면서 아래 네 가지를 만들어요. 이 설명서는 이 네 가지 이름으로 이야기해요.</p>
 <div class="keys" role="list">
@@ -252,7 +275,7 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 <h2 id="signup">5. 가입하기 — 한 단계씩</h2>
 <p>Claude Code에 이런 한 줄이 보이면 가입이 시작된 거예요.</p>
 <div class="say">가입하려고 브라우저 창을 열었어요. 약 5분이면 끝나요. 화면이 하라는 대로 마친 뒤 여기 Claude Code로 돌아와 주세요.</div>
-<p>브라우저에 <b>"시작하기 전에"</b> 화면이 열리고, 앞으로 만들 네 가지와 Ideatrail 서버에 무엇이 남는지가 나와요. 화면 위의 <b>"연결할 컴퓨터: (컴퓨터 이름)"</b>이 사용자의 컴퓨터가 아니거나, Claude Code가 연 창이 아니라면 그냥 닫으세요.</p>
+<p>브라우저에 첫 화면이 열려요. <b>“이렇게 써요”</b> 예시, <b>써 보면 좋은 점 세 가지</b>, <b>안심하고 쓰는 이유</b>(앞으로 만들 네 가지와 Ideatrail 서버에 무엇이 남는지)가 차례로 나와요. 화면 위의 <b>"연결할 컴퓨터: (컴퓨터 이름)"</b>이 사용자의 컴퓨터가 아니거나, Claude Code가 연 창이 아니라면 그냥 닫으세요.</p>
 <p>[시작하기]를 누르면 1단계부터 시작해요. 단계가 끝날 때마다 다음 화면 맨 위에 <b>"✓ 방금 한 일"</b>이 한 줄로 나와요.</p>
 
 <section class="step s1" aria-labelledby="st1">
@@ -327,12 +350,13 @@ footer{margin-top:56px;color:var(--muted);font-size:13px}
 <p><b>마지막 화면 "준비됐어요"</b>에서 만든 네 가지가 어디 있는지 다시 보여 줘요. 건너뛴 것은 "아직 안 만들었어요"로 나와요. 그다음 [터미널로 돌아가기]를 누르거나 창을 닫고 Claude Code로 돌아가면 돼요.</p>
 
 <h2 id="daily">6. 평소에 쓰기</h2>
-<p>따로 할 일은 없어요. <b>평소처럼 Claude Code와 작업하세요.</b> 기획 확정, 기능 완성, 피드백 반영처럼 의미 있는 변화가 생기면 기록 도우미가 남기고 터미널에 한 줄로 알려 줘요. 오타 고치기 같은 작은 변화는 기록하지 않아요.</p>
+<p><b>평소처럼 Claude Code와 이야기하세요.</b> “이거 괜찮은데?” 싶은 순간엔 <b>“기억해 줘”</b> 한마디면 돼요. 말하지 않아도 기획 확정, 기능 완성, 피드백 반영처럼 의미 있는 변화가 생기면 기록 도우미가 남기고 터미널에 한 줄로 알려 줘요. 오타 고치기 같은 작은 변화는 기록하지 않아요.</p>
 <div class="say">기록했어요 · 가계부 앱 · 단계: 기획 확정 (AI 추정)</div>
 <p><b>이렇게 말해 보세요</b></p>
 <div class="tbl"><table>
 <thead><tr><th>말하기</th><th>일어나는 일</th></tr></thead>
 <tbody>
+<tr><td>"이거 괜찮은데? 기억해 줘"</td><td>대화에서 고른 것·이유·안 하기로 한 것을 메모로 정리해 기록해요</td></tr>
 <tr><td>"아이디어 상태 알려줘"</td><td>이 프로젝트의 지금 단계와 기록이 있는지 알려 줘요</td></tr>
 <tr><td>"지금 기록해 줘"</td><td>방금 바뀐 내용을 기록해요</td></tr>
 <tr><td>"기획 확정됐어. 기록해 줘"</td><td>단계를 '기획 확정'으로 남겨요. 사용자가 직접 말했으니 "AI 추정"이 안 붙어요</td></tr>

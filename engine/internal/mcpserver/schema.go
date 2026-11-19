@@ -2,7 +2,7 @@ package mcpserver
 
 // Tool descriptions and schemas are the plugin draft §4 text (token budget: ≤1,500 with the skill).
 const (
-	recordDescription = "Record a meaningful change to an idea (plan decided, feature done, feedback applied). Not for typo fixes. The engine fingerprints, seals and anchors the files; you only describe."
+	recordDescription = "Record a meaningful change to an idea (plan decided, feature done, feedback applied), or a moment the user asks to remember (\"기억해 줘\"). If it lives only in the conversation, first save it as a short Markdown note in the project folder (what was chosen, why, what was ruled out), then record that file. Not for typo fixes. The engine fingerprints, seals and anchors the files; you only describe."
 	statusDescription = "Show this project's idea: stage, empty routine slots, last record. Call before recording if unsure whether it is a new idea."
 	importDescription = "Ask to import existing notes from folders. Only shows a list; the user approves on the dashboard."
 )
