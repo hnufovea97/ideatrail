@@ -15,7 +15,7 @@ test("end screen: 3 lines, the GitHub banner stays until the engine's link arriv
   await expect(page.getByTestId("done-how")).toMatchAriaSnapshot(`
     - heading "앞으로 이렇게 동작해요" [level=2]
     - list:
-      - listitem: “기억해 줘”라고 하면 그 순간을, 말하지 않아도 의미 있는 변화는 저절로 기록해요. 터미널에 한 줄로 알려 드려요
+      - listitem: “기록해 줘”라고 하면 그 순간을, 말하지 않아도 의미 있는 변화는 저절로 기록해요. 터미널에 한 줄로 알려 드려요
       - listitem: 기록은 몇 시간 뒤 블록체인에 날짜가 새겨져요
       - listitem: 공개로 바꾸기·지우기는 대시보드에서 사용자만 할 수 있어요
   `);
