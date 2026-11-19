@@ -56,10 +56,39 @@ describe("pairing (2.4)", () => {
     expect(await env.DB.prepare("SELECT last_req_seq FROM engines WHERE engine_id = ?").bind(e.engineId).first("last_req_seq")).toBe(3);
   });
 
-  it("an engine id can start pairing only once", async () => {
+  it("the same engine (same keys) can start again while its earlier session is unused — G1: a refreshed signup window must not lock the engine out", async () => {
+    const e = makeEngine();
+    const first = await startPairing(e);
+    expect(first.r.status).toBe(201);
+    const path = `/v1/pairing/${first.sessionId}/blob`;
+    expect((await engineCall(path, signedInit(e, "GET", path, "", 4n))).status).toBe(404); // seq 4 used on the old session
+    const again = await startPairing(e);
+    expect(again.r.status).toBe(201);
+    expect(again.sessionId).not.toBe(first.sessionId);
+    expect((await browser().call("GET", `/v1/pairing/${first.sessionId}`)).status).toBe(404); // the old link is gone
+    const rows = await env.DB.prepare("SELECT session_id, last_req_seq FROM pairing_sessions WHERE engine_id = ?").bind(e.engineId).all();
+    expect(rows.results).toEqual([{ session_id: again.sessionId, last_req_seq: 4 }]); // request sequence carried over: no replay
+  });
+
+  it("a different key pair can never take over an engine id's pairing", async () => {
     const e = makeEngine();
     expect((await startPairing(e)).r.status).toBe(201);
+    const other = makeEngine();
+    expect((await startPairing({ ...other, engineId: e.engineId })).r.status).toBe(409);
+    expect((await startPairing({ ...e, kemPub: other.kemPub })).r.status).toBe(409);
+  });
+
+  it("once delivered, the engine id cannot start pairing again", async () => {
+    const { e, sessionId } = await startPairing();
+    const { b } = await signedUpAndConfirmed(sessionId);
+    expect((await b.call("POST", `/v1/pairing/${sessionId}/deliver`, deliverBody(1))).status).toBe(200);
     expect((await startPairing(e)).r.status).toBe(409);
+  });
+
+  it("even after the browser signed up on it, an undelivered session can be restarted by its engine (the window was lost mid-signup)", async () => {
+    const { e, sessionId } = await startPairing();
+    await signedUpAndConfirmed(sessionId);
+    expect((await startPairing(e)).r.status).toBe(201);
   });
 
   it("rejects public keys that are not 32 bytes", async () => {

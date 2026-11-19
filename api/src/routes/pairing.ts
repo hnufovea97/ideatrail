@@ -40,10 +40,17 @@ export function pairingRoutes(getLimiter: (env: Bindings) => Limiter) {
   r.post("/", ipLimit("pairing_start", getLimiter), async (c) => {
     const body = await readJson(c, zStart);
     const db = c.env.DB;
-    const known = await db.prepare("SELECT 1 FROM engines WHERE engine_id = ?1 UNION ALL SELECT 1 FROM pairing_sessions WHERE engine_id = ?1").bind(body.engine_id).first();
-    if (known) throw new ApiError(409, "engine_exists", "This engine id is already used; pair with a new one");
+    const engineExists = () => new ApiError(409, "engine_exists", "This engine id is already used; pair with a new one");
+    if (await db.prepare("SELECT 1 FROM engines WHERE engine_id = ?").bind(body.engine_id).first()) throw engineExists();
+    // G1: the signup window can be lost (refreshed, closed) before it delivers. The same engine — same
+    // keys — may then start again: its unused session row is rotated in place (new id and expiry), so
+    // last_req_seq stays on the row and earlier signed requests cannot be replayed. Other keys, or a
+    // delivered session, stay refused (security review: one atomic UPDATE, no read-then-write gap).
     const sessionId = newId();
     const expiresAt = inSeconds(PAIRING_SECONDS);
+    const rotated = await db.prepare("UPDATE pairing_sessions SET session_id = ?, user_id = NULL, expires_at = ? WHERE engine_id = ? AND used_at IS NULL AND sign_pubkey = ? AND kem_pubkey = ?")
+      .bind(sessionId, expiresAt, body.engine_id, body.sign_pubkey, body.kem_pubkey).run();
+    if (rotated.meta.changes === 1) return c.json({ session_id: sessionId, expires_at: expiresAt }, 201);
     try {
       await db.prepare("INSERT INTO pairing_sessions (session_id, engine_id, sign_pubkey, kem_pubkey, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)")
         .bind(sessionId, body.engine_id, body.sign_pubkey, body.kem_pubkey, nowIso(), expiresAt).run();
