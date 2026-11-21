@@ -13,7 +13,7 @@ import (
 var jargon = regexp.MustCompile(`비트코인|코인|엔진|패스키|PRF|봉투|HPKE|서명|MCP|OTS`)
 
 func TestFixedSentencesUsePlainWords(t *testing.T) {
-	all := []string{msgPairing, msgPairingOpened, msgNotRegistered, msgNotAllowed, msgBadInput, msgTooLarge,
+	all := []string{msgPairing, msgPairingOpened, msgPairingFailed, msgNotRegistered, msgNotAllowed, msgBadInput, msgTooLarge,
 		msgQueueFull, msgOTSFailed, msgFailed, msgImportAsked, msgImportBad, msgImportTooMany, msgPublicRefusal,
 		suffixQueued, suffixBlocked}
 	for _, s := range all {

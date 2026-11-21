@@ -251,7 +251,7 @@ func (e *Engine) ensurePaired(ctx context.Context) (string, bool) {
 	}
 	sess, err := pairing.Start(ctx, e.Pairing, e.Computer)
 	if err != nil {
-		return msgPairing, false
+		return msgPairingFailed, false
 	}
 	e.lastPairing = time.Now()
 	e.goSafe(func() {

@@ -66,4 +66,9 @@ describe("screen copy", () => {
     expect(errorMessage(new DOMException("x", "NotAllowedError"))).toBe(COPY.errors.passkey_cancel);
     expect(errorMessage(new Error("server said: secret"))).toBe(COPY.errors.generic);
   });
+  it("tells the person to close GitHub's finished tab and come back (G1: no next action after 'all set')", () => {
+    expect(COPY.github.steps.at(-1)).toMatch(/all set/);
+    expect(COPY.github.steps.at(-1)).toMatch(/돌아오세요/);
+    expect(COPY.github.waiting).toMatch(/돌아오세요/);
+  });
 });

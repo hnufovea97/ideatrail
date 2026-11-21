@@ -212,3 +212,19 @@ func TestCleanName(t *testing.T) {
 		t.Fatalf("%q", got)
 	}
 }
+
+// G1: when signup cannot even start (server refused or offline), the person must not be told to
+// continue in a browser window that was never opened.
+func TestPairingStartFailureDoesNotPointAtAWindow(t *testing.T) {
+	e := newEnv(t, false)
+	e.srv.Handle("POST", "/v1/pairing", func(w http.ResponseWriter, r *http.Request, _ []byte, _ string) {
+		testsrv.Fail(w, 409, "conflict")
+	})
+	out, _ := e.call(t, "status", map[string]any{})
+	if out != msgPairingFailed || len(e.opened) != 0 {
+		t.Fatalf("%q opened=%d", out, len(e.opened))
+	}
+	if strings.Contains(out, "창에서 이어") {
+		t.Fatal("points at a window that was never opened")
+	}
+}

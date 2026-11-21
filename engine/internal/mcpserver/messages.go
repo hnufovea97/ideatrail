@@ -15,6 +15,7 @@ import (
 // passed through (injection channel), only these fixed texts plus a sanitized folder name.
 const (
 	msgPairing       = "가입이 아직 안 끝났어요. 앞서 열린 브라우저 창에서 이어 가 주세요(약 5분). 다 마치면 여기로 돌아와 다시 말해 주세요."
+	msgPairingFailed = "가입을 시작하지 못했어요. 인터넷 연결을 확인하고 잠시 뒤 다시 말해 주세요. 계속 안 되면 Claude Code를 닫았다가 다시 켜 주세요."
 	msgPairingOpened = "가입하려고 브라우저 창을 열었어요. 약 5분이면 끝나요. 화면이 하라는 대로 마친 뒤 여기 Claude Code로 돌아와 주세요."
 	msgNotRegistered = "이 폴더는 아직 기록하지 않는 폴더예요. 대시보드에서 이 폴더를 허락하면 기록할 수 있어요."
 	msgNotAllowed    = "이 파일은 기록할 수 없어요. 기록하기로 고른 폴더 밖에 있거나, 비밀번호 같은 비밀 파일이에요."

@@ -90,10 +90,11 @@ export const COPY = {
       "버튼을 누르면 'ideatrail' 작은 창에 8자리 코드가 보여요. 코드는 이미 복사돼 있어요",
       "이어서 열리는 GitHub 화면의 칸에 붙여 넣고(Mac은 Cmd+V, Windows는 Ctrl+V) [Continue]를 눌러요",
       "GitHub가 'Ideatrail'을 설치하고 승인할지 물으면 [Install]과 [Authorize]를 눌러 주세요",
+      "GitHub에 'all set'이나 'Congratulations'가 나오면 끝났어요. 그 GitHub 탭을 닫고 이 화면으로 돌아오세요",
     ],
     action: "GitHub에 보관함 만들기",
     later: "나중에",
-    waiting: "GitHub 화면에서 코드를 붙여 넣고 [Authorize]까지 눌러 주세요. 끝나면 이 화면이 저절로 넘어가요.", // 새 문구
+    waiting: "GitHub 화면에서 코드를 붙여 넣고 [Authorize]까지 눌러 주세요. GitHub에 'all set'이 나오면 그 탭을 닫고 이 화면으로 돌아오세요. 이 화면은 저절로 넘어가요.", // 새 문구
     banner: "증명 보관함을 아직 안 만들었어요. 만들어 두면 증명이 사용자의 GitHub에도 남아요", // 새 문구
     bannerAction: "지금 만들기",
   },

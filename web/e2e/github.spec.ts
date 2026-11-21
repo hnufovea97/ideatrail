@@ -8,7 +8,7 @@ test("[GitHub에 보관함 만들기] → engine inbox gets connect_github → s
   await passStepOne(page, engine);
   await skipPhone(page);
   await page.getByRole("button", { name: "GitHub에 보관함 만들기" }).click();
-  await expect(page.getByText("GitHub 화면에서 코드를 붙여 넣고 [Authorize]까지 눌러 주세요. 끝나면 이 화면이 저절로 넘어가요.")).toBeVisible();
+  await expect(page.getByText(/GitHub에 'all set'이 나오면 그 탭을 닫고 이 화면으로 돌아오세요/)).toBeVisible();
   const msgs = await engine.readInbox();
   expect(msgs.map((m) => m.body.type)).toEqual(["connect_github"]);
   await engine.putStorageLink();
