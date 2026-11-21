@@ -24,6 +24,8 @@ header h1{font-size:20px;margin:0;text-wrap:balance}
 .tabs button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:999px;padding:4px 12px;cursor:pointer}
 .tabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:transparent}
 .list{display:grid;gap:8px}
+.sort{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin:0 0 10px}
+.sort select{font:inherit;font-size:13px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:4px 8px;min-width:0;flex:1}
 .card{font:inherit;text-align:left;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;display:grid;gap:4px}
 .card[aria-current="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .card .nm{font-weight:700}
@@ -82,9 +84,18 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
     <section aria-label="아이디어 목록">
       <div class="tabs" role="group" aria-label="보기">
         <button type="button" data-tab="all" aria-pressed="true">전체</button>
-        <button type="button" data-tab="pub" aria-pressed="false">공개</button>
-        <button type="button" data-tab="pri" aria-pressed="false">비공개</button>
+        <button type="button" data-tab="pub" aria-pressed="false">공유 가능</button>
+        <button type="button" data-tab="pri" aria-pressed="false">나만 보기</button>
       </div>
+      <label class="sort" for="sort">정렬
+        <select id="sort">
+          <option value="firstOld" selected>처음 기록한 순 (오래된 것부터)</option>
+          <option value="firstNew">처음 기록한 순 (최신부터)</option>
+          <option value="last">마지막 기록 순</option>
+          <option value="stage">진행 단계 순</option>
+          <option value="opened">최근 열어 본 순 (이 기기에만 저장)</option>
+        </select>
+      </label>
       <div class="list" id="list"></div>
     </section>
     <section class="detail" id="detail" aria-live="polite"></section>
@@ -108,18 +119,22 @@ const IDEAS=[
  {name:"피아노 연습 기록기",pri:false,tags:["취미"],first:"2026.10.08",last:"2026.10.08",stage:1,
   stages:[{d:"10.08",range:"10.08",decided:0,deferred:0,turn:"",vers:[{w:"10.08",t:"개요",f:"메모.md",fp:"03d…b7f",c:"pending"}]}]}
 ];
-let sel=0,selStage=IDEAS[0].stage-1,tab="all";
+let sel=0,selStage=IDEAS[0].stage-1,tab="all",sortBy="firstOld";
+const opened=IDEAS.map(()=>0);let clock=0;opened[0]=++clock;
+const SORTS={firstOld:(a,b)=>a.first.localeCompare(b.first),firstNew:(a,b)=>b.first.localeCompare(a.first),
+ last:(a,b)=>b.last.localeCompare(a.last),stage:(a,b)=>b.stage-a.stage||b.last.localeCompare(a.last)};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const lock=pri=>pri?' <span role="img" aria-label="비공개">🔒</span>':"";
+const lock=pri=>pri?' <span role="img" aria-label="나만 보기">🔒</span>':"";
 const sum=(d,k)=>d.stages.reduce((a,s)=>a+s[k],0);
 function renderList(){
- const show=IDEAS.map((d,i)=>[d,i]).filter(([d])=>tab==="all"||(tab==="pri")===d.pri);
+ const show=IDEAS.map((d,i)=>[d,i]).filter(([d])=>tab==="all"||(tab==="pri")===d.pri)
+  .sort(([a,i],[b,j])=>sortBy==="opened"?opened[j]-opened[i]:SORTS[sortBy](a,b));
  $("list").innerHTML=show.length?show.map(([d,i])=>`<button type="button" class="card" data-i="${i}" aria-current="${i===sel}">
   <span class="nm"><span class="lk">${esc(d.name)}</span>${lock(d.pri)}</span>
   <span class="small"><span class="lk">${d.stage}/5 ${STAGES[d.stage-1]}</span></span>
   <span class="mini" aria-hidden="true"><i style="width:${d.stage*20}%"></i></span>
-  <span class="small">최초 ${d.first.slice(5)} · 마지막 ${d.last.slice(5)}</span></button>`).join(""):`<p class="empty">공개 기록이 없어요. 기록은 기본 비공개예요.</p>`;
+  <span class="small">최초 ${d.first.slice(5)} · 마지막 ${d.last.slice(5)}</span></button>`).join(""):`<p class="empty">${tab==="pub"?"공유 가능으로 둔 기록이 없어요. 기록은 기본으로 나만 봐요.":"나만 보는 기록이 없어요."}</p>`;
 }
 function renderDetail(){
  const d=IDEAS[sel],st=d.stages[selStage];
@@ -136,7 +151,8 @@ function renderDetail(){
   <div class="bar" role="group" aria-label="단계 ${d.stage}/5">${segs}</div>${panel}`;
 }
 function render(){renderList();renderDetail()}
-$("list").addEventListener("click",e=>{const b=e.target.closest(".card");if(!b)return;sel=+b.dataset.i;selStage=IDEAS[sel].stage-1;render()});
+$("list").addEventListener("click",e=>{const b=e.target.closest(".card");if(!b)return;sel=+b.dataset.i;opened[sel]=++clock;selStage=IDEAS[sel].stage-1;render()});
+$("sort").addEventListener("change",e=>{sortBy=e.target.value;renderList()});
 $("detail").addEventListener("click",e=>{const b=e.target.closest(".seg");if(!b||b.disabled)return;selStage=+b.dataset.s;renderDetail()});
 document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;tab=b.dataset.tab;document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-pressed",x===b));renderList()});
 $("srv").addEventListener("change",e=>{const on=e.target.checked;$("app").classList.toggle("srv",on);$("srvNote").textContent=on?"서버에는 날짜, 지문, 블록체인 상태뿐이에요. 흐린 글자는 잠긴 채로만 있어요":"지금은 이 기기에서 풀어 본 모습이에요"});
