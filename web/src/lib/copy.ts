@@ -47,10 +47,10 @@ export const COPY = {
         { when: "11월 10일", what: "초안", file: "기획-초안.md", fp: "5d2…0b3", chain: "done" },
       ],
       chain: { done: "블록체인 확산됨", pending: "블록체인 진행 중" },
-      toggle: "Ideatrail 서버가 보는 모습", // 새 문구
+      toggle: "Ideatrail 서버가 가진 데이터", // 새 문구
       serverFirst: true, // founder: 처음엔 서버 눈으로 보여 줌
-      deviceNote: "지금은 이 기기에서 풀어 본 모습이에요. 다시 켜면 Ideatrail 서버가 아는 것만 남아요", // 새 문구
-      serverNote: "흐린 글자는 Ideatrail이 읽을 수 없는, 사용자만 여는 데이터예요. 또렷한 것은 날짜, 지문, 블록체인 상태뿐이에요", // 새 문구
+      deviceNote: "지금은 이 기기에서 풀어 본 모습이에요. 다시 켜면 Ideatrail이 보관하는 데이터만 선명하게 남아요", // 새 문구
+      serverNote: "선명한 글자는 Ideatrail이 보관하는 데이터예요. 흐린 글자는 사용자의 컴퓨터와 GitHub에 있는 개인 데이터라, Ideatrail은 잠긴 채로만 갖고 있어 읽을 수 없어요", // 새 문구
     },
     benefitsTitle: "써 보면 좋은 점", // 새 문구
     benefits: [

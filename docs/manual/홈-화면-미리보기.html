@@ -85,7 +85,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
   </header>
   <label class="switch" for="srv">
     <span class="cbx"><input type="checkbox" id="srv" checked><svg class="mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path pathLength="1" d="M9 23 C 6 11, 19 4, 29 8 C 37 12, 38 26, 31 33 C 23 39, 9 37, 6 27 C 4 19, 11 11, 21 9"/></svg></span>
-    <span><b>Ideatrail 서버가 보는 모습</b><span class="sub" id="srvNote" aria-live="polite">흐린 글자는 Ideatrail이 읽을 수 없는, 사용자만 여는 데이터예요</span></span>
+    <span><b>Ideatrail 서버가 가진 데이터</b><span class="sub" id="srvNote" aria-live="polite">선명한 글자는 Ideatrail이 보관하는 데이터예요. 흐린 글자는 사용자의 컴퓨터와 GitHub에 있는 개인 데이터라, Ideatrail은 잠긴 채로만 갖고 있어 읽을 수 없어요</span></span>
   </label>
   <div class="main">
     <section aria-label="아이디어 목록">
@@ -107,7 +107,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
     </section>
     <section class="detail" id="detail" aria-live="polite"></section>
   </div>
-  <p class="legend"><span>흐린 글자 = Ideatrail이 읽을 수 없는, 사용자만 여는 데이터</span><span>또렷한 것 = Ideatrail 서버가 아는 것: 날짜 · 지문 · 블록체인 상태</span></p>
+  <p class="legend"><span>선명한 글자 = Ideatrail이 보관하는 데이터: 날짜 · 지문 · 블록체인 상태</span><span>흐린 글자 = 사용자의 컴퓨터와 GitHub에 있는 개인 데이터 (Ideatrail은 못 읽어요)</span></p>
 </div>
 <script>
 const STAGES=["착상","기획 중","기획 확정","개발 중","MVP 완료"];
@@ -162,6 +162,6 @@ $("list").addEventListener("click",e=>{const b=e.target.closest(".card");if(!b)r
 $("sort").addEventListener("change",e=>{sortBy=e.target.value;renderList()});
 $("detail").addEventListener("click",e=>{const b=e.target.closest(".seg");if(!b||b.disabled)return;selStage=+b.dataset.s;renderDetail()});
 document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;tab=b.dataset.tab;document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-pressed",x===b));renderList()});
-$("srv").addEventListener("change",e=>{const on=e.target.checked;$("app").classList.toggle("srv",on);$("srvNote").textContent=on?"흐린 글자는 Ideatrail이 읽을 수 없는, 사용자만 여는 데이터예요":"지금은 이 기기에서 풀어 본 모습이에요. 다시 켜면 Ideatrail 서버가 아는 것만 남아요"});
+$("srv").addEventListener("change",e=>{const on=e.target.checked;$("app").classList.toggle("srv",on);$("srvNote").textContent=on?"선명한 글자는 Ideatrail이 보관하는 데이터예요. 흐린 글자는 사용자의 컴퓨터와 GitHub에 있는 개인 데이터라, Ideatrail은 잠긴 채로만 갖고 있어 읽을 수 없어요":"지금은 이 기기에서 풀어 본 모습이에요. 다시 켜면 Ideatrail이 보관하는 데이터만 선명하게 남아요"});
 render();
 </script>

@@ -17,11 +17,11 @@ test("shows the computer name from the link and removes the secret from the addr
   await expect(home).toContainText("a3f…9c1");
   await expect(home).toContainText("최초 기록");
   // founder: the server view is on by default, so the first look says "the blurred text is not Ideatrail's to read"
-  const toggle = home.getByRole("checkbox", { name: "Ideatrail 서버가 보는 모습" });
+  const toggle = home.getByRole("checkbox", { name: "Ideatrail 서버가 가진 데이터" });
   await expect(toggle).toBeChecked();
   await expect(home.getByTestId("locked").first()).toHaveClass(/blur/);
   await expect(home.getByTestId("locked").first()).toHaveAttribute("aria-hidden", "true");
-  await expect(home).toContainText("Ideatrail이 읽을 수 없는");
+  await expect(home).toContainText("선명한 글자는 Ideatrail이 보관하는 데이터");
   await expect(home).toContainText("a3f…9c1"); // what the server has stays readable
   await toggle.uncheck();
   await expect(home.getByTestId("locked").first()).not.toHaveClass(/blur/);

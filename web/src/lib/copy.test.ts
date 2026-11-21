@@ -79,9 +79,11 @@ describe("screen copy", () => {
     expect(h.chain).toEqual({ done: "블록체인 확산됨", pending: "블록체인 진행 중" });
     for (const v of h.versions) expect(v.file).toMatch(/\.md$/); // one file per version, never the whole project folder
     expect(h.turn).not.toBe(""); // a turning point lives in the stage, not summed
-    expect(h.toggle).toBe("Ideatrail 서버가 보는 모습");
-    expect(h.serverNote).toMatch(/날짜.*지문.*블록체인/);
-    expect(h.serverNote).toContain("Ideatrail이 읽을 수 없는"); // founder: blurred text is not Ideatrail's data
+    expect(h.toggle).toBe("Ideatrail 서버가 가진 데이터");
+    expect(h.serverNote).toMatch(/선명한 글자는 Ideatrail이 보관하는 데이터/);
+    expect(h.serverNote).toMatch(/흐린 글자는 사용자의 컴퓨터와 GitHub/);
+    expect(h.serverNote).toContain("잠긴 채로만"); // true: names exist on the server, locked
+    expect(h.serverNote).not.toMatch(/클라우드|NAS/); // the engine refuses cloud-synced folders
     expect(h.serverFirst).toBe(true);
     expect(h.nameNote).toContain("이 기기에서 풀었어요");
   });
