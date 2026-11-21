@@ -48,8 +48,9 @@ export const COPY = {
       ],
       chain: { done: "블록체인 확산됨", pending: "블록체인 진행 중" },
       toggle: "Ideatrail 서버가 보는 모습", // 새 문구
-      deviceNote: "지금은 이 기기에서 풀어 본 모습이에요", // 새 문구
-      serverNote: "서버에는 날짜, 지문, 블록체인 상태뿐이에요. 흐린 글자는 잠긴 채로만 있어요", // 새 문구
+      serverFirst: true, // founder: 처음엔 서버 눈으로 보여 줌
+      deviceNote: "지금은 이 기기에서 풀어 본 모습이에요. 다시 켜면 Ideatrail 서버가 아는 것만 남아요", // 새 문구
+      serverNote: "흐린 글자는 Ideatrail이 읽을 수 없는, 사용자만 여는 데이터예요. 또렷한 것은 날짜, 지문, 블록체인 상태뿐이에요", // 새 문구
     },
     benefitsTitle: "써 보면 좋은 점", // 새 문구
     benefits: [

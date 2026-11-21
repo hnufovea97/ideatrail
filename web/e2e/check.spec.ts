@@ -16,11 +16,15 @@ test("shows the computer name from the link and removes the secret from the addr
   const home = page.getByRole("region", { name: /나중엔 이렇게 한눈에 봐요/ });
   await expect(home).toContainText("a3f…9c1");
   await expect(home).toContainText("최초 기록");
-  await expect(home.getByTestId("locked").first()).not.toHaveClass(/blur/);
-  await home.getByRole("checkbox", { name: "Ideatrail 서버가 보는 모습" }).check();
+  // founder: the server view is on by default, so the first look says "the blurred text is not Ideatrail's to read"
+  const toggle = home.getByRole("checkbox", { name: "Ideatrail 서버가 보는 모습" });
+  await expect(toggle).toBeChecked();
   await expect(home.getByTestId("locked").first()).toHaveClass(/blur/);
   await expect(home.getByTestId("locked").first()).toHaveAttribute("aria-hidden", "true");
+  await expect(home).toContainText("Ideatrail이 읽을 수 없는");
   await expect(home).toContainText("a3f…9c1"); // what the server has stays readable
+  await toggle.uncheck();
+  await expect(home.getByTestId("locked").first()).not.toHaveClass(/blur/);
   await expect(page.getByRole("region", { name: "써 보면 좋은 점" }).getByRole("listitem")).toHaveCount(3);
   const map = page.getByRole("region", { name: "안심하고 쓰는 이유: 무엇이 어디에 생기나요" });
   await expect(map.getByRole("listitem")).toHaveCount(4);

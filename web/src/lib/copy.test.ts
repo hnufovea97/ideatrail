@@ -81,6 +81,8 @@ describe("screen copy", () => {
     expect(h.turn).not.toBe(""); // a turning point lives in the stage, not summed
     expect(h.toggle).toBe("Ideatrail 서버가 보는 모습");
     expect(h.serverNote).toMatch(/날짜.*지문.*블록체인/);
+    expect(h.serverNote).toContain("Ideatrail이 읽을 수 없는"); // founder: blurred text is not Ideatrail's data
+    expect(h.serverFirst).toBe(true);
     expect(h.nameNote).toContain("이 기기에서 풀었어요");
   });
 });

@@ -63,7 +63,14 @@ input[type="text"] { font: inherit; padding: 10px; border-radius: 8px; border: 1
 
 /* ADR-0018: first-screen home example + server-view switch */
 .mini-home { margin: 18px 0; }
-.server-toggle { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.server-toggle { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; padding: 10px 0 10px 12px; }
+.server-toggle .cbx { position: relative; display: inline-grid; place-items: center; flex: none; }
+.server-toggle input { margin: 0; }
+.server-toggle .mark { position: absolute; left: -11px; top: -11px; width: 40px; height: 40px; pointer-events: none; overflow: visible; }
+.server-toggle .mark path { fill: none; stroke: var(--warn); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 0; }
+@media (prefers-reduced-motion: no-preference) { .server-toggle .mark path { animation: mark-draw 3.2s ease-in-out infinite; } }
+@keyframes mark-draw { 0% { stroke-dashoffset: 1; opacity: 1; } 45% { stroke-dashoffset: 0; opacity: 1; } 80% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
+.server-note.on { color: var(--warn); }
 .server-note { color: var(--muted); font-size: 0.85rem; margin: 4px 0 8px; }
 .mini-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
 .mini-name { font-weight: 700; margin: 0; }

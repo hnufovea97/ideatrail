@@ -4,9 +4,9 @@
 <style>
 /* Layout: list of ideas on the left, the chosen idea on the right (stacked on phones); same tokens as the signup screen */
 :root{--fg:#1b1b1f;--muted:#5b5b66;--bg:#ffffff;--panel:#f6f7fb;--line:#d9d9e0;--accent:#1f5eff;--accent-soft:#e8eeff;--accent-fg:#ffffff;--ok:#1e7b34;--ok-soft:#e6f4ea;--wait:#8a5a00;--wait-soft:#fdf3e1;
---sans:"Noto Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fg:#ececf1;--muted:#a6a6b3;--bg:#15151a;--panel:#1d1d24;--line:#33333d;--accent:#7aa2ff;--accent-soft:#1f2a4a;--accent-fg:#0b0b0f;--ok:#7bd88f;--ok-soft:#173322;--wait:#f0c060;--wait-soft:#3a2e12;color-scheme:dark}}
-:root[data-theme="dark"]{--fg:#ececf1;--muted:#a6a6b3;--bg:#15151a;--panel:#1d1d24;--line:#33333d;--accent:#7aa2ff;--accent-soft:#1f2a4a;--accent-fg:#0b0b0f;--ok:#7bd88f;--ok-soft:#173322;--wait:#f0c060;--wait-soft:#3a2e12;color-scheme:dark}
+--mark:#d93025;--sans:"Noto Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--mark:#ff7a6e;--fg:#ececf1;--muted:#a6a6b3;--bg:#15151a;--panel:#1d1d24;--line:#33333d;--accent:#7aa2ff;--accent-soft:#1f2a4a;--accent-fg:#0b0b0f;--ok:#7bd88f;--ok-soft:#173322;--wait:#f0c060;--wait-soft:#3a2e12;color-scheme:dark}}
+:root[data-theme="dark"]{--mark:#ff7a6e;--fg:#ececf1;--muted:#a6a6b3;--bg:#15151a;--panel:#1d1d24;--line:#33333d;--accent:#7aa2ff;--accent-soft:#1f2a4a;--accent-fg:#0b0b0f;--ok:#7bd88f;--ok-soft:#173322;--wait:#f0c060;--wait-soft:#3a2e12;color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .wrap{max-width:1080px;margin:0 auto;display:grid;gap:14px}
@@ -15,7 +15,14 @@ header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:s
 header h1{font-size:20px;margin:0;text-wrap:balance}
 .status{font-size:13px;color:var(--muted)}
 .switch{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
-.switch input{width:18px;height:18px;accent-color:var(--accent)}
+.cbx{position:relative;display:inline-grid;place-items:center;flex:none}
+.switch input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.mark{position:absolute;left:-11px;top:-11px;width:40px;height:40px;pointer-events:none;overflow:visible}
+.mark path{fill:none;stroke:var(--mark);stroke-width:2;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:0}
+@media (prefers-reduced-motion:no-preference){.mark path{animation:draw 3.2s ease-in-out infinite}}
+@keyframes draw{0%{stroke-dashoffset:1;opacity:1}45%{stroke-dashoffset:0;opacity:1}80%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.cbx:not(:has(input:checked)) .mark{display:none}
+.switch .sub#srvNote{color:var(--mark)}
 .switch b{font-weight:500}
 .switch span.sub{display:block;font-size:13px;color:var(--muted)}
 .main{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:16px;align-items:start}
@@ -70,15 +77,15 @@ header h1{font-size:20px;margin:0;text-wrap:balance}
 button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
 </style>
-<div class="wrap" id="app">
+<div class="wrap srv" id="app">
   <p class="note">미리보기예요 · 데이터는 예시예요 · 아이디어 카드와 단계 막대를 눌러 보세요</p>
   <header>
     <h1>내 생각의 기록</h1>
     <span class="status">기록 사슬 정상 · 마지막 확인 Mac 9:12</span>
   </header>
   <label class="switch" for="srv">
-    <input type="checkbox" id="srv">
-    <span><b>Ideatrail 서버가 보는 모습</b><span class="sub" id="srvNote" aria-live="polite">지금은 이 기기에서 풀어 본 모습이에요</span></span>
+    <span class="cbx"><input type="checkbox" id="srv" checked><svg class="mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path pathLength="1" d="M9 23 C 6 11, 19 4, 29 8 C 37 12, 38 26, 31 33 C 23 39, 9 37, 6 27 C 4 19, 11 11, 21 9"/></svg></span>
+    <span><b>Ideatrail 서버가 보는 모습</b><span class="sub" id="srvNote" aria-live="polite">흐린 글자는 Ideatrail이 읽을 수 없는, 사용자만 여는 데이터예요</span></span>
   </label>
   <div class="main">
     <section aria-label="아이디어 목록">
@@ -100,7 +107,7 @@ button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(-
     </section>
     <section class="detail" id="detail" aria-live="polite"></section>
   </div>
-  <p class="legend"><span>흐려지는 글자 = 서버에는 잠긴 채로만 있어요</span><span>또렷한 것 = 날짜 · 지문 · 블록체인 상태</span></p>
+  <p class="legend"><span>흐린 글자 = Ideatrail이 읽을 수 없는, 사용자만 여는 데이터</span><span>또렷한 것 = Ideatrail 서버가 아는 것: 날짜 · 지문 · 블록체인 상태</span></p>
 </div>
 <script>
 const STAGES=["착상","기획 중","기획 확정","개발 중","MVP 완료"];
@@ -155,6 +162,6 @@ $("list").addEventListener("click",e=>{const b=e.target.closest(".card");if(!b)r
 $("sort").addEventListener("change",e=>{sortBy=e.target.value;renderList()});
 $("detail").addEventListener("click",e=>{const b=e.target.closest(".seg");if(!b||b.disabled)return;selStage=+b.dataset.s;renderDetail()});
 document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;tab=b.dataset.tab;document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-pressed",x===b));renderList()});
-$("srv").addEventListener("change",e=>{const on=e.target.checked;$("app").classList.toggle("srv",on);$("srvNote").textContent=on?"서버에는 날짜, 지문, 블록체인 상태뿐이에요. 흐린 글자는 잠긴 채로만 있어요":"지금은 이 기기에서 풀어 본 모습이에요"});
+$("srv").addEventListener("change",e=>{const on=e.target.checked;$("app").classList.toggle("srv",on);$("srvNote").textContent=on?"흐린 글자는 Ideatrail이 읽을 수 없는, 사용자만 여는 데이터예요":"지금은 이 기기에서 풀어 본 모습이에요. 다시 켜면 Ideatrail 서버가 아는 것만 남아요"});
 render();
 </script>
