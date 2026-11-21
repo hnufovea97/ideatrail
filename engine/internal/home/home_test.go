@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -29,12 +30,15 @@ func TestRefusesSyncthingFolder(t *testing.T) {
 func TestRefusesCloudLocations(t *testing.T) {
 	fake := t.TempDir()
 	t.Setenv("HOME", fake)
-	for _, p := range []string{
+	paths := []string{
 		filepath.Join(fake, "Library", "Mobile Documents", "com~apple~CloudDocs", "x"),
 		filepath.Join(fake, "Library", "CloudStorage", "OneDrive-Personal", "x"),
 		filepath.Join(fake, "Dropbox", "x"),
-		filepath.Join(fake, "LIBRARY", "cloudstorage", "GoogleDrive", "x"), // case-insensitive on darwin
-	} {
+	}
+	if runtime.GOOS == "darwin" { // Mac folders ignore case; Linux folders do not (CI ubuntu)
+		paths = append(paths, filepath.Join(fake, "LIBRARY", "cloudstorage", "GoogleDrive", "x"))
+	}
+	for _, p := range paths {
 		if ok, _ := Synced(p); !ok {
 			t.Errorf("%s not detected", p)
 		}

@@ -9,7 +9,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Windows는 베타 뒤 (ADR-0017: 첫 베타는 Mac만). Windows를 다시 붙일 때 이 줄에 windows-latest를 되돌린다
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
