@@ -55,14 +55,33 @@ input[type="text"] { font: inherit; padding: 10px; border-radius: 8px; border: 1
 .bubble { border-radius: 14px; padding: 10px 14px; margin: 6px 0; max-width: 90%; }
 .bubble.say { margin-left: auto; background: var(--accent); color: var(--accent-fg); border-bottom-right-radius: 4px; }
 .bubble.reply { border: 1px solid var(--line); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.85rem; border-bottom-left-radius: 4px; }
-.later-title { color: var(--muted); font-size: 0.85rem; margin: 14px 0 4px; }
-.later { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--accent); display: grid; gap: 8px; }
-.later li { display: grid; gap: 2px; }
-.later-stage { font-weight: 700; }
-.later-when { color: var(--muted); font-size: 0.85rem; }
-.later-chose { font-size: 0.85rem; }
 .benefits ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
 .benefits li { display: grid; grid-template-columns: 28px minmax(0, 1fr); column-gap: 10px; }
 .benefit-icon { width: 28px; height: 28px; color: var(--accent); grid-row: span 2; }
 .benefit-head { font-weight: 700; }
 .benefit-body { color: var(--muted); font-size: 0.9rem; }
+
+/* ADR-0018: first-screen home example + server-view switch */
+.mini-home { margin: 18px 0; }
+.server-toggle { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.server-note { color: var(--muted); font-size: 0.85rem; margin: 4px 0 8px; }
+.mini-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.mini-name { font-weight: 700; margin: 0; }
+.mini-dates, .mini-note { color: var(--muted); font-size: 0.82rem; margin: 2px 0; }
+.mini-bar { list-style: none; padding: 0; margin: 10px 0 6px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; font-size: 0.72rem; color: var(--muted); }
+.mini-bar li { border-top: 6px solid var(--line); padding-top: 3px; overflow-wrap: anywhere; }
+.mini-bar li.on { border-top-color: var(--accent); }
+.mini-bar li[aria-current] { color: var(--fg); font-weight: 700; }
+.mini-stage { font-size: 0.85rem; margin: 8px 0 4px; }
+.mini-versions { list-style: none; padding: 0; margin: 0; }
+.mini-versions li { display: grid; grid-template-columns: 4.5em minmax(0, 1fr) auto; gap: 2px 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 0.82rem; }
+.mini-when { color: var(--muted); grid-row: span 2; }
+.mini-what { display: grid; }
+.mini-file { color: var(--muted); font-size: 0.78rem; }
+.mini-fp { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.mini-chain { grid-column: 2 / 4; font-size: 0.78rem; }
+.mini-chain.done { color: var(--ok); }
+.mini-chain.pending { color: var(--muted); }
+.locked { transition: filter 0.2s; }
+.locked.blur { filter: blur(5px); user-select: none; }
+@media (prefers-reduced-motion: reduce) { .locked { transition: none; } }

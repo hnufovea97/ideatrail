@@ -1,0 +1,144 @@
+<title>Ideatrail 홈 화면</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: list of ideas on the left, the chosen idea on the right (stacked on phones); same tokens as the signup screen */
+:root{--fg:#1b1b1f;--muted:#5b5b66;--bg:#ffffff;--panel:#f6f7fb;--line:#d9d9e0;--accent:#1f5eff;--accent-soft:#e8eeff;--accent-fg:#ffffff;--ok:#1e7b34;--ok-soft:#e6f4ea;--wait:#8a5a00;--wait-soft:#fdf3e1;
+--sans:"Noto Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;--mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fg:#ececf1;--muted:#a6a6b3;--bg:#15151a;--panel:#1d1d24;--line:#33333d;--accent:#7aa2ff;--accent-soft:#1f2a4a;--accent-fg:#0b0b0f;--ok:#7bd88f;--ok-soft:#173322;--wait:#f0c060;--wait-soft:#3a2e12;color-scheme:dark}}
+:root[data-theme="dark"]{--fg:#ececf1;--muted:#a6a6b3;--bg:#15151a;--panel:#1d1d24;--line:#33333d;--accent:#7aa2ff;--accent-soft:#1f2a4a;--accent-fg:#0b0b0f;--ok:#7bd88f;--ok-soft:#173322;--wait:#f0c060;--wait-soft:#3a2e12;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:14px}
+.note{font-size:13px;color:var(--muted);background:var(--panel);border-radius:10px;padding:8px 12px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+header h1{font-size:20px;margin:0;text-wrap:balance}
+.status{font-size:13px;color:var(--muted)}
+.switch{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.switch input{width:18px;height:18px;accent-color:var(--accent)}
+.switch b{font-weight:500}
+.switch span.sub{display:block;font-size:13px;color:var(--muted)}
+.main{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:760px){.main{grid-template-columns:minmax(0,1fr)}}
+.tabs{display:flex;gap:6px;margin:0 0 10px}
+.tabs button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:999px;padding:4px 12px;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:transparent}
+.list{display:grid;gap:8px}
+.card{font:inherit;text-align:left;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;display:grid;gap:4px}
+.card[aria-current="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.card .nm{font-weight:700}
+.small{font-size:13px;color:var(--muted)}
+.mini{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.mini i{display:block;height:100%;background:var(--accent)}
+.detail{border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px;min-width:0}
+.detail h2{font-size:19px;margin:0}
+.tags{font-size:13px;color:var(--muted)}
+.dates{display:flex;flex-wrap:wrap;gap:8px}
+.date{background:var(--panel);border-radius:8px;padding:6px 10px;font-size:13px}
+.date b{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.how{font-size:12px;color:var(--muted)}
+.how a{color:var(--accent)}
+.bar{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+.seg{font:inherit;color:inherit;background:none;border:0;padding:0;text-align:left;cursor:pointer;display:grid;gap:4px;min-width:0}
+.seg .ln{height:9px;border-radius:5px;background:var(--line)}
+.seg.done .ln{background:var(--accent)}
+.seg[aria-pressed="true"] .ln{outline:2px solid var(--accent);outline-offset:2px}
+.seg .sn{font-size:13px;overflow-wrap:anywhere}
+.seg .sd{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.seg:disabled{cursor:default}
+.panel{background:var(--panel);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+.ph{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ph strong{font-size:16px}
+.chip{font-size:12px;border-radius:999px;padding:2px 9px;background:var(--bg);border:1px solid var(--line)}
+.chip.turn{border-color:var(--accent);color:var(--accent)}
+.vers{list-style:none;margin:0;padding:0;display:grid}
+.ver{display:grid;grid-template-columns:4.2em minmax(0,1fr) auto;gap:2px 10px;padding:9px 0;border-top:1px solid var(--line);align-items:center}
+.ver .w{font-size:13px;color:var(--muted);font-family:var(--mono)}
+.ver .wh{min-width:0}
+.ver .f{display:block;font-size:12px;color:var(--muted)}
+.ver .r{display:grid;gap:3px;justify-items:end}
+.fp{font-family:var(--mono);font-size:13px}
+.pill{font-size:12px;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.pill.done{background:var(--ok-soft);color:var(--ok)}
+.pill.pending{background:var(--wait-soft);color:var(--wait)}
+.empty{font-size:13px;color:var(--muted)}
+.lk{transition:filter .2s}
+.srv .lk{filter:blur(6px);user-select:none}
+@media (prefers-reduced-motion:reduce){.lk{transition:none}}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
+</style>
+<div class="wrap" id="app">
+  <p class="note">미리보기예요 · 데이터는 예시예요 · 아이디어 카드와 단계 막대를 눌러 보세요</p>
+  <header>
+    <h1>내 생각의 기록</h1>
+    <span class="status">기록 사슬 정상 · 마지막 확인 Mac 9:12</span>
+  </header>
+  <label class="switch" for="srv">
+    <input type="checkbox" id="srv">
+    <span><b>Ideatrail 서버가 보는 모습</b><span class="sub" id="srvNote" aria-live="polite">지금은 이 기기에서 풀어 본 모습이에요</span></span>
+  </label>
+  <div class="main">
+    <section aria-label="아이디어 목록">
+      <div class="tabs" role="group" aria-label="보기">
+        <button type="button" data-tab="all" aria-pressed="true">전체</button>
+        <button type="button" data-tab="pub" aria-pressed="false">공개</button>
+        <button type="button" data-tab="pri" aria-pressed="false">비공개</button>
+      </div>
+      <div class="list" id="list"></div>
+    </section>
+    <section class="detail" id="detail" aria-live="polite"></section>
+  </div>
+  <p class="legend"><span>흐려지는 글자 = 서버에는 잠긴 채로만 있어요</span><span>또렷한 것 = 날짜 · 지문 · 블록체인 상태</span></p>
+</div>
+<script>
+const STAGES=["착상","기획 중","기획 확정","개발 중","MVP 완료"];
+const IDEAS=[
+ {name:"공정 가계부 앱",pri:true,tags:["가계부","1인가구"],first:"2026.09.03",last:"2026.10.11",stage:3,
+  stages:[
+   {d:"09.03",range:"09.03 – 09.05",decided:0,deferred:0,turn:"",vers:[{w:"09.03",t:"개요 · 혼자 쓰는 가계부",f:"아이디어-메모.md",fp:"1c4…e7a",c:"done"}]},
+   {d:"09.06",range:"09.06 – 09.09",decided:1,deferred:1,turn:"",vers:[{w:"09.09",t:"초안 · 맞벌이 부부 대상",f:"기획-초안.md",fp:"8e0…41d",c:"done"},{w:"09.06",t:"개요 보강",f:"아이디어-메모.md",fp:"2b9…c60",c:"done"}]},
+   {d:"09.10",range:"09.10 – 10.11",decided:2,deferred:1,turn:"카드 연동 빼기",vers:[{w:"10.11",t:"개선 2 · 수익 모델 뺌",f:"기획서.md",fp:"a3f…9c1",c:"pending"},{w:"10.02",t:"개선 1 · 1인 가구로 대상 바꿈",f:"결정-대상.md",fp:"5d2…0b3",c:"done"},{w:"09.10",t:"기획 확정",f:"기획서.md",fp:"77a…e12",c:"done"}]}
+  ]},
+ {name:"인터뷰 도우미",pri:true,tags:["리서치"],first:"2026.10.01",last:"2026.10.20",stage:2,
+  stages:[
+   {d:"10.01",range:"10.01 – 10.07",decided:1,deferred:0,turn:"",vers:[{w:"10.01",t:"개요 · 질문을 대신 정리",f:"착안.md",fp:"7be…d04",c:"done"}]},
+   {d:"10.08",range:"10.08 – 10.20",decided:1,deferred:2,turn:"녹음 기능 미루기",vers:[{w:"10.20",t:"초안 · 질문 목록만 먼저",f:"기획-초안.md",fp:"e51…90a",c:"pending"}]}
+  ]},
+ {name:"피아노 연습 기록기",pri:false,tags:["취미"],first:"2026.10.08",last:"2026.10.08",stage:1,
+  stages:[{d:"10.08",range:"10.08",decided:0,deferred:0,turn:"",vers:[{w:"10.08",t:"개요",f:"메모.md",fp:"03d…b7f",c:"pending"}]}]}
+];
+let sel=0,selStage=IDEAS[0].stage-1,tab="all";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const lock=pri=>pri?' <span role="img" aria-label="비공개">🔒</span>':"";
+const sum=(d,k)=>d.stages.reduce((a,s)=>a+s[k],0);
+function renderList(){
+ const show=IDEAS.map((d,i)=>[d,i]).filter(([d])=>tab==="all"||(tab==="pri")===d.pri);
+ $("list").innerHTML=show.length?show.map(([d,i])=>`<button type="button" class="card" data-i="${i}" aria-current="${i===sel}">
+  <span class="nm"><span class="lk">${esc(d.name)}</span>${lock(d.pri)}</span>
+  <span class="small"><span class="lk">${d.stage}/5 ${STAGES[d.stage-1]}</span></span>
+  <span class="mini" aria-hidden="true"><i style="width:${d.stage*20}%"></i></span>
+  <span class="small">최초 ${d.first.slice(5)} · 마지막 ${d.last.slice(5)}</span></button>`).join(""):`<p class="empty">공개 기록이 없어요. 기록은 기본 비공개예요.</p>`;
+}
+function renderDetail(){
+ const d=IDEAS[sel],st=d.stages[selStage];
+ const segs=STAGES.map((s,i)=>{const has=i<d.stages.length;return `<button type="button" class="seg ${i<d.stage?"done":""}" data-s="${i}" aria-pressed="${i===selStage}" ${has?"":"disabled"}><span class="ln"></span><span class="sn lk">${s}</span><span class="sd">${has?d.stages[i].d:"—"}</span></button>`}).join("");
+ const panel=st?`<div class="panel"><div class="ph"><strong class="lk">${STAGES[selStage]}</strong><span class="small">${st.range}</span>
+   <span class="chip lk">결정 ${st.decided}</span><span class="chip lk">미룸 ${st.deferred}</span>${st.turn?`<span class="chip turn lk">변곡점 · ${esc(st.turn)}</span>`:""}</div>
+   <ul class="vers">${st.vers.map(v=>`<li class="ver"><span class="w">${v.w}</span><span class="wh"><span class="lk">${esc(v.t)}</span><span class="f lk">원래 위치: ${esc(v.f)}</span></span>
+   <span class="r"><span class="fp" title="지문 앞뒤 3자리">${v.fp}</span><span class="pill ${v.c}">${v.c==="done"?"블록체인 확산됨":"블록체인 진행 중"}</span></span></li>`).join("")}</ul></div>`
+  :`<p class="empty">아직 이 단계에 오지 않았어요.</p>`;
+ $("detail").innerHTML=`<div><h2><span class="lk">${esc(d.name)}</span>${lock(d.pri)}</h2>
+  <p class="tags lk">${d.tags.map(t=>"#"+esc(t)).join(" ")} · 결정 ${sum(d,"decided")} · 미룸 ${sum(d,"deferred")} · Claude Code가 기록</p>
+  <p class="how lk">이 제목은 이 기기에서 풀었어요 · <a href="#how" onclick="return false">어떻게?</a></p></div>
+  <div class="dates"><span class="date"><b>최초 기록</b>${d.first}</span><span class="date"><b>마지막 기록</b>${d.last}</span></div>
+  <div class="bar" role="group" aria-label="단계 ${d.stage}/5">${segs}</div>${panel}`;
+}
+function render(){renderList();renderDetail()}
+$("list").addEventListener("click",e=>{const b=e.target.closest(".card");if(!b)return;sel=+b.dataset.i;selStage=IDEAS[sel].stage-1;render()});
+$("detail").addEventListener("click",e=>{const b=e.target.closest(".seg");if(!b||b.disabled)return;selStage=+b.dataset.s;renderDetail()});
+document.querySelector(".tabs").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;tab=b.dataset.tab;document.querySelectorAll(".tabs button").forEach(x=>x.setAttribute("aria-pressed",x===b));renderList()});
+$("srv").addEventListener("change",e=>{const on=e.target.checked;$("app").classList.toggle("srv",on);$("srvNote").textContent=on?"서버에는 날짜, 지문, 블록체인 상태뿐이에요. 흐린 글자는 잠긴 채로만 있어요":"지금은 이 기기에서 풀어 본 모습이에요"});
+render();
+</script>

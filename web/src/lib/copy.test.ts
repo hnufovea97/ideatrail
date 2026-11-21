@@ -54,7 +54,7 @@ describe("screen copy", () => {
     expect(COPY.intro.what).toContain("기록해 줘");
     expect(COPY.intro.benefits.map((b) => b.key)).toEqual(["say", "find", "safe"]);
     // the not-yet-built overview is always marked, never promised as if it exists
-    expect(COPY.intro.example.laterTitle).toContain("곧 생겨요");
+    expect(COPY.intro.home.title).toContain("곧 생겨요");
     expect(COPY.intro.benefits[1].body).toContain("곧");
     expect(COPY.done.next[0]).toContain("기록해 줘");
     // "기억해 줘" reads as setting the AI's memory (founder); the record words are the user's own
@@ -70,5 +70,17 @@ describe("screen copy", () => {
     expect(COPY.github.steps.at(-1)).toMatch(/all set/);
     expect(COPY.github.steps.at(-1)).toMatch(/돌아오세요/);
     expect(COPY.github.waiting).toMatch(/돌아오세요/);
+  });
+  it("first-screen home example follows the prototype home with today's decisions (ADR-0018)", () => {
+    const h = COPY.intro.home;
+    expect(h.stages).toEqual(["착상", "기획 중", "기획 확정", "개발 중", "MVP 완료"]);
+    for (const v of h.versions) expect(v.fp).toMatch(/^[0-9a-f]{3}…[0-9a-f]{3}$/); // start and end only
+    expect(h.versions.map((v) => v.chain).sort()).toEqual(["done", "pending"]);
+    expect(h.chain).toEqual({ done: "블록체인 확산됨", pending: "블록체인 진행 중" });
+    for (const v of h.versions) expect(v.file).toMatch(/\.md$/); // one file per version, never the whole project folder
+    expect(h.turn).not.toBe(""); // a turning point lives in the stage, not summed
+    expect(h.toggle).toBe("Ideatrail 서버가 보는 모습");
+    expect(h.serverNote).toMatch(/날짜.*지문.*블록체인/);
+    expect(h.nameNote).toContain("이 기기에서 풀었어요");
   });
 });

@@ -13,6 +13,14 @@ test("shows the computer name from the link and removes the secret from the addr
   await expect(page.getByText("약 5분 걸려요", { exact: false })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("이거 괜찮은데?");
   await expect(page.getByRole("region", { name: "이렇게 써요" })).toContainText("기록해 줘");
+  const home = page.getByRole("region", { name: /나중엔 이렇게 한눈에 봐요/ });
+  await expect(home).toContainText("a3f…9c1");
+  await expect(home).toContainText("최초 기록");
+  await expect(home.getByTestId("locked").first()).not.toHaveClass(/blur/);
+  await home.getByRole("checkbox", { name: "Ideatrail 서버가 보는 모습" }).check();
+  await expect(home.getByTestId("locked").first()).toHaveClass(/blur/);
+  await expect(home.getByTestId("locked").first()).toHaveAttribute("aria-hidden", "true");
+  await expect(home).toContainText("a3f…9c1"); // what the server has stays readable
   await expect(page.getByRole("region", { name: "써 보면 좋은 점" }).getByRole("listitem")).toHaveCount(3);
   const map = page.getByRole("region", { name: "안심하고 쓰는 이유: 무엇이 어디에 생기나요" });
   await expect(map.getByRole("listitem")).toHaveCount(4);

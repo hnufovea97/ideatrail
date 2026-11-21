@@ -27,11 +27,29 @@ export const COPY = {
     example: {
       say: "좋아, 이 방향으로 가자. 왜 이걸 골랐는지까지 기록해 줘",
       reply: "기록했어요 · 가계부 앱 · 단계: 기획 확정 (AI 추정)",
-      laterTitle: "나중엔 이렇게 한눈에 봐요 (곧 생겨요)",
-      later: [
-        { when: "11월 3일", stage: "아이디어", chose: "" },
-        { when: "11월 18일", stage: "기획 확정", chose: "고른 것: 카드 연동 없이 직접 입력 · 이유: 금융 정보를 넘기기 싫어서 · 안 하기로 한 것: 가족 공유" },
+    },
+    // ADR-0018: the confirmed home (prototype shape) as a small example, with the server-view switch
+    home: {
+      title: "나중엔 이렇게 한눈에 봐요 (예시 · 곧 생겨요)", // 새 문구
+      name: "가계부 앱",
+      nameNote: "이 이름은 이 기기에서 풀었어요", // 새 문구
+      first: "11월 3일",
+      last: "11월 18일",
+      labels: { first: "최초 기록", last: "마지막 기록", decided: "결정", deferred: "미룸", turn: "변곡점", file: "원래 위치" },
+      stages: ["착상", "기획 중", "기획 확정", "개발 중", "MVP 완료"],
+      current: 2,
+      stageRange: "11월 10일 – 18일",
+      decided: 2,
+      deferred: 1,
+      turn: "카드 연동 빼기",
+      versions: [
+        { when: "11월 18일", what: "개선 1 · 카드 연동 빼기", file: "결정-카드연동.md", fp: "a3f…9c1", chain: "pending" },
+        { when: "11월 10일", what: "초안", file: "기획-초안.md", fp: "5d2…0b3", chain: "done" },
       ],
+      chain: { done: "블록체인 확산됨", pending: "블록체인 진행 중" },
+      toggle: "Ideatrail 서버가 보는 모습", // 새 문구
+      deviceNote: "지금은 이 기기에서 풀어 본 모습이에요", // 새 문구
+      serverNote: "서버에는 날짜, 지문, 블록체인 상태뿐이에요. 흐린 글자는 잠긴 채로만 있어요", // 새 문구
     },
     benefitsTitle: "써 보면 좋은 점", // 새 문구
     benefits: [

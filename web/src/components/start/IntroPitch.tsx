@@ -1,5 +1,6 @@
 import type { JSX } from "preact";
 import { COPY } from "../../lib/copy";
+import { IntroHome } from "./IntroHome";
 
 type Key = (typeof COPY.intro.benefits)[number]["key"];
 
@@ -10,7 +11,7 @@ const ICONS: Record<Key, JSX.Element> = {
   safe: <><rect x="5" y="10" width="14" height="10" rx="1.5" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></>,
 };
 
-/** Step 0's pitch: one familiar scene, what it looks like later, then three benefits. */
+/** Step 0's pitch: one familiar scene, the home it becomes (ADR-0018), then three benefits. */
 export function IntroPitch() {
   const ex = COPY.intro.example;
   return (
@@ -19,16 +20,8 @@ export function IntroPitch() {
         <h2 id="example-title">{COPY.intro.exampleTitle}</h2>
         <p class="bubble say">{ex.say}</p>
         <p class="bubble reply">{ex.reply}</p>
-        <p class="later-title">{ex.laterTitle}</p>
-        <ol class="later">
-          {ex.later.map((l) => (
-            <li key={l.when}>
-              <span class="later-stage">{l.stage}</span> <span class="later-when">{l.when}</span>
-              {l.chose ? <span class="later-chose">{l.chose}</span> : null}
-            </li>
-          ))}
-        </ol>
       </section>
+      <IntroHome />
       <section class="benefits" aria-labelledby="benefits-title">
         <h2 id="benefits-title">{COPY.intro.benefitsTitle}</h2>
         <ul>
