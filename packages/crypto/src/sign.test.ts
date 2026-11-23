@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { sha256 } from "@noble/hashes/sha2.js";
 import data from "../../../spec/vectors/sign.json";
 import { messageFor, sign, verify, type Signable } from "./sign";
 import { fromB64u, fromHex, toB64u, toHex } from "./bytes";
@@ -73,5 +74,29 @@ describe("sign §8", () => {
     expect(() => messageFor({ ...rec, recordedAt: "2026-11-14 05:12:03" })).toThrow("bad_field");
     expect(() => messageFor({ ...rec, parents: [ID, ID] })).toThrow("bad_field");
     expect(() => messageFor({ type: "repo_head", userId: ID, engineId: ID2, commitSha: "xyz", unixTs: 1n })).toThrow("bad_field");
+  });
+});
+
+describe("record message from the server's stored hashes (M5a, spec §8)", () => {
+  for (const v of data.vectors.filter((x) => x.name.startsWith("record"))) {
+    it(`${v.name}: same bytes and signature as the full record`, () => {
+      const i = inputOf(v);
+      const msg = messageFor({
+        type: "record_hashed", userId: i.user_id, rootId: i.root_id, recordId: i.record_id, parents: i.parents ? i.parents.split(",") : [],
+        commitmentHex: i.commitment_hex, metaSealed: fromHex(i.meta_sealed_hex),
+        bodyHashHex: toHex(sha256(fromHex(i.body_sealed_hex))), nonceHashHex: toHex(sha256(fromHex(i.nonce_sealed_hex))),
+        logSeq: BigInt(i.log_seq), recordedAt: i.recorded_at,
+      });
+      expect(toHex(msg)).toBe(v.message_hex);
+      expect(verify(fromHex(data.public_hex), msg, v.signature_b64u)).toBe(true);
+    });
+  }
+  it("refuses hashes that are not lowercase hex of 64 characters", () => {
+    const base = { type: "record_hashed" as const, userId: ID, rootId: ID, recordId: ID2, parents: [], commitmentHex: "a".repeat(64), metaSealed: new Uint8Array([1]),
+      bodyHashHex: "b".repeat(64), nonceHashHex: "c".repeat(64), logSeq: 1n, recordedAt: "2026-11-14T05:12:03Z" };
+    expect(() => messageFor(base)).not.toThrow();
+    expect(() => messageFor({ ...base, bodyHashHex: "B".repeat(64) })).toThrow("bad_field");
+    expect(() => messageFor({ ...base, nonceHashHex: "c".repeat(63) })).toThrow("bad_field");
+    expect(() => messageFor({ ...base, bodyHashHex: `${"b".repeat(63)}\n` })).toThrow("bad_field");
   });
 });

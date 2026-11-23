@@ -6,6 +6,7 @@ import { idField, joinFields, orDash, SEP_SIGN } from "./format";
 export type Signable =
   | { type: "request"; method: string; path: string; body: Uint8Array; engineId: string; reqSeq: bigint; unixTs: bigint }
   | { type: "record"; userId: string; rootId: string; recordId: string; parents: string[]; commitmentHex: string; metaSealed: Uint8Array; bodySealed: Uint8Array; nonceSealed: Uint8Array; logSeq: bigint; recordedAt: string }
+  | { type: "record_hashed"; userId: string; rootId: string; recordId: string; parents: string[]; commitmentHex: string; metaSealed: Uint8Array; bodyHashHex: string; nonceHashHex: string; logSeq: bigint; recordedAt: string }
   | { type: "delta"; userId: string; rootId: string; deltaId: string; deltaSealed: Uint8Array; logSeq: bigint; createdAt: string }
   | { type: "storage_link"; userId: string; engineId: string; tokenSealed: Uint8Array; unixTs: bigint }
   | { type: "repo_head"; userId: string; engineId: string; commitSha: string; unixTs: bigint }
@@ -47,6 +48,9 @@ function fields(s: Signable): string[] {
     case "record":
       return ["ideatrail-v1-record", idField(s.userId), idField(s.rootId), idField(s.recordId), parents(s.parents), match(SHA256_HEX, s.commitmentHex),
         h(s.metaSealed), h(s.bodySealed), h(s.nonceSealed), u64(s.logSeq), match(TIME, s.recordedAt)];
+    case "record_hashed": // the dashboard has only D1's hashes of the GitHub-side blobs (M5a); same bytes as "record"
+      return ["ideatrail-v1-record", idField(s.userId), idField(s.rootId), idField(s.recordId), parents(s.parents), match(SHA256_HEX, s.commitmentHex),
+        h(s.metaSealed), match(SHA256_HEX, s.bodyHashHex), match(SHA256_HEX, s.nonceHashHex), u64(s.logSeq), match(TIME, s.recordedAt)];
     case "delta":
       return ["ideatrail-v1-delta", idField(s.userId), idField(s.rootId), idField(s.deltaId), h(s.deltaSealed), u64(s.logSeq), match(TIME, s.createdAt)];
     case "storage_link":
