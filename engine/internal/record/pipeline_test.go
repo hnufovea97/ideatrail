@@ -318,3 +318,49 @@ func TestCrashOrphansAreSwept(t *testing.T) {
 		t.Fatalf("%+v outbox=%d", r, countEntries(e.d.OutboxDir))
 	}
 }
+
+func openMeta(t *testing.T, e *env, recordID string) []byte {
+	t.Helper()
+	meta, err := ic.UnB64(e.records[recordID]["list_meta"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pt, err := ic.Open(ic.KindRecordMeta, e.akPriv, ic.AAD{UserID: testUser, RootID: testRoot, RecordID: recordID, Version: "0"}, meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pt
+}
+
+func TestRecordMetaCarriesTagsAndRoutine(t *testing.T) {
+	e := newEnv(t)
+	in := Input{Paths: []string{e.file(t, "docs/plan.md", "# 가계부")}, Note: "문제를 정했다", Tags: []string{"finance", "기획"},
+		Routine: []Routine{{Slot: "problem", Estimated: true}}}
+	r, err := Record(context.Background(), e.d, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pt := openMeta(t, e, r.RecordID)
+	var m struct {
+		Tags    []string  `json:"tags"`
+		Routine []Routine `json:"routine"`
+	}
+	if err := json.Unmarshal(pt, &m); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Tags) != 2 || m.Tags[1] != "기획" || len(m.Routine) != 1 || m.Routine[0].Slot != "problem" || !m.Routine[0].Estimated {
+		t.Fatalf("meta %s", pt)
+	}
+}
+
+func TestRecordMetaEmptyListsAreArrays(t *testing.T) {
+	e := newEnv(t)
+	r, err := Record(context.Background(), e.d, Input{Paths: []string{e.file(t, "a.md", "x")}, Note: "n"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pt := string(openMeta(t, e, r.RecordID))
+	if !strings.Contains(pt, `"tags":[]`) || !strings.Contains(pt, `"routine":[]`) {
+		t.Fatalf("meta %s", pt)
+	}
+}

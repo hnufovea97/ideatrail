@@ -281,7 +281,8 @@ func metaJSON(title string, in Input, col *Collected, recordedAt string) ([]byte
 			shown = shown[:limit]
 		}
 		m := map[string]any{"v": 1, "title": title, "milestone": orNone(in.Milestone), "milestone_certain": in.MilestoneCertain,
-			"files": shown, "more_files": len(files) - len(shown), "recorded_at": recordedAt}
+			"files": shown, "more_files": len(files) - len(shown), "recorded_at": recordedAt,
+			"tags": orEmpty(in.Tags), "routine": routineOrEmpty(in.Routine)} // list view needs these without GitHub (spec §15 M5a)
 		b, err := json.Marshal(m)
 		if err != nil || len(b) <= maxMetaPlain || limit == 0 {
 			if len(b) > maxMetaPlain {
@@ -297,6 +298,21 @@ func orNone(s string) string {
 		return "none"
 	}
 	return s
+}
+
+// orEmpty keeps JSON arrays as [] (never null) so the dashboard reads one shape.
+func orEmpty(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+func routineOrEmpty(r []Routine) []Routine {
+	if r == nil {
+		return []Routine{}
+	}
+	return r
 }
 
 func accountKey(b64 string) (kem.PublicKey, error) {
