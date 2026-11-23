@@ -30,15 +30,9 @@
         { "name": "IP_LIMITER", "namespace_id": "2001", "simple": { "limit": 10, "period": 60 } },
         { "name": "WRITE_LIMITER", "namespace_id": "2002", "simple": { "limit": 60, "period": 60 } }
       ],
-      // G1(2026-11-18 founder 승인): 시험 서버가 웹 화면(web/dist)도 같은 주소에서 내보낸다.
-      // workers.dev 하위 주소끼리는 브라우저가 다른 사이트로 봐서 SameSite=Strict 쿠키가 안 가기 때문(정식 도메인은 app./api. 같은 사이트).
-      // web은 PUBLIC_API_BASE=이 주소로 빌드한다. 가입을 다시 막으려면 vars를 staging.invalid로 되돌리고 assets를 지운다.
-      "assets": { "directory": "../web/dist", "run_worker_first": ["/v1/*"] },
-      "vars": {
-        "RP_ID": "ideatrail-api-staging.seunghun-steven-shin-gmail-com-s-account.workers.dev",
-        "RP_NAME": "Ideatrail (staging)",
-        "APP_ORIGIN": "https://ideatrail-api-staging.seunghun-steven-shin-gmail-com-s-account.workers.dev"
-      }
+      // 시험 배포는 가입을 받지 않도록 존재하지 않는 출처로 둔다 (G1 끝, 2026-11-23 닫음).
+      // 다시 열려면 커밋 9fce4f6처럼 assets와 workers.dev 주소 vars를 되살린다.
+      "vars": { "RP_ID": "staging.invalid", "RP_NAME": "Ideatrail (staging)", "APP_ORIGIN": "https://staging.invalid" }
     }
   }
 }
