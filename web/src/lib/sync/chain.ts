@@ -6,6 +6,7 @@ export type ChainIssue =
   | { kind: "unknown_engine"; table: "records" | "deltas"; id: string }
   | { kind: "gap"; engineId: string; missing: readonly string[] }
   | { kind: "duplicate_seq"; engineId: string; seq: string }
+  | { kind: "revoked_mismatch"; engineId: string } // a disconnected engine's rows differ from the set frozen at disconnect
   | { kind: "rollback"; what: "log_seq" | "root_meta"; id: string }
   | { kind: "unreadable"; table: "records" | "deltas" | "roots"; id: string };
 

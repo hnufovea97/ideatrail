@@ -100,3 +100,10 @@ describe("record message from the server's stored hashes (M5a, spec §8)", () =>
     expect(() => messageFor({ ...base, bodyHashHex: `${"b".repeat(63)}\n` })).toThrow("bad_field");
   });
 });
+
+describe("sha256Hex (thin export of the hash the signed messages already use)", () => {
+  it("matches the FIPS 180-2 'abc' vector", async () => {
+    const { sha256Hex } = await import("./message");
+    expect(sha256Hex(new TextEncoder().encode("abc"))).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+  });
+});

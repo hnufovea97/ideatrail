@@ -3,13 +3,14 @@ import { relock, unlock } from "@ideatrail/crypto/relock";
 import { subkey } from "@ideatrail/crypto/subkey";
 
 /**
- * Spec §15 M5a: a disconnected engine stays listed so its earlier rows still verify. `revoked_after_seq` (decimal
- * uint64) freezes the cutoff — the highest log_seq accepted from it at disconnect time; only rows at or below it
- * count (its key could backdate a signed time, never a seq below the cutoff). `revoked_at` is for display only.
- * Without `revoked_after_seq`, a revoked engine's rows are all refused. Writing both at disconnect is 5.9 (M5d).
+ * Spec §15 M5a: a disconnected engine stays listed so its earlier rows still verify. At disconnect the list freezes
+ * `revoked_after_seq` (decimal uint64, the highest log_seq accepted from it) and `revoked_digest` (sync/verify.ts
+ * revokedDigest over its accepted rows up to that seq). Its rows count only if those at or below the cutoff hash to
+ * exactly the digest — its key could backdate a signed time or re-sign an old seq. `revoked_at` is for display only.
+ * Missing cutoff or digest: none of its rows count. Writing these at disconnect is 5.9 (M5d).
  */
 export interface EngineEntry {
-  engine_id: string; sign_pubkey: string; kem_pubkey: string; name: string; added_at: string; revoked_at?: string; revoked_after_seq?: string;
+  engine_id: string; sign_pubkey: string; kem_pubkey: string; name: string; added_at: string; revoked_at?: string; revoked_after_seq?: string; revoked_digest?: string;
 }
 export interface EngineList { v: 1; version: number; engines: EngineEntry[] }
 

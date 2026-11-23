@@ -12,7 +12,9 @@ export type Signable =
   | { type: "repo_head"; userId: string; engineId: string; commitSha: string; unixTs: bigint }
   | { type: "approval"; userId: string; approvalId: string; kind: string; summarySealed: Uint8Array; apprSeq: bigint };
 
-const h = (b: Uint8Array) => toHex(sha256(b));
+/** Hex SHA-256 — the same hash the signed messages use (exported for the dashboard's revoked-engine digest, spec §15 M5a). */
+export const sha256Hex = (b: Uint8Array): string => toHex(sha256(b));
+const h = sha256Hex;
 const U64_MAX = 2n ** 64n - 1n;
 const I64_MIN = -(2n ** 63n);
 const I64_MAX = 2n ** 63n - 1n;

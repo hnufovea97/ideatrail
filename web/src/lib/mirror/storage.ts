@@ -8,7 +8,7 @@ import type { LinkRow } from "../sync/rows";
 import type { RepoAccess } from "./github";
 
 export async function openRepoAccess(v: { userId: string; akPriv: Uint8Array }, list: EngineList, links: Iterable<LinkRow>): Promise<RepoAccess | null> {
-  const engines = new Map(list.engines.filter((e) => e.revoked_at === undefined && e.revoked_after_seq === undefined).map((e) => [e.engine_id, e]));
+  const engines = new Map(list.engines.filter((e) => e.revoked_at === undefined && e.revoked_after_seq === undefined && e.revoked_digest === undefined).map((e) => [e.engine_id, e]));
   const valid = [...links]
     .filter((l) => {
       const e = engines.get(l.engine_id);
