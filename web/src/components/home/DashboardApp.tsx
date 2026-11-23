@@ -40,7 +40,7 @@ export default function DashboardApp() {
     <>
       <div class="blur-cover" aria-hidden="true"><LockIcon /><span class="sr-only">{COPY.dash.cover}</span></div>
       {vault
-        ? <OpenShell vault={vault} onLock={() => lock(vault, false)} />
+        ? <OpenShell api={api} vault={vault} onLock={() => lock(vault, false)} />
         : <LockScreen api={api} notice={notice} onOpen={(v) => { setNotice(null); setVault(v); }} />}
     </>
   );
