@@ -15,7 +15,7 @@ import type { DashboardVault } from "../unlock";
 
 /** `alive` is false once the dashboard locked: a refresh in flight then seals, saves and mirrors nothing. */
 /** `cache` lives as long as the open vault: OpenShell clears it at lock, and so does a refresh that finds it locked. */
-export interface LoadDeps { api: Api; github: Fetch; marks: VersionStore; now: () => Date; alive: () => boolean; cache?: RowCache }
+export interface LoadDeps { api: Api; github: Fetch; marks: VersionStore; now: () => Date; alive: () => boolean; cache?: RowCache; signal?: AbortSignal }
 /** "refused": the storage link points to another repo than the one this browser pinned (sec L2). */
 export type MirrorResult = "none" | "done" | "failed" | "refused";
 /** `mirrorDirty`: a saved merge is not in index/ yet — pass it to the next refresh, which retries until "done". */
@@ -41,7 +41,7 @@ async function mirror(d: LoadDeps, v: DashboardVault, merged: Merged, built: Bui
     const access = await openRepoAccess(v, v.engineList, merged.sync.links.values());
     if (!access || !d.alive()) return "none"; // GitHub not connected yet: D1 only (spec §3.1.10 E)
     if (!repoPinned(d, v.userId, access.repoId)) return "refused";
-    await commitIndex(d.github, access, indexFiles(v, merged.sync, merged.verified, merged.metas, built.metas));
+    await commitIndex(d.github, access, indexFiles(v, merged.sync, merged.verified, merged.metas, built.metas), d.signal);
     return "done";
   } catch {
     return "failed"; // D1 stays the source; the next refresh rewrites the whole index

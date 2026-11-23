@@ -17,19 +17,20 @@ export default function DashboardApp() {
 
   useEffect(() => bindPrivacyBlur(window, document), []);
 
-  const lock = useCallback((v: DashboardVault, idle: boolean) => {
+  /** `closing`: from pagehide — the logout request must outlive the page (keepalive). */
+  const lock = useCallback((v: DashboardVault, idle: boolean, closing = false) => {
     opened.current.abort(); // stop any refresh in flight before its keys turn to zeros
     wipeVault(v); // keys first; everything decrypted is dropped with the OpenShell state
     setVault(null);
     setNotice(idle ? COPY.dash.lockedIdle(v.autoLockMinutes) : null);
-    void api.logout().catch(() => undefined); // best effort: the keys are already gone
+    void api.logout({ keepalive: closing }).catch(() => undefined); // best effort: the keys are already gone
   }, [api]);
 
   useEffect(() => {
     if (!vault) return;
     const auto = startAutoLock(vault.autoLockMinutes, () => lock(vault, true));
     const unbind = bindActivity(window, document, auto);
-    const onHide = () => lock(vault, false);
+    const onHide = () => lock(vault, false, true);
     window.addEventListener("pagehide", onHide);
     return () => {
       auto.stop();

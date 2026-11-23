@@ -26,11 +26,11 @@ function toBase64(b: Uint8Array): string {
   return btoa(s);
 }
 
-async function gh<T>(f: Fetch, a: RepoAccess, method: string, path: string, body?: unknown): Promise<T> {
+async function gh<T>(f: Fetch, a: RepoAccess, signal: AbortSignal | undefined, method: string, path: string, body?: unknown): Promise<T> {
   let res: Response;
   try {
     res = await f(GITHUB_API + path, {
-      method, credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer",
+      method, signal, credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer",
       headers: { accept: "application/vnd.github+json", authorization: `Bearer ${a.token}`, "x-github-api-version": "2022-11-28", ...(body === undefined ? {} : { "content-type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -51,24 +51,25 @@ function shaOf(v: unknown): string {
   return s;
 }
 
-/** Write `files` (path → bytes) in one commit on the default branch; retries a moved ref. Returns the commit sha. */
-export async function commitIndex(f: Fetch, a: RepoAccess, files: Readonly<Record<string, Uint8Array>>): Promise<string> {
+/** Write `files` (path → bytes) in one commit on the default branch; retries a moved ref. Returns the commit sha.
+ * `signal` is the lock's: aborting it stops an in-flight commit. */
+export async function commitIndex(f: Fetch, a: RepoAccess, files: Readonly<Record<string, Uint8Array>>, signal?: AbortSignal): Promise<string> {
   if (!FULL_NAME.test(a.fullName)) throw new GithubFailure(0, "bad_repo");
-  const repo = await gh<{ id?: unknown; private?: unknown; default_branch?: unknown }>(f, a, "GET", `/repos/${a.fullName}`);
+  const repo = await gh<{ id?: unknown; private?: unknown; default_branch?: unknown }>(f, a, signal, "GET", `/repos/${a.fullName}`);
   if (repo.id !== a.repoId || repo.private !== true || typeof repo.default_branch !== "string" || !BRANCH.test(repo.default_branch)) {
     throw new GithubFailure(0, "repo_mismatch");
   }
   const git = `/repos/${a.fullName}/git`;
   const branch = repo.default_branch;
   const tree = await Promise.all(Object.entries(files).map(async ([path, bytes]) =>
-    ({ path, mode: "100644", type: "blob", sha: shaOf(await gh(f, a, "POST", `${git}/blobs`, { content: toBase64(bytes), encoding: "base64" })) })));
+    ({ path, mode: "100644", type: "blob", sha: shaOf(await gh(f, a, signal, "POST", `${git}/blobs`, { content: toBase64(bytes), encoding: "base64" })) })));
   for (let attempt = 1; ; attempt++) {
-    const head = shaOf((await gh<{ object?: unknown }>(f, a, "GET", `${git}/ref/heads/${branch}`)).object);
-    const baseTree = shaOf((await gh<{ tree?: unknown }>(f, a, "GET", `${git}/commits/${head}`)).tree);
-    const newTree = shaOf(await gh(f, a, "POST", `${git}/trees`, { base_tree: baseTree, tree }));
-    const commit = shaOf(await gh(f, a, "POST", `${git}/commits`, { message: INDEX_MESSAGE, tree: newTree, parents: [head] }));
+    const head = shaOf((await gh<{ object?: unknown }>(f, a, signal, "GET", `${git}/ref/heads/${branch}`)).object);
+    const baseTree = shaOf((await gh<{ tree?: unknown }>(f, a, signal, "GET", `${git}/commits/${head}`)).tree);
+    const newTree = shaOf(await gh(f, a, signal, "POST", `${git}/trees`, { base_tree: baseTree, tree }));
+    const commit = shaOf(await gh(f, a, signal, "POST", `${git}/commits`, { message: INDEX_MESSAGE, tree: newTree, parents: [head] }));
     try {
-      await gh(f, a, "PATCH", `${git}/refs/heads/${branch}`, { sha: commit, force: false });
+      await gh(f, a, signal, "PATCH", `${git}/refs/heads/${branch}`, { sha: commit, force: false });
       return commit;
     } catch (e) {
       const moved = e instanceof GithubFailure && (e.status === 409 || e.status === 422);

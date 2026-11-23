@@ -59,4 +59,12 @@ describe("api client — dashboard routes", () => {
     expect(seen[0].url).toBe("http://api.test/v1/logout");
     expect(seen[0].init?.method).toBe("POST");
   });
+
+  it("logout can ride out a closing page (keepalive), and is a plain request otherwise", async () => {
+    const { seen, api } = capture({ signed_out: true });
+    await api.logout({ keepalive: true });
+    await api.logout();
+    expect(seen.map((s) => s.init?.keepalive)).toEqual([true, undefined]);
+    expect(seen[0].url).toBe("http://api.test/v1/logout");
+  });
 });

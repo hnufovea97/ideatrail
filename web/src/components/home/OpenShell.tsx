@@ -24,7 +24,7 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
     let live = true;
     let running = false;
     const cache = new RowCache(); // verified rows and opened metas of this open vault only
-    const deps: LoadDeps = { api, github: (input, init) => fetch(input, init), marks: browserStore(), now: () => new Date(), alive: () => live && !signal.aborted, cache };
+    const deps: LoadDeps = { api, github: (input, init) => fetch(input, init), marks: browserStore(), now: () => new Date(), alive: () => live && !signal.aborted, cache, signal };
     const run = () => {
       if (running || document.visibilityState !== "visible") return;
       running = true;

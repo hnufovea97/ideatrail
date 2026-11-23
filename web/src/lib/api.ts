@@ -31,11 +31,12 @@ type Check = (d: Fields) => boolean;
 const isObject = (d: unknown): d is Fields => typeof d === "object" && d !== null && !Array.isArray(d);
 const isCount = (v: unknown) => Number.isInteger(v) && (v as number) >= 0;
 
-async function call<T>(f: Fetch, base: string, method: string, path: string, body?: unknown, headers: Record<string, string> = {}, check?: Check): Promise<T> {
+async function call<T>(f: Fetch, base: string, method: string, path: string, body?: unknown, headers: Record<string, string> = {}, check?: Check, keepalive?: boolean): Promise<T> {
   let res: Response;
   try {
     res = await f(base + path, {
       method,
+      ...(keepalive ? { keepalive: true } : {}),
       credentials: "include",
       cache: "no-store",
       redirect: "error",
@@ -142,7 +143,8 @@ export function createApi(base: string, f: Fetch = (input, init) => fetch(input,
         && typeof d.envelope.envelope_id === "string" && ID.test(d.envelope.envelope_id) && typeof d.envelope.wrapped_master_key === "string"),
     saveRootMeta: async (rootId: string, body: RootMetaBody) =>
       sendChecked<{ meta_version: number }>("POST", `/v1/roots/${id(rootId)}/meta`, body, (d) => isCount(d.meta_version)),
-    logout: () => send<{ signed_out: true }>("POST", "/v1/logout", {}),
+    /** `keepalive`: sent from pagehide, so the request outlives the closing page. */
+    logout: (o: { keepalive?: boolean } = {}) => call<{ signed_out: true }>(f, base, "POST", "/v1/logout", {}, {}, undefined, o.keepalive),
   };
 }
 

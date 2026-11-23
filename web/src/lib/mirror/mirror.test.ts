@@ -32,6 +32,15 @@ describe("index/ mirror (spec §12, §15 M5a)", () => {
     }
   });
 
+  it("every GitHub request carries the lock's abort signal", async () => {
+    const gh = fakeGithub();
+    const signals: (AbortSignal | null | undefined)[] = [];
+    const ctl = new AbortController();
+    await commitIndex(async (input, init) => { signals.push(init?.signal); return gh.fetch(input, init); }, ACCESS, FILES, ctl.signal);
+    expect(signals.length).toBeGreaterThan(0);
+    expect(signals.every((s) => s === ctl.signal)).toBe(true);
+  });
+
   it("retries a ref that moved, at most COMMIT_ATTEMPTS times", async () => {
     const twice = fakeGithub({ refConflicts: 2 });
     await commitIndex(twice.fetch, ACCESS, FILES);

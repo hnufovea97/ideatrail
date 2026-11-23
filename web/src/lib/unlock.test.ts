@@ -7,11 +7,12 @@ import { subkey } from "@ideatrail/crypto/subkey";
 import { ApiFailure, type AccountInfo, type Api, type AssertionJSON } from "./api";
 import { memoryStore, sealEngineList, type EngineList } from "./engine-list";
 import { makeEnvelope } from "./signup/account";
-import { openVault, unlockReason, wipeVault, UnlockFailure, type PreparedLogin } from "./unlock";
+import { isFresh, openVault, prepareLogin, settleOpened, unlockReason, wipeVault, UnlockFailure, type DashboardVault, type PreparedLogin } from "./unlock";
+import { LOGIN_REFRESH_MS } from "./timing";
 
 const RAW_ID = new Uint8Array(16).fill(1);
 const prfBytes = () => new Uint8Array(32).fill(7);
-const prepared: PreparedLogin = { challenge_id: "01jcm3v8q7s2kx4f9d6b5n0tqw", options: { challenge: "AAAA" } };
+const prepared: PreparedLogin = { challenge_id: "01jcm3v8q7s2kx4f9d6b5n0tqw", options: { challenge: "AAAA" }, preparedAt: 0 };
 
 function account(version = 1) {
   const userId = newId();
@@ -93,5 +94,30 @@ describe("open the vault after the passkey (5.1)", () => {
     expect(unlockReason(new DOMException("x", "NotAllowedError"))).toBe("passkey_cancel");
     expect(unlockReason(new UnlockFailure("offline"))).toBe("offline");
     expect(unlockReason(new Error("boom"))).toBe("failed");
+  });
+
+  it("only the server's unknown-passkey code is 'not registered'; a used/expired challenge or 429 asks to retry", async () => {
+    const a = account();
+    const failWith = (status: number, code: string) => fakeApi(a, { loginVerify: async () => { throw new ApiFailure(status, code); } }).api;
+    expect(await reasonOf(openVault(failWith(400, "webauthn_failed"), prepared, got(), memoryStore()))).toBe("not_registered");
+    expect(await reasonOf(openVault(failWith(400, "challenge_invalid"), prepared, got(), memoryStore()))).toBe("retry");
+    expect(await reasonOf(openVault(failWith(429, "rate_limited"), prepared, got(), memoryStore()))).toBe("retry");
+    expect(await reasonOf(openVault(failWith(400, "invalid_input"), prepared, got(), memoryStore()))).toBe("failed");
+  });
+  it("prepared login options carry their age; older than LOGIN_REFRESH_MS is stale", async () => {
+    const api = { loginOptions: async () => ({ challenge_id: prepared.challenge_id, options: prepared.options }) } as unknown as Api;
+    const p = await prepareLogin(api, () => 1000);
+    expect(p.preparedAt).toBe(1000);
+    expect(isFresh(p, 1000 + LOGIN_REFRESH_MS - 1)).toBe(true);
+    expect(isFresh(p, 1000 + LOGIN_REFRESH_MS)).toBe(false);
+  });
+  it("a vault that opens after the lock screen went away is wiped, not handed over", () => {
+    const v = { userId: "u", mk: new Uint8Array(32).fill(1), akPriv: new Uint8Array(32).fill(2), akPub: new Uint8Array(32) } as DashboardVault;
+    let taken = 0;
+    settleOpened(false, v, () => taken++);
+    expect([taken, v.mk.every((b) => b === 0), v.akPriv.every((b) => b === 0)]).toEqual([0, true, true]);
+    const w = { ...v, mk: new Uint8Array(32).fill(1) };
+    settleOpened(true, w, () => taken++);
+    expect([taken, w.mk[0]]).toEqual([1, 1]);
   });
 });

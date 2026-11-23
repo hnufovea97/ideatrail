@@ -59,3 +59,18 @@ test("blurs the whole screen when the window loses focus", async ({ page }) => {
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(html).not.toHaveClass(/privacy-blur/);
 });
+
+test("a lost connection on the lock screen clears when the tab comes back and the options load", async ({ page }) => {
+  const { engine } = await openSignup(page, { prf: true });
+  await passStepOne(page, engine);
+  let refuse = true;
+  await page.route("**/v1/webauthn/login/options", (r) => (refuse ? r.abort() : r.continue()));
+  page.once("dialog", (d) => void d.accept());
+  await page.goto(`${APP}/home`);
+  await expect(page.getByText("인터넷이 끊겼어요. 연결되면 다시 불러올게요")).toBeVisible();
+  await expect(page.getByRole("button", { name: OPEN })).toBeDisabled();
+  refuse = false;
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await expect(page.getByRole("button", { name: OPEN })).toBeEnabled();
+  await expect(page.getByText("인터넷이 끊겼어요. 연결되면 다시 불러올게요")).toBeHidden();
+});

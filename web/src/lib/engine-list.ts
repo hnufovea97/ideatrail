@@ -17,8 +17,18 @@ export interface EngineList { v: 1; version: number; engines: EngineEntry[] }
 const aad = (userId: string, version: number) => ({ userId, version: String(version) });
 
 /** Spec §15 M4: relock(subkey(MK,"engine_list"), "engine_list", {user_id, version:"N"}, JSON). */
+/** The engine-list subkey for one use, zeroed afterwards on every path. */
+function withListKey<T>(mk: Uint8Array, use: (k: Uint8Array) => T): T {
+  const k = subkey(mk, "engine_list");
+  try {
+    return use(k);
+  } finally {
+    k.fill(0);
+  }
+}
+
 export function sealEngineList(mk: Uint8Array, userId: string, list: EngineList): string {
-  return toB64u(relock(subkey(mk, "engine_list"), "engine_list", aad(userId, list.version), utf8(JSON.stringify(list))));
+  return withListKey(mk, (k) => toB64u(relock(k, "engine_list", aad(userId, list.version), utf8(JSON.stringify(list)))));
 }
 
 const isEntry = (e: unknown): e is EngineEntry => {
@@ -27,7 +37,7 @@ const isEntry = (e: unknown): e is EngineEntry => {
 };
 
 export function openEngineList(mk: Uint8Array, userId: string, version: number, blob: string): EngineList {
-  const list = JSON.parse(new TextDecoder().decode(unlock(subkey(mk, "engine_list"), "engine_list", aad(userId, version), fromB64u(blob)))) as EngineList;
+  const list = JSON.parse(new TextDecoder().decode(withListKey(mk, (k) => unlock(k, "engine_list", aad(userId, version), fromB64u(blob))))) as EngineList;
   if (list.v !== 1 || list.version !== version || !Array.isArray(list.engines) || !list.engines.every(isEntry)) throw new Error("engine_list_invalid");
   return list;
 }

@@ -9,6 +9,7 @@ import { subkey } from "@ideatrail/crypto/subkey";
 import { ApiFailure, type AccountInfo, type Api, type LoginOptions } from "./api";
 import { isRollback, openEngineList, rememberVersion, type EngineList, type VersionStore } from "./engine-list";
 import type { Vault } from "./signup/account";
+import { LOGIN_REFRESH_MS } from "./timing";
 import { assertWithPrf, type Unlocked } from "./webauthn";
 
 export const DEFAULT_LOCK_MINUTES = 5;
@@ -16,7 +17,7 @@ const MIN_LOCK_MINUTES = 1;
 
 export interface DashboardVault extends Vault { engineList: EngineList; autoLockMinutes: number }
 
-export type UnlockReason = "passkey_cancel" | "prf_missing" | "not_registered" | "offline" | "account_mismatch" | "engine_list_rollback" | "failed";
+export type UnlockReason = "passkey_cancel" | "prf_missing" | "not_registered" | "retry" | "offline" | "account_mismatch" | "engine_list_rollback" | "failed";
 
 export class UnlockFailure extends Error {
   constructor(readonly reason: UnlockReason) {
@@ -25,10 +26,19 @@ export class UnlockFailure extends Error {
   }
 }
 
-export type PreparedLogin = LoginOptions;
+/** `preparedAt` (ms): the server challenge expires, so options older than LOGIN_REFRESH_MS are fetched again before get. */
+export interface PreparedLogin extends LoginOptions { preparedAt: number }
 
 /** Fetched before the click (Safari: no await between the click and get). */
-export const prepareLogin = (api: Api): Promise<PreparedLogin> => api.loginOptions();
+export const prepareLogin = async (api: Api, now: () => number = Date.now): Promise<PreparedLogin> => ({ ...(await api.loginOptions()), preparedAt: now() });
+
+export const isFresh = (p: PreparedLogin, now: number = Date.now()): boolean => now - p.preparedAt < LOGIN_REFRESH_MS;
+
+/** A vault that opened after its screen went away is wiped at once instead of being handed over. */
+export function settleOpened(alive: boolean, v: DashboardVault, onOpen: (v: DashboardVault) => void): void {
+  if (alive) onOpen(v);
+  else wipeVault(v);
+}
 
 /** Call straight from the click handler. */
 export const askPasskey = (p: PreparedLogin, nav?: CredentialsContainer): Promise<Unlocked> => assertWithPrf(p.options, nav);
@@ -43,17 +53,27 @@ export function wipeVault(v: Vault): void {
 const clampMinutes = (m: unknown): number =>
   typeof m === "number" && Number.isInteger(m) ? Math.min(DEFAULT_LOCK_MINUTES, Math.max(MIN_LOCK_MINUTES, m)) : DEFAULT_LOCK_MINUTES;
 
-function apiReason(e: unknown, refused: UnlockReason): UnlockFailure {
-  if (e instanceof ApiFailure && e.code === "offline") return new UnlockFailure("offline");
-  if (e instanceof ApiFailure && e.status >= 400 && e.status < 500) return new UnlockFailure(refused);
+const UNKNOWN_PASSKEY = "webauthn_failed"; // api/src/auth/webauthn.ts: an unknown credential (or a failed check) on login
+const STALE_CHALLENGE = "challenge_invalid"; // api/src/auth/challenges.ts: expired or already used
+
+/** Login verify: only the server's unknown-passkey code means "not registered"; a stale challenge or 429 can be retried. */
+function verifyReason(e: unknown): UnlockFailure {
+  if (!(e instanceof ApiFailure)) return new UnlockFailure("failed");
+  if (e.code === "offline") return new UnlockFailure("offline");
+  if (e.code === UNKNOWN_PASSKEY) return new UnlockFailure("not_registered");
+  if (e.code === STALE_CHALLENGE || e.status === 429) return new UnlockFailure("retry");
   return new UnlockFailure("failed");
+}
+
+function apiReason(e: unknown): UnlockFailure {
+  return new UnlockFailure(e instanceof ApiFailure && e.code === "offline" ? "offline" : "failed");
 }
 
 async function openMasterKey(api: Api, p: PreparedLogin, got: Unlocked): Promise<{ userId: string; mk: Uint8Array }> {
   const prf = got.prf;
   if (!prf) throw new UnlockFailure("prf_missing");
   try {
-    const login = await api.loginVerify({ challenge_id: p.challenge_id, response: got.assertion }).catch((e: unknown) => { throw apiReason(e, "not_registered"); });
+    const login = await api.loginVerify({ challenge_id: p.challenge_id, response: got.assertion }).catch((e: unknown) => { throw verifyReason(e); });
     const wrap = prfWrapKey(prf, got.rawId);
     try {
       return { userId: login.user_id, mk: unwrapMasterKey(wrap, login.user_id, login.envelope.envelope_id, fromB64u(login.envelope.wrapped_master_key)) };
@@ -64,6 +84,16 @@ async function openMasterKey(api: Api, p: PreparedLogin, got: Unlocked): Promise
     }
   } finally {
     prf.fill(0);
+  }
+}
+
+/** The account public key, or null when it differs from the server's (or either one is malformed). */
+function matchingPublic(akPriv: Uint8Array, serverPub: string) {
+  try {
+    const akPub = kemPublicOf(akPriv);
+    return bytesEqual(akPub, fromB64u(serverPub)) ? akPub : null;
+  } catch {
+    return null;
   }
 }
 
@@ -78,8 +108,8 @@ function openAccountKey(mk: Uint8Array, userId: string, acct: AccountInfo): { ak
   } finally {
     k.fill(0);
   }
-  const akPub = kemPublicOf(akPriv);
-  if (!bytesEqual(akPub, fromB64u(acct.account_pubkey))) {
+  const akPub = matchingPublic(akPriv, acct.account_pubkey);
+  if (!akPub) {
     akPriv.fill(0);
     throw new UnlockFailure("account_mismatch"); // the server swapped the public key engines seal to
   }
@@ -107,7 +137,7 @@ function openList(mk: Uint8Array, userId: string, acct: AccountInfo, store: Vers
 export async function openVault(api: Api, p: PreparedLogin, got: Unlocked, store: VersionStore): Promise<DashboardVault> {
   const { userId, mk } = await openMasterKey(api, p, got);
   try {
-    const acct = await api.account().catch((e: unknown) => { throw apiReason(e, "failed"); });
+    const acct = await api.account().catch((e: unknown) => { throw apiReason(e); });
     const { akPriv, akPub } = openAccountKey(mk, userId, acct);
     try {
       return { userId, mk, akPriv, akPub, engineList: openList(mk, userId, acct, store), autoLockMinutes: clampMinutes(acct.auto_lock_minutes) };
