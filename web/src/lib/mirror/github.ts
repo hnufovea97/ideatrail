@@ -1,0 +1,78 @@
+// The dashboard's only GitHub write: the index/ mirror (spec §12, §3.1.10 E) as one commit through the Git Data API,
+// with the engine's GitHub access opened from kind 6. The token goes only in the Authorization header and never
+// into an error. Only to the pinned repo id, and only when it is private.
+import type { Fetch } from "../api";
+
+export const GITHUB_API = "https://api.github.com";
+export const COMMIT_ATTEMPTS = 5; // same as the engine (spec §12)
+export const INDEX_MESSAGE = "ideatrail: index"; // no content information (spec §12)
+
+export interface RepoAccess { token: string; fullName: string; repoId: number }
+
+export class GithubFailure extends Error {
+  constructor(readonly status: number, readonly code: "offline" | "github_refused" | "bad_response" | "repo_mismatch" | "bad_repo") {
+    super(code);
+    this.name = "GithubFailure";
+  }
+}
+
+const FULL_NAME = /^[A-Za-z0-9-]{1,39}\/[A-Za-z0-9._-]{1,100}$/;
+const BRANCH = /^[A-Za-z0-9._-]{1,100}$/;
+const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+
+function toBase64(b: Uint8Array): string {
+  let s = "";
+  for (const x of b) s += String.fromCharCode(x);
+  return btoa(s);
+}
+
+async function gh<T>(f: Fetch, a: RepoAccess, method: string, path: string, body?: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await f(GITHUB_API + path, {
+      method, credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer",
+      headers: { accept: "application/vnd.github+json", authorization: `Bearer ${a.token}`, "x-github-api-version": "2022-11-28", ...(body === undefined ? {} : { "content-type": "application/json" }) },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new GithubFailure(0, "offline");
+  }
+  if (!res.ok) throw new GithubFailure(res.status, "github_refused");
+  try {
+    return (await res.json()) as T;
+  } catch {
+    throw new GithubFailure(res.status, "bad_response");
+  }
+}
+
+function shaOf(v: unknown): string {
+  const s = (v as { sha?: unknown } | null | undefined)?.sha;
+  if (typeof s !== "string" || !SHA.test(s)) throw new GithubFailure(0, "bad_response");
+  return s;
+}
+
+/** Write `files` (path → bytes) in one commit on the default branch; retries a moved ref. Returns the commit sha. */
+export async function commitIndex(f: Fetch, a: RepoAccess, files: Readonly<Record<string, Uint8Array>>): Promise<string> {
+  if (!FULL_NAME.test(a.fullName)) throw new GithubFailure(0, "bad_repo");
+  const repo = await gh<{ id?: unknown; private?: unknown; default_branch?: unknown }>(f, a, "GET", `/repos/${a.fullName}`);
+  if (repo.id !== a.repoId || repo.private !== true || typeof repo.default_branch !== "string" || !BRANCH.test(repo.default_branch)) {
+    throw new GithubFailure(0, "repo_mismatch");
+  }
+  const git = `/repos/${a.fullName}/git`;
+  const branch = repo.default_branch;
+  const tree = await Promise.all(Object.entries(files).map(async ([path, bytes]) =>
+    ({ path, mode: "100644", type: "blob", sha: shaOf(await gh(f, a, "POST", `${git}/blobs`, { content: toBase64(bytes), encoding: "base64" })) })));
+  for (let attempt = 1; ; attempt++) {
+    const head = shaOf((await gh<{ object?: unknown }>(f, a, "GET", `${git}/ref/heads/${branch}`)).object);
+    const baseTree = shaOf((await gh<{ tree?: unknown }>(f, a, "GET", `${git}/commits/${head}`)).tree);
+    const newTree = shaOf(await gh(f, a, "POST", `${git}/trees`, { base_tree: baseTree, tree }));
+    const commit = shaOf(await gh(f, a, "POST", `${git}/commits`, { message: INDEX_MESSAGE, tree: newTree, parents: [head] }));
+    try {
+      await gh(f, a, "PATCH", `${git}/refs/heads/${branch}`, { sha: commit, force: false });
+      return commit;
+    } catch (e) {
+      const moved = e instanceof GithubFailure && (e.status === 409 || e.status === 422);
+      if (!moved || attempt >= COMMIT_ATTEMPTS) throw e;
+    }
+  }
+}
