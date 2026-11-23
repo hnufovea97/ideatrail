@@ -93,7 +93,10 @@ export interface RegisterVerifyBody {
   account?: { account_pubkey: string; wrapped_account_privkey: string };
   envelope: EnvelopeUpload;
 }
-export interface AccountInfo { user_id: string; engine_list: string | null; engine_list_version: number; confirmed_at: string | null; recovery_key_status: string }
+export interface AccountInfo {
+  user_id: string; engine_list: string | null; engine_list_version: number; confirmed_at: string | null; recovery_key_status: string;
+  account_pubkey?: string | null; wrapped_account_privkey?: string | null; auto_lock_minutes?: number;
+}
 export interface DeliverBody { payload: string; mac: string; engine_list: string; engine_list_version: number }
 export interface RecoveryBody { envelope_id: string; method: "recovery"; wrapped_master_key: string; lookup_hash: string; verify_pubkey: string }
 export interface DeviceAddState { joined: boolean; t_pub: string | null; join_mac: string | null; key_uploaded: boolean; used: boolean; expires_at: string }
@@ -101,10 +104,14 @@ export interface SealedMessage { msg_id: string; sealed: string }
 export interface ApprovalRow { approval_id: string; engine_id: string; kind: string; summary: string; appr_seq: string; engine_sig: string; created_at: string; expires_at: string }
 export interface StorageLinkRow { link_id: string; engine_id: string; provider: string; enc_token: string | null; engine_sig: string; created_at: string; revoked_at: string | null }
 export interface SyncResponse { changes: { storage_links?: StorageLinkRow[] | null } & Record<string, unknown>; cursor: number; next_cursor?: number | null }
+export interface LoginOptions { challenge_id: string; options: RequestOptionsJSON }
+export interface LoginResult { user_id: string; envelope: { envelope_id: string; wrapped_master_key: string } }
+export interface RootMetaBody { list_meta: string; meta_version: number; merged_delta_ids: string[] }
 
 export function createApi(base: string, f: Fetch = (input, init) => fetch(input, init)) {
   const get = <T>(path: string, headers?: Record<string, string>, check?: Check) => call<T>(f, base, "GET", path, undefined, headers, check);
   const send = <T>(method: "POST" | "PUT", path: string, body: unknown) => call<T>(f, base, method, path, body);
+  const sendChecked = <T>(method: "POST" | "PUT", path: string, body: unknown, check: Check) => call<T>(f, base, method, path, body, {}, check);
   // Methods that take an id are async so a bad id rejects (like any other ApiFailure) instead of throwing.
   return {
     pairing: async (s: string) => get<PairingInfo>(`/v1/pairing/${id(s)}`, undefined, (d) => typeof d.delivered === "boolean"),
@@ -128,6 +135,14 @@ export function createApi(base: string, f: Fetch = (input, init) => fetch(input,
     sync: (cursor: number) => get<SyncResponse>(`/v1/sync?cursor=${Math.max(0, Math.floor(cursor))}`, undefined, (d) =>
       isObject(d.changes) && (d.changes.storage_links == null || Array.isArray(d.changes.storage_links))
       && isCount(d.cursor) && (d.next_cursor == null || isCount(d.next_cursor))),
+    loginOptions: () => sendChecked<LoginOptions>("POST", "/v1/webauthn/login/options", {},
+      (d) => typeof d.challenge_id === "string" && isObject(d.options) && typeof d.options.challenge === "string"),
+    loginVerify: (body: { challenge_id: string; response: AssertionJSON }) => sendChecked<LoginResult>("POST", "/v1/webauthn/login/verify", body,
+      (d) => typeof d.user_id === "string" && ID.test(d.user_id) && isObject(d.envelope)
+        && typeof d.envelope.envelope_id === "string" && ID.test(d.envelope.envelope_id) && typeof d.envelope.wrapped_master_key === "string"),
+    saveRootMeta: async (rootId: string, body: RootMetaBody) =>
+      sendChecked<{ meta_version: number }>("POST", `/v1/roots/${id(rootId)}/meta`, body, (d) => isCount(d.meta_version)),
+    logout: () => send<{ signed_out: true }>("POST", "/v1/logout", {}),
   };
 }
 
