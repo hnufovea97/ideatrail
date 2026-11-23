@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { headersFile, injectMeta, policyFor } from "./csp";
+import { GITHUB_API as MIRROR_GITHUB_API } from "../src/lib/mirror/github";
+import { connectExtraFor, GITHUB_API, headersFile, injectMeta, policyFor } from "./csp";
 
 const hash = (s: string) => `'sha256-${createHash("sha256").update(s, "utf8").digest("base64")}'`;
 const html = `<!doctype html><html><head><meta charset="utf-8"><style>astro-island{display:contents}</style>` +
@@ -11,7 +12,7 @@ describe("CSP for built pages", () => {
     const p = policyFor(html, "http://localhost:8787");
     expect(p).toContain(`script-src 'self' ${hash('customElements.define("x",class{})')}`);
     expect(p).toContain(`style-src 'self' ${hash("astro-island{display:contents}")}`);
-    expect(p).toContain("connect-src 'self' http://localhost:8787 https://api.github.com;");
+    expect(p).toContain("connect-src 'self' http://localhost:8787;");
     expect(p).toContain("default-src 'none'");
     expect(p).not.toContain("unsafe-inline");
   });
@@ -35,5 +36,23 @@ describe("CSP for built pages", () => {
     expect(all).toContain("  Referrer-Policy: no-referrer");
     for (const p of ["/start", "/start/", "/connect", "/connect/", "/home", "/home/"]) expect(block(p)).toContain("  Cache-Control: no-store");
     expect(all).not.toContain("Cache-Control");
+  });
+
+  it("GitHub is reachable from /home only, the same origin the mirror writes to", () => {
+    expect(GITHUB_API).toBe(MIRROR_GITHUB_API);
+    for (const route of ["/home", "/home/"]) expect(connectExtraFor(route)).toEqual([GITHUB_API]);
+    for (const route of ["/start", "/connect", "/"]) expect(connectExtraFor(route)).toEqual([]);
+    expect(policyFor(html, "http://localhost:8787", connectExtraFor("/home"))).toContain("connect-src 'self' http://localhost:8787 https://api.github.com;");
+  });
+  it("deploy headers: every path without GitHub; /home replaces the policy with its own that allows it", () => {
+    const h = headersFile("connect-src 'self';", "connect-src 'self' https://api.github.com;");
+    const block = (path: string) => h.split("\n\n").find((b) => b.split("\n")[0] === path) ?? "";
+    expect(block("/*")).not.toContain("api.github.com");
+    for (const p of ["/home", "/home/"]) {
+      expect(block(p)).toContain("  ! Content-Security-Policy");
+      expect(block(p)).toContain("  Content-Security-Policy: connect-src 'self' https://api.github.com; frame-ancestors 'none';");
+      expect(block(p)).toContain("  Cache-Control: no-store");
+    }
+    expect(block("/start")).not.toContain("Content-Security-Policy");
   });
 });
