@@ -3,7 +3,7 @@ import { z } from "zod";
 import { fromHex, toB64u } from "@ideatrail/crypto/bytes";
 import type { AppEnv } from "../env";
 import { ApiError } from "../http/errors";
-import { readJson, zB64u, zB64uMax, zHexText, zId, zSealedMax, zSeq, zTime } from "../http/validate";
+import { assertNotFuture, readJson, zB64u, zB64uMax, zHexText, zId, zSealedMax, zSeq, zTime } from "../http/validate";
 import { requireEngine } from "../auth/engine-sig";
 import { CURSOR_SQL, guard, writeWithCursor } from "../db/change";
 import { checkEngineQuota, countEngineWrite, engineSlowDown } from "../db/quota";
@@ -84,6 +84,7 @@ export function recordRoutes() {
   /** One record (spec §8 record + §12 bundle fields). Server stores; the browser verifies engine_sig. */
   r.post("/", requireEngine, requireEngineAccount, async (c) => {
     const b = await readJson(c, zRecord);
+    assertNotFuture(b.recorded_at);
     const db = c.env.DB;
     const userId = c.get("userId")!;
     const engineId = c.get("engineId")!;

@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { toB64u } from "@ideatrail/crypto/bytes";
 import { newId } from "@ideatrail/crypto/ids";
+import { inSeconds } from "../src/db/values";
 import { MAX_OPEN_DELTAS } from "../src/routes/deltas";
 import { browser, signUp } from "./browser";
 import { engineClient, seedEngine } from "./engine";
@@ -35,6 +36,13 @@ describe("POST /v1/deltas (2.8)", () => {
     expect((await c.post("/v1/deltas", d)).status).toBe(201);
     expect((await json(await c.post("/v1/deltas", d))).duplicate).toBe(true);
     expect(await one("SELECT COUNT(*) AS n FROM meta_deltas WHERE delta_id = ?", d.delta_id)).toEqual({ n: 1 });
+  });
+  it("a created_at more than 10 minutes ahead of the server clock is refused", async () => {
+    const { c, rootId } = await engineWithRoot();
+    const far = await c.post("/v1/deltas", { ...deltaBody(rootId, "2"), created_at: inSeconds(11 * 60) });
+    expect(far.status).toBe(400);
+    expect((await json(far)).error?.code).toBe("future_time");
+    expect((await c.post("/v1/deltas", { ...deltaBody(rootId, "3"), created_at: inSeconds(9 * 60) })).status).toBe(201);
   });
   it("deltas never create roots and cannot touch another account's root", async () => {
     const { c } = await engineWithRoot();

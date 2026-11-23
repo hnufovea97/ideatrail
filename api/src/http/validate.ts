@@ -53,6 +53,14 @@ export const zHexText = (bytes: number) => z.string().regex(new RegExp(`^[0-9a-f
 /** RFC 3339 UTC seconds with Z (spec §2). */
 export const zTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
 
+/** How far a signed time may run ahead of the server clock (drift allowance; the dashboard uses the same bound). */
+export const MAX_FUTURE_SKEW_MS = 10 * 60_000;
+
+/** A signed time from the far future would win every "later" comparison in the dashboard merge: refuse it at ingest. */
+export function assertNotFuture(time: string): void {
+  if (Date.parse(time) > Date.now() + MAX_FUTURE_SKEW_MS) throw new ApiError(400, "future_time", "Signed time is ahead of the server clock");
+}
+
 const MAX_SEQ = 2n ** 63n - 1n;
 /** A sequence number as a decimal string, 1..2^63-1 (spec §2, server cap). */
 export const zSeq = z.string().regex(/^[1-9][0-9]{0,18}$/).refine((s) => BigInt(s) <= MAX_SEQ, "sequence too large");

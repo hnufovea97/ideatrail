@@ -109,6 +109,14 @@ describe("POST /v1/records (2.8)", () => {
     expect((await c.post("/v1/records", recordBody({ log_seq: "3", list_meta: toB64u(new Uint8Array([0x49, 0x54, 0x31, 1, ...new Uint8Array(9000)])) }))).status).toBe(400);
   });
 
+  it("a recorded_at more than 10 minutes ahead of the server clock is refused; within it is fine", async () => {
+    const c = engineClient(await seedEngine());
+    const far = await c.post("/v1/records", recordBody({ log_seq: "1", recorded_at: inSeconds(11 * 60) }));
+    expect(far.status).toBe(400);
+    expect((await json(far)).error?.code).toBe("future_time");
+    expect((await c.post("/v1/records", recordBody({ log_seq: "2", recorded_at: inSeconds(9 * 60) }))).status).toBe(201);
+  });
+
   it("revoked engines are refused", async () => {
     const e = await seedEngine({ revoked: true });
     expect((await engineClient(e).post("/v1/records", recordBody({ log_seq: "1" }))).status).toBe(401);
