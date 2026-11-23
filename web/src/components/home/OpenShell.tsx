@@ -3,6 +3,7 @@ import type { Api } from "../../lib/api";
 import { COPY } from "../../lib/copy";
 import { refresh, refreshFailure, type Loaded, type LoadDeps, type RefreshFailure } from "../../lib/dashboard/load";
 import { browserStore } from "../../lib/engine-list";
+import { RowCache } from "../../lib/sync/cache";
 import { chainLine, type ChainStatus } from "../../lib/sync/chain";
 import { emptySync, type SyncState } from "../../lib/sync/store";
 import { SYNC_MS } from "../../lib/timing";
@@ -22,7 +23,8 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
   useEffect(() => {
     let live = true;
     let running = false;
-    const deps: LoadDeps = { api, github: (input, init) => fetch(input, init), marks: browserStore(), now: () => new Date(), alive: () => live && !signal.aborted };
+    const cache = new RowCache(); // verified rows and opened metas of this open vault only
+    const deps: LoadDeps = { api, github: (input, init) => fetch(input, init), marks: browserStore(), now: () => new Date(), alive: () => live && !signal.aborted, cache };
     const run = () => {
       if (running || document.visibilityState !== "visible") return;
       running = true;
@@ -41,6 +43,7 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
     document.addEventListener("visibilitychange", run);
     return () => {
       live = false; // a refresh still in flight is dropped; its keys are the vault's, wiped by the lock
+      cache.clear();
       clearInterval(t);
       document.removeEventListener("visibilitychange", run);
     };

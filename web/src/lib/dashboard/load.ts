@@ -6,6 +6,7 @@ import { commitIndex } from "../mirror/github";
 import { indexFiles } from "../mirror/index-files";
 import { openRepoAccess } from "../mirror/storage";
 import { buildModel, type Built, type IdeaView } from "../model/read-model";
+import type { RowCache } from "../sync/cache";
 import { chainStatus, type ChainIssue, type ChainStatus } from "../sync/chain";
 import { repoMark } from "../sync/marks";
 import { pull } from "../sync/pull";
@@ -13,7 +14,8 @@ import type { SyncState } from "../sync/store";
 import type { DashboardVault } from "../unlock";
 
 /** `alive` is false once the dashboard locked: a refresh in flight then seals, saves and mirrors nothing. */
-export interface LoadDeps { api: Api; github: Fetch; marks: VersionStore; now: () => Date; alive: () => boolean }
+/** `cache` lives as long as the open vault: OpenShell clears it at lock, and so does a refresh that finds it locked. */
+export interface LoadDeps { api: Api; github: Fetch; marks: VersionStore; now: () => Date; alive: () => boolean; cache?: RowCache }
 /** "refused": the storage link points to another repo than the one this browser pinned (sec L2). */
 export type MirrorResult = "none" | "done" | "failed" | "refused";
 /** `mirrorDirty`: a saved merge is not in index/ yet — pass it to the next refresh, which retries until "done". */
@@ -47,9 +49,12 @@ async function mirror(d: LoadDeps, v: DashboardVault, merged: Merged, built: Bui
 }
 
 export async function refresh(d: LoadDeps, v: DashboardVault, prev: SyncState, mirrorDirty = false): Promise<Loaded> {
-  const merged = await mergeAll(d.api, v, d.marks, await pull(d.api, prev), d.alive);
-  if (!d.alive()) return { sync: merged.sync, ideas: [], chain: { state: "checking" }, mirror: "none", mirrorDirty }; // locked: drop everything
-  const built = await buildModel(v, merged.sync, merged.verified, merged.metas);
+  const merged = await mergeAll(d.api, v, d.marks, await pull(d.api, prev), d.alive, { now: d.now(), cache: d.cache });
+  if (!d.alive()) { // locked: drop everything
+    d.cache?.clear();
+    return { sync: merged.sync, ideas: [], chain: { state: "checking" }, mirror: "none", mirrorDirty };
+  }
+  const built = await buildModel(v, merged.sync, merged.verified, merged.metas, d.cache);
   const issues: ChainIssue[] = [...merged.issues, ...built.issues];
   const wanted = mirrorDirty || merged.saved.length > 0;
   // Only a clean, finished view is mirrored: a skipped (rolled-back, unreadable) root must never be written to index/.

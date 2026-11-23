@@ -1,6 +1,7 @@
 // The typed read model M5b renders (ADR-0018). `server` = what Ideatrail already holds in plain (dates, fingerprint,
 // chain state, visibility) — sharp under the "server's data" switch. `locked` = opened on this device — blurred.
 import { emptyRootMeta, type RootMetaV1 } from "../merge/lww";
+import { cached, type RowCache } from "../sync/cache";
 import type { ChainIssue } from "../sync/chain";
 import type { AnchorRow, RecordRow, RootRow } from "../sync/rows";
 import type { SyncState } from "../sync/store";
@@ -112,8 +113,8 @@ function ideaOf(rootId: string, root: RootRow | undefined, found: readonly Item[
 }
 
 /** Open every verified record's list meta and group by idea. Roots come from the records (a missing root row hides nothing). */
-export async function buildModel(v: { userId: string; akPriv: Uint8Array }, sync: SyncState, verified: Verified, rootMetas: ReadonlyMap<string, RootMetaV1>): Promise<Built> {
-  const opened = await Promise.all(verified.records.map(async (row) => ({ row, meta: await openRecordMeta(v.akPriv, v.userId, row) })));
+export async function buildModel(v: { userId: string; akPriv: Uint8Array }, sync: SyncState, verified: Verified, rootMetas: ReadonlyMap<string, RootMetaV1>, cache?: RowCache): Promise<Built> {
+  const opened = await Promise.all(verified.records.map(async (row) => ({ row, meta: await cached(cache, "record", row.record_id, row, () => openRecordMeta(v.akPriv, v.userId, row)) })));
   const issues: ChainIssue[] = [];
   const metas = new Map<string, RecordMeta>();
   const byRoot = new Map<string, Item[]>();

@@ -4,12 +4,18 @@
 import { fromB64u, utf8 } from "@ideatrail/crypto/bytes";
 import { messageFor, sha256Hex, verify } from "@ideatrail/crypto/sign";
 import type { EngineEntry, EngineList, VersionStore } from "../engine-list";
+import { cached, type RowCache } from "./cache";
 import type { ChainIssue } from "./chain";
 import { rememberMax, seenMax, seqMark } from "./marks";
 import type { DeltaRow, RecordRow } from "./rows";
 import type { SyncState } from "./store";
 
 export interface Verified { records: readonly RecordRow[]; deltas: readonly DeltaRow[]; issues: readonly ChainIssue[] }
+/** `now` judges signed times; `cache` keeps signature verdicts across refreshes of one open vault. */
+export interface VerifyOptions { now?: Date; cache?: RowCache }
+
+/** A signed time this far past the browser's clock is refused (clock drift allowance), so it cannot win a merge. */
+export const FUTURE_SKEW_MS = 10 * 60_000;
 
 const MISSING_SHOWN = 5;
 const parentsOf = (p: string) => (p === "-" ? [] : p.split(","));
@@ -37,6 +43,9 @@ function signedBy(userId: string, e: EngineEntry, x: Row): boolean {
   }
 }
 
+const signedAt = (x: Row) => (x.table === "records" ? x.row.recorded_at : x.row.created_at);
+const fromFuture = (x: Row, now: Date) => !(Date.parse(signedAt(x)) <= now.getTime() + FUTURE_SKEW_MS); // NaN counts as future
+
 /**
  * The commitment frozen in the engine list when an engine is disconnected (spec §15 M5a; written by 5.9): hex SHA-256 over
  * the lines "<r|d>\t<log_seq>\t<row id>\t<hex SHA-256 of the row's §8 signed message>" for every accepted row of that engine
@@ -58,8 +67,10 @@ function revokedKeep(userId: string, e: EngineEntry, rows: readonly Row[], issue
   const cut = e.revoked_after_seq;
   const frozen = typeof cut === "string" && DIGITS.test(cut) && typeof e.revoked_digest === "string" && HEX64.test(e.revoked_digest);
   const under = frozen ? rows.filter((x) => BigInt(x.row.log_seq) <= BigInt(cut)) : [];
-  for (const x of rows) if (!under.includes(x)) issues.push({ kind: "unknown_engine", table: x.table, id: idOf(x) });
-  if (under.length === 0) return [];
+  const kept = new Set(under);
+  for (const x of rows) if (!kept.has(x)) issues.push({ kind: "unknown_engine", table: x.table, id: idOf(x) });
+  if (!frozen) return [];
+  // zero rows under the cutoff is still compared (against the digest of the empty set): hiding them all is a mismatch
   const split = { records: under.flatMap((x) => (x.table === "records" ? [x.row] : [])), deltas: under.flatMap((x) => (x.table === "deltas" ? [x.row] : [])) };
   if (revokedDigest(userId, split) === e.revoked_digest) return under;
   issues.push({ kind: "revoked_mismatch", engineId: e.engine_id });
@@ -85,16 +96,23 @@ function gapIssues(engineId: string, seqs: readonly bigint[]): ChainIssue[] {
   return missing.length ? [{ kind: "gap", engineId, missing }] : [];
 }
 
-export function verifyRows(userId: string, list: EngineList, sync: SyncState, marks: VersionStore): Verified {
+export function verifyRows(userId: string, list: EngineList, sync: SyncState, marks: VersionStore, opts: VerifyOptions = {}): Verified {
+  const now = opts.now ?? new Date();
   const engines = new Map(list.engines.map((e) => [e.engine_id, e]));
   const issues: ChainIssue[] = sync.bad.map((table) => ({ kind: "bad_row", table }));
   const signed = new Map<string, Row[]>(); // local builder: per engine, rows with a valid signature
+  for (const e of list.engines) if (isRevoked(e)) signed.set(e.engine_id, []); // a revoked engine is judged even with no row
   const all: Row[] = [...[...sync.records.values()].map((row): Row => ({ table: "records", row })), ...[...sync.deltas.values()].map((row): Row => ({ table: "deltas", row }))];
   for (const x of all) {
     const e = engines.get(x.row.engine_id);
     if (!e) issues.push({ kind: "unknown_engine", table: x.table, id: idOf(x) });
-    else if (!signedBy(userId, e, x)) issues.push({ kind: "bad_signature", table: x.table, id: idOf(x) });
-    else signed.set(e.engine_id, [...(signed.get(e.engine_id) ?? []), x]);
+    else if (fromFuture(x, now)) issues.push({ kind: "future_time", table: x.table, id: idOf(x) });
+    else if (!cached(opts.cache, `sig.${x.table}`, idOf(x), x.row, () => signedBy(userId, e, x))) issues.push({ kind: "bad_signature", table: x.table, id: idOf(x) });
+    else {
+      const list = signed.get(e.engine_id);
+      if (list) list.push(x);
+      else signed.set(e.engine_id, [x]);
+    }
   }
 
   const kept = new Set<Row>();

@@ -11,6 +11,7 @@ import { FakeServer } from "../testing/fake-server";
 import { deltaRow, fakeWorld, linkRow, recordRow, rootRow } from "../testing/fake-world";
 import { wipeVault } from "../unlock";
 import { MAX_ROOT_META_PLAIN, sealRootMeta } from "../merge/root-meta";
+import { RowCache } from "../sync/cache";
 import { refresh, refreshFailure, type LoadDeps } from "./load";
 
 const noGithub: Fetch = async () => { throw new Error("GitHub must not be called"); };
@@ -166,5 +167,29 @@ describe("one dashboard refresh", () => {
     expect(gh.calls).toEqual([]);
     expect(second.mirror).toBe("refused");
     expect(second.chain.state).toBe("warn");
+  });
+
+  it("keeps verified rows and opened metas across refreshes, and drops them when a refresh finds the vault locked", async () => {
+    const { w, server } = await withOpenFragment();
+    const cache = new RowCache();
+    const d = { ...deps(server, fakeGithub().fetch), cache };
+    const first = await refresh(d, w.vault, emptySync());
+    expect(cache.size).toBeGreaterThan(0);
+    await refresh(d, w.vault, first.sync);
+    expect(cache.hits).toBe(2); // the unchanged record: its signature and its opened meta (the saved root and merged fragment are new rows)
+    await refresh({ ...d, alive: () => false }, w.vault, first.sync);
+    expect(cache.size).toBe(0);
+  });
+
+  it("a far-future fragment never wins the merge", async () => {
+    const w = fakeWorld();
+    const root = newId();
+    const server = new FakeServer();
+    server.add({ roots: [rootRow(root)], records: [await recordRow(w, { rootId: root, seq: 1 })],
+      deltas: [await deltaRow(w, { rootId: root, seq: 2, createdAt: "2026-11-23T09:30:00Z", body: { op: "title", value: "미래에서 온 제목" } })] });
+    const out = await refresh({ ...deps(server), now: () => new Date("2026-11-23T09:12:00Z") }, w.vault, emptySync());
+    expect(server.saves).toBe(0);
+    expect(out.ideas[0].locked.title).toBe("가계부 앱");
+    expect(out.chain.state).toBe("warn");
   });
 });

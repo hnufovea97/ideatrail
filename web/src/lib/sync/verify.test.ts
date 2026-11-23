@@ -7,7 +7,8 @@ import { deltaRow, fakeWorld, recordRow, rootRow, syncOf, worldEngine } from "..
 import { chainLine, chainStatus } from "./chain";
 import { seqMark } from "./marks";
 import { applyPage } from "./store";
-import { revokedDigest, verifyRows } from "./verify";
+import { RowCache } from "./cache";
+import { FUTURE_SKEW_MS, revokedDigest, verifyRows } from "./verify";
 
 const NOW = new Date(2026, 10, 23, 9, 12);
 const tags = { op: "tags", value: ["기획"] };
@@ -159,5 +160,49 @@ describe("sync verification (5.2)", () => {
     const w = fakeWorld();
     const s = applyPage(syncOf({}), { roots: [], records: [], deltas: [], anchors: [], storage_links: [], bad: ["records"] }, 0, true);
     expect(verifyRows(w.userId, w.list, s, memoryStore()).issues).toEqual([{ kind: "bad_row", table: "records" }]);
+  });
+
+  it("a revoked engine whose frozen rows were all hidden is a mismatch, not silence", async () => {
+    const w = fakeWorld();
+    const root = newId();
+    const r1 = await recordRow(w, { rootId: root, seq: 1 });
+    const list = revokedList(w, "1", revokedDigest(w.userId, { records: [r1], deltas: [] }));
+    for (const rows of [{}, { records: [await recordRow(w, { rootId: root, seq: 2 })] }]) {
+      const v = verifyRows(w.userId, list, syncOf(rows), memoryStore());
+      expect(v.issues).toContainEqual({ kind: "revoked_mismatch", engineId: w.engine.id });
+    }
+    const none = revokedList(w, "0", revokedDigest(w.userId, { records: [], deltas: [] })); // revoked before its first row
+    expect(verifyRows(w.userId, none, syncOf({}), memoryStore()).issues).toEqual([]);
+  });
+
+  it("a signed time later than now + FUTURE_SKEW_MS drops the row with an issue", async () => {
+    const w = fakeWorld();
+    const root = newId();
+    const now = new Date("2026-11-23T00:00:00Z");
+    const soon = new Date(now.getTime() + FUTURE_SKEW_MS).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const ok = await recordRow(w, { rootId: root, seq: 1, recordedAt: soon });
+    const farRecord = await recordRow(w, { rootId: root, seq: 2, recordedAt: "2099-01-01T00:00:00Z" });
+    const farDelta = await deltaRow(w, { rootId: root, seq: 3, createdAt: "2026-11-23T00:10:01Z", body: tags });
+    const v = verifyRows(w.userId, w.list, syncOf({ records: [ok, farRecord], deltas: [farDelta] }), memoryStore(), { now });
+    expect(v.records.map((r) => r.record_id)).toEqual([ok.record_id]);
+    expect(v.deltas).toEqual([]);
+    expect(v.issues).toContainEqual({ kind: "future_time", table: "records", id: farRecord.record_id });
+    expect(v.issues).toContainEqual({ kind: "future_time", table: "deltas", id: farDelta.delta_id });
+  });
+
+  it("signature checks are cached per (id, change_seq) row; a changed row under the same change_seq is checked again", async () => {
+    const w = fakeWorld();
+    const root = newId();
+    const r = await recordRow(w, { rootId: root, seq: 1 });
+    const cache = new RowCache();
+    verifyRows(w.userId, w.list, syncOf({ records: [r] }), memoryStore(), { cache });
+    expect(cache.hits).toBe(0);
+    verifyRows(w.userId, w.list, syncOf({ records: [r] }), memoryStore(), { cache });
+    expect(cache.hits).toBe(1);
+    const swapped = { ...r, recorded_at: "2026-11-01T00:00:00Z" }; // same id and change_seq, other bytes
+    const v = verifyRows(w.userId, w.list, syncOf({ records: [swapped] }), memoryStore(), { cache });
+    expect(v.issues).toContainEqual({ kind: "bad_signature", table: "records", id: r.record_id });
+    cache.clear();
+    expect(cache.size).toBe(0);
   });
 });

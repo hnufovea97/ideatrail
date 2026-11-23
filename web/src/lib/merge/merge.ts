@@ -7,7 +7,8 @@ import type { ChainIssue } from "../sync/chain";
 import { metaMark, rememberMax } from "../sync/marks";
 import { pull } from "../sync/pull";
 import type { SyncState } from "../sync/store";
-import { verifyRows, type Verified } from "../sync/verify";
+import { cached } from "../sync/cache";
+import { verifyRows, type Verified, type VerifyOptions } from "../sync/verify";
 import { openDelta, UNKNOWN_OP } from "./delta";
 import { applyDeltas, isMerged, type Opened, type RootMetaV1 } from "./lww";
 import { openRootMetas, sealRootMeta } from "./root-meta";
@@ -20,13 +21,13 @@ export interface Merged {
   issues: readonly ChainIssue[];
 }
 
-async function openPending(v: MergeVault, verified: Verified, metas: ReadonlyMap<string, RootMetaV1>): Promise<{ byRoot: Map<string, Opened[]>; issues: ChainIssue[] }> {
+async function openPending(v: MergeVault, verified: Verified, metas: ReadonlyMap<string, RootMetaV1>, opts: VerifyOptions): Promise<{ byRoot: Map<string, Opened[]>; issues: ChainIssue[] }> {
   const issues: ChainIssue[] = [];
   const byRoot = new Map<string, Opened[]>();
   for (const row of verified.deltas) {
     const meta = metas.get(row.root_id);
     if (!meta || isMerged(meta, row)) continue; // the locked merged ranges decide, not the server's merged_at (G5)
-    const body = await openDelta(v.akPriv, v.userId, row);
+    const body = await cached(opts.cache, "delta", row.delta_id, row, () => openDelta(v.akPriv, v.userId, row));
     if (body === null) {
       issues.push({ kind: "unreadable", table: "deltas", id: row.delta_id });
       continue;
@@ -63,14 +64,14 @@ function rootFailure(rootId: string, e: unknown): ChainIssue {
 }
 
 /** `alive` turns false the moment the dashboard locks: nothing is sealed or sent after that (the keys are being wiped). */
-export async function mergeAll(api: Api, v: MergeVault, marks: VersionStore, start: SyncState, alive: () => boolean = () => true): Promise<Merged> {
+export async function mergeAll(api: Api, v: MergeVault, marks: VersionStore, start: SyncState, alive: () => boolean = () => true, opts: VerifyOptions = {}): Promise<Merged> {
   let sync = start;
   const saved: string[] = [];
   for (let attempt = 1; ; attempt++) {
-    const verified = verifyRows(v.userId, v.engineList, sync, marks);
-    const roots = openRootMetas(v, sync, marks);
+    const verified = verifyRows(v.userId, v.engineList, sync, marks, opts);
+    const roots = openRootMetas(v, sync, marks, opts.cache);
     const metas = new Map(roots.metas);
-    const pending = sync.complete ? await openPending(v, verified, metas) : { byRoot: new Map<string, Opened[]>(), issues: [] };
+    const pending = sync.complete ? await openPending(v, verified, metas, opts) : { byRoot: new Map<string, Opened[]>(), issues: [] };
     let conflict = false;
     const issues = [...verified.issues, ...roots.issues, ...pending.issues];
     for (const [rootId, items] of pending.byRoot) {

@@ -5,6 +5,7 @@ import { fromB64u, toB64u, utf8 } from "@ideatrail/crypto/bytes";
 import { assertLiveKey, relock, unlock } from "@ideatrail/crypto/relock";
 import { subkey } from "@ideatrail/crypto/subkey";
 import type { VersionStore } from "../engine-list";
+import { cached, type RowCache } from "../sync/cache";
 import type { ChainIssue } from "../sync/chain";
 import { metaMark, rememberMax, seenMax } from "../sync/marks";
 import type { RootRow } from "../sync/rows";
@@ -57,7 +58,7 @@ export function openRootMeta(mk: Uint8Array, userId: string, row: RootRow): Root
 export interface OpenedRoots { metas: ReadonlyMap<string, RootMetaV1>; issues: readonly ChainIssue[] }
 
 /** Every root's merged meta. A rolled-back or unreadable one is reported and left out (nothing is merged onto it). */
-export function openRootMetas(v: { userId: string; mk: Uint8Array }, sync: SyncState, marks: VersionStore): OpenedRoots {
+export function openRootMetas(v: { userId: string; mk: Uint8Array }, sync: SyncState, marks: VersionStore, cache?: RowCache): OpenedRoots {
   const metas = new Map<string, RootMetaV1>();
   const issues: ChainIssue[] = [];
   for (const row of sync.roots.values()) {
@@ -66,12 +67,18 @@ export function openRootMetas(v: { userId: string; mk: Uint8Array }, sync: SyncS
       issues.push({ kind: "rollback", what: "root_meta", id: row.root_id });
       continue;
     }
-    try {
-      metas.set(row.root_id, openRootMeta(v.mk, v.userId, row));
-    } catch {
+    const meta = cached(cache, "root", row.root_id, row, () => {
+      try {
+        return openRootMeta(v.mk, v.userId, row);
+      } catch {
+        return null;
+      }
+    });
+    if (!meta) {
       issues.push({ kind: "unreadable", table: "roots", id: row.root_id });
       continue;
     }
+    metas.set(row.root_id, meta);
     if (sync.complete) rememberMax(marks, key, BigInt(row.meta_version));
   }
   return { metas, issues };
