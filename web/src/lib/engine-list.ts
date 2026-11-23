@@ -2,7 +2,8 @@ import { fromB64u, toB64u, utf8 } from "@ideatrail/crypto/bytes";
 import { relock, unlock } from "@ideatrail/crypto/relock";
 import { subkey } from "@ideatrail/crypto/subkey";
 
-export interface EngineEntry { engine_id: string; sign_pubkey: string; kem_pubkey: string; name: string; added_at: string }
+/** `revoked_at` (spec §15 M5a): a disconnected engine stays listed so its earlier records still verify. */
+export interface EngineEntry { engine_id: string; sign_pubkey: string; kem_pubkey: string; name: string; added_at: string; revoked_at?: string }
 export interface EngineList { v: 1; version: number; engines: EngineEntry[] }
 
 const aad = (userId: string, version: number) => ({ userId, version: String(version) });
