@@ -8,7 +8,9 @@ export type ChainIssue =
   | { kind: "duplicate_seq"; engineId: string; seq: string }
   | { kind: "revoked_mismatch"; engineId: string } // a disconnected engine's rows differ from the set frozen at disconnect
   | { kind: "rollback"; what: "log_seq" | "root_meta"; id: string }
-  | { kind: "unreadable"; table: "records" | "deltas" | "roots"; id: string };
+  | { kind: "unreadable"; table: "records" | "deltas" | "roots"; id: string }
+  | { kind: "repo_mismatch" } // the storage link points to another GitHub repo than the pinned one: no mirror
+  | { kind: "too_large"; table: "roots"; id: string }; // the merged meta no longer fits: that root is left as it was
 
 export type ChainStatus = { state: "checking" } | { state: "ok"; at: Date } | { state: "warn"; issues: readonly ChainIssue[] };
 

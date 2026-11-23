@@ -8,7 +8,8 @@ import { emptySync, type SyncState } from "../sync/store";
 import { FakeServer } from "../testing/fake-server";
 import { deltaRow, fakeWorld, recordRow, rootRow, type World } from "../testing/fake-world";
 import { mergeAll, MERGE_ATTEMPTS } from "./merge";
-import { openRootMeta } from "./root-meta";
+import type { RootMetaV1 } from "./lww";
+import { MAX_ROOT_META_PLAIN, openRootMeta, sealRootMeta } from "./root-meta";
 
 const BASE = "http://fake.test";
 
@@ -45,7 +46,6 @@ describe("merging fragments (5.3, spec §3.1.10 E)", () => {
     expect(openRootMeta(w.mk, w.userId, server.roots.get(root)!)).toEqual(a.metas.get(root));
     expect(a.metas.get(root)!.cells.title.value).toBe("가계부 앱 v2");
     expect([...server.deltas.values()].every((d) => d.merged_at !== null)).toBe(true);
-    expect(a.pending || b.pending).toBe(false);
   });
 
   it("a fragment arriving during the race is folded in by the retry; the other tab catches up the same", async () => {
@@ -95,7 +95,46 @@ describe("merging fragments (5.3, spec §3.1.10 E)", () => {
     };
     const out = await tab(server, w, emptySync(), alwaysBehind);
     expect(posts).toBe(MERGE_ATTEMPTS);
-    expect(out.pending).toBe(true);
     expect(out.saved).toEqual([]);
+  });
+
+  it("one root too large to save is reported and the other roots still merge", async () => {
+    const w = fakeWorld();
+    const [big, ok] = [newId(), newId()];
+    const full: RootMetaV1 = { v: 1, version: 1, merged: {}, cells: { title: { value: "x".repeat(MAX_ROOT_META_PLAIN - 200), at: "2026-11-10T00:00:00Z", engine: "-", seq: "1" } } };
+    const server = new FakeServer();
+    server.add({
+      roots: [rootRow(big, { meta_version: 1, list_meta: sealRootMeta(w.mk, w.userId, big, full) }), rootRow(ok)],
+      records: [await recordRow(w, { rootId: big, seq: 1 }), await recordRow(w, { rootId: ok, seq: 2 })],
+      deltas: [
+        await deltaRow(w, { rootId: big, seq: 3, body: { op: "tags", value: ["가나다라마바사아자차", "가나다라마바사아자차", "가나다라마바사아자차", "가나다라마바사아자차", "가나다라마바사아자차"] } }),
+        await deltaRow(w, { rootId: ok, seq: 4, body: { op: "title", value: "새 제목" } }),
+      ],
+    });
+    const out = await tab(server, w);
+    expect(out.saved).toEqual([ok]);
+    expect(out.issues).toContainEqual({ kind: "too_large", table: "roots", id: big });
+    expect(out.metas.get(ok)!.cells.title.value).toBe("새 제목");
+  });
+
+  it("a save refused for one root (4xx) is reported as unreadable and the others still merge", async () => {
+    const { w, root, server } = await setup();
+    const other = newId();
+    server.add({ roots: [rootRow(other)], deltas: [await deltaRow(w, { rootId: other, seq: 4, body: { op: "title", value: "다른 것" } })] });
+    const refuseFirst: Fetch = async (input, init) => (init?.method === "POST" && input.includes(root)
+      ? new Response(JSON.stringify({ error: { code: "bad_meta" } }), { status: 400 })
+      : server.fetch(input, init));
+    const out = await tab(server, w, emptySync(), refuseFirst);
+    expect(out.saved).toEqual([other]);
+    expect(out.issues).toContainEqual({ kind: "unreadable", table: "roots", id: root });
+  });
+
+  it("an offline save still fails the whole refresh (not a per-root problem)", async () => {
+    const { w, server } = await setup();
+    const offline: Fetch = async (input, init) => {
+      if (init?.method === "POST") throw new TypeError("network");
+      return server.fetch(input, init);
+    };
+    await expect(tab(server, w, emptySync(), offline)).rejects.toMatchObject({ code: "offline" });
   });
 });

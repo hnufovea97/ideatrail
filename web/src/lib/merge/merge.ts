@@ -1,7 +1,7 @@
 // 5.3 (spec §3.1.10 E): fold each root's open fragments into its merged meta, relock, and save only if nobody saved
 // in between (meta_version). On 409 pull again and fold what is left. Tabs converge because the per-cell order is
 // total (lww.ts). Merges only after a finished pull: it needs the latest root rows.
-import { ApiFailure, type Api } from "../api";
+import { ApiFailure, isRetryable, type Api } from "../api";
 import type { EngineList, VersionStore } from "../engine-list";
 import type { ChainIssue } from "../sync/chain";
 import { metaMark, rememberMax } from "../sync/marks";
@@ -17,7 +17,6 @@ export interface MergeVault { userId: string; mk: Uint8Array; akPriv: Uint8Array
 export interface Merged {
   sync: SyncState; verified: Verified; metas: ReadonlyMap<string, RootMetaV1>;
   saved: readonly string[]; // roots saved by this tab (the mirror runs only then)
-  pending: boolean; // gave up after MERGE_ATTEMPTS conflicts; the next refresh tries again
   issues: readonly ChainIssue[];
 }
 
@@ -56,6 +55,13 @@ async function saveRoot(api: Api, v: MergeVault, rootId: string, meta: RootMetaV
   }
 }
 
+/** A root that cannot be saved (too large, refused) is reported and skipped; no answer or a 5xx fails the refresh. */
+function rootFailure(rootId: string, e: unknown): ChainIssue {
+  if (isRetryable(e)) throw e;
+  const tooLarge = (e instanceof Error && e.message === "root_meta_too_large") || (e instanceof ApiFailure && e.status === 413);
+  return { kind: tooLarge ? "too_large" : "unreadable", table: "roots", id: rootId };
+}
+
 /** `alive` turns false the moment the dashboard locks: nothing is sealed or sent after that (the keys are being wiped). */
 export async function mergeAll(api: Api, v: MergeVault, marks: VersionStore, start: SyncState, alive: () => boolean = () => true): Promise<Merged> {
   let sync = start;
@@ -68,8 +74,15 @@ export async function mergeAll(api: Api, v: MergeVault, marks: VersionStore, sta
     let conflict = false;
     const issues = [...verified.issues, ...roots.issues, ...pending.issues];
     for (const [rootId, items] of pending.byRoot) {
-      if (!alive()) return { sync, verified, metas, saved, pending: true, issues };
-      const next = await saveRoot(api, v, rootId, metas.get(rootId)!, items);
+      if (!alive()) return { sync, verified, metas, saved, issues };
+      let next: RootMetaV1 | null;
+      try {
+        next = await saveRoot(api, v, rootId, metas.get(rootId)!, items);
+      } catch (e) {
+        if (!alive()) throw e; // locked mid-save (wiped keys): nothing to report
+        issues.push(rootFailure(rootId, e));
+        continue;
+      }
       if (!next) {
         conflict = true;
         continue;
@@ -78,8 +91,8 @@ export async function mergeAll(api: Api, v: MergeVault, marks: VersionStore, sta
       saved.push(rootId);
       rememberMax(marks, metaMark(v.userId, rootId), BigInt(next.version));
     }
-    if (!conflict || attempt >= MERGE_ATTEMPTS) return { sync, verified, metas, saved, pending: conflict, issues };
-    if (!alive()) return { sync, verified, metas, saved, pending: true, issues };
+    // gave up after MERGE_ATTEMPTS conflicts: the fragments stay open and the next refresh tries again
+    if (!conflict || attempt >= MERGE_ATTEMPTS || !alive()) return { sync, verified, metas, saved, issues };
     sync = await pull(api, sync); // another tab or device saved first: take its meta and fold only what is left
   }
 }
