@@ -88,15 +88,42 @@ describe("sync verification (5.2)", () => {
     expect(marks.get(seqMark(w.userId, w.engine.id))).toBe("3");
   });
 
-  it("a revoked engine: earlier records still count, later ones are refused", async () => {
+  it("a revoked engine: rows up to the frozen cutoff seq still count, later ones are refused", async () => {
     const w = fakeWorld();
-    const list = { ...w.list, engines: [{ ...w.engine.entry, revoked_at: "2026-11-10T12:00:00Z" }] };
+    const list = { ...w.list, engines: [{ ...w.engine.entry, revoked_at: "2026-11-10T12:00:00Z", revoked_after_seq: "1" }] };
     const root = newId();
     const before = await recordRow(w, { rootId: root, seq: 1, recordedAt: "2026-11-10T00:00:00Z" });
     const after = await recordRow(w, { rootId: root, seq: 2, recordedAt: "2026-11-11T00:00:00Z" });
     const v = verifyRows(w.userId, list, syncOf({ records: [before, after] }), memoryStore());
     expect(v.records.map((r) => r.record_id)).toEqual([before.record_id]);
     expect(v.issues).toContainEqual({ kind: "unknown_engine", table: "records", id: after.record_id });
+  });
+
+  it("a revoked engine's key cannot backdate new rows: seq above the cutoff is refused whatever the signed time", async () => {
+    const w = fakeWorld();
+    const list = { ...w.list, engines: [{ ...w.engine.entry, revoked_at: "2026-11-10T12:00:00Z", revoked_after_seq: "2" }] };
+    const root = newId();
+    const ok1 = await recordRow(w, { rootId: root, seq: 1, recordedAt: "2026-11-09T00:00:00Z" });
+    const ok2 = await deltaRow(w, { rootId: root, seq: 2, createdAt: "2026-11-09T01:00:00Z", body: tags });
+    const backRecord = await recordRow(w, { rootId: root, seq: 3, recordedAt: "2026-11-01T00:00:00Z" });
+    const backDelta = await deltaRow(w, { rootId: root, seq: 4, createdAt: "2026-11-01T00:00:00Z", body: tags });
+    const v = verifyRows(w.userId, list, syncOf({ records: [ok1, backRecord], deltas: [ok2, backDelta] }), memoryStore());
+    expect(v.records.map((r) => r.record_id)).toEqual([ok1.record_id]);
+    expect(v.deltas.map((d) => d.delta_id)).toEqual([ok2.delta_id]);
+    expect(v.issues).toContainEqual({ kind: "unknown_engine", table: "records", id: backRecord.record_id });
+    expect(v.issues).toContainEqual({ kind: "unknown_engine", table: "deltas", id: backDelta.delta_id });
+  });
+
+  it("revoked_at without a frozen cutoff accepts none of that engine's rows", async () => {
+    const w = fakeWorld();
+    const list = { ...w.list, engines: [{ ...w.engine.entry, revoked_at: "2026-11-10T12:00:00Z" }] };
+    const root = newId();
+    const r = await recordRow(w, { rootId: root, seq: 1, recordedAt: "2026-11-01T00:00:00Z" });
+    const d = await deltaRow(w, { rootId: root, seq: 2, createdAt: "2026-11-01T00:00:00Z", body: tags });
+    const v = verifyRows(w.userId, list, syncOf({ records: [r], deltas: [d] }), memoryStore());
+    expect([v.records, v.deltas]).toEqual([[], []]);
+    expect(v.issues).toContainEqual({ kind: "unknown_engine", table: "records", id: r.record_id });
+    expect(v.issues).toContainEqual({ kind: "unknown_engine", table: "deltas", id: d.delta_id });
   });
 
   it("malformed rows from the server are reported", async () => {

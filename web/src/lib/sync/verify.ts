@@ -13,7 +13,14 @@ export interface Verified { records: readonly RecordRow[]; deltas: readonly Delt
 
 const MISSING_SHOWN = 5;
 const parentsOf = (p: string) => (p === "-" ? [] : p.split(","));
-const usable = (e: EngineEntry | undefined, at: string): e is EngineEntry => !!e && (!e.revoked_at || at <= e.revoked_at);
+const CUTOFF = /^[0-9]{1,20}$/;
+/** A revoked engine counts only up to its frozen cutoff seq (spec §15 M5a) — never by its own signed time. */
+function usable(e: EngineEntry | undefined, seq: string): e is EngineEntry {
+  if (!e) return false;
+  if (e.revoked_at === undefined && e.revoked_after_seq === undefined) return true;
+  const cut = e.revoked_after_seq;
+  return typeof cut === "string" && CUTOFF.test(cut) && BigInt(seq) <= BigInt(cut);
+}
 
 function signedBy(e: EngineEntry, message: () => Uint8Array, sig: string): boolean {
   try {
@@ -60,14 +67,14 @@ export function verifyRows(userId: string, list: EngineList, sync: SyncState, ma
 
   const records = [...sync.records.values()].filter((r) => {
     const e = engines.get(r.engine_id);
-    if (!usable(e, r.recorded_at)) return (issues.push({ kind: "unknown_engine", table: "records", id: r.record_id }), false);
+    if (!usable(e, r.log_seq)) return (issues.push({ kind: "unknown_engine", table: "records", id: r.record_id }), false);
     if (!recordSigned(userId, e, r)) return (issues.push({ kind: "bad_signature", table: "records", id: r.record_id }), false);
     counted(r.engine_id, r.log_seq);
     return true;
   });
   const deltas = [...sync.deltas.values()].filter((d) => {
     const e = engines.get(d.engine_id);
-    if (!usable(e, d.created_at)) return (issues.push({ kind: "unknown_engine", table: "deltas", id: d.delta_id }), false);
+    if (!usable(e, d.log_seq)) return (issues.push({ kind: "unknown_engine", table: "deltas", id: d.delta_id }), false);
     if (!deltaSigned(userId, e, d)) return (issues.push({ kind: "bad_signature", table: "deltas", id: d.delta_id }), false);
     counted(d.engine_id, d.log_seq);
     return true;
