@@ -56,7 +56,8 @@ async function saveRoot(api: Api, v: MergeVault, rootId: string, meta: RootMetaV
   }
 }
 
-export async function mergeAll(api: Api, v: MergeVault, marks: VersionStore, start: SyncState): Promise<Merged> {
+/** `alive` turns false the moment the dashboard locks: nothing is sealed or sent after that (the keys are being wiped). */
+export async function mergeAll(api: Api, v: MergeVault, marks: VersionStore, start: SyncState, alive: () => boolean = () => true): Promise<Merged> {
   let sync = start;
   const saved: string[] = [];
   for (let attempt = 1; ; attempt++) {
@@ -65,7 +66,9 @@ export async function mergeAll(api: Api, v: MergeVault, marks: VersionStore, sta
     const metas = new Map(roots.metas);
     const pending = sync.complete ? await openPending(v, verified, metas) : { byRoot: new Map<string, Opened[]>(), issues: [] };
     let conflict = false;
+    const issues = [...verified.issues, ...roots.issues, ...pending.issues];
     for (const [rootId, items] of pending.byRoot) {
+      if (!alive()) return { sync, verified, metas, saved, pending: true, issues };
       const next = await saveRoot(api, v, rootId, metas.get(rootId)!, items);
       if (!next) {
         conflict = true;
@@ -75,8 +78,8 @@ export async function mergeAll(api: Api, v: MergeVault, marks: VersionStore, sta
       saved.push(rootId);
       rememberMax(marks, metaMark(v.userId, rootId), BigInt(next.version));
     }
-    const issues = [...verified.issues, ...roots.issues, ...pending.issues];
     if (!conflict || attempt >= MERGE_ATTEMPTS) return { sync, verified, metas, saved, pending: conflict, issues };
+    if (!alive()) return { sync, verified, metas, saved, pending: true, issues };
     sync = await pull(api, sync); // another tab or device saved first: take its meta and fold only what is left
   }
 }

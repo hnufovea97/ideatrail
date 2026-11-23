@@ -32,6 +32,11 @@ describe("root_meta relock (spec §15 M5a)", () => {
     const big: RootMetaV1 = { ...meta(1), cells: { title: { value: "x".repeat(MAX_ROOT_META_PLAIN), at: "2026-11-11T00:00:00Z", engine: "-", seq: "1" } } };
     expect(() => sealRootMeta(w.mk, w.userId, newId(), big)).toThrow("root_meta_too_large");
   });
+  it("refuses to seal with a wiped master key (the lock zeroes it in place)", () => {
+    const w = fakeWorld();
+    w.mk.fill(0);
+    expect(() => sealRootMeta(w.mk, w.userId, newId(), meta(1))).toThrow("zero_key");
+  });
   it("openRootMetas: a meta_version lower than this browser saw is a rollback and is not used", () => {
     const w = fakeWorld();
     const root = newId();

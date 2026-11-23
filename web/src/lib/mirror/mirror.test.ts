@@ -68,6 +68,14 @@ describe("index/ mirror (spec §12, §15 M5a)", () => {
     expect(read("index_records", INDEX_RECORDS).records[0]).toMatchObject({ record_id: rec.record_id, root_id: root, log_seq: "1", commitment: rec.commitment, meta: { title: "가계부 앱" } });
   });
 
+  it("refuses to build index files with a wiped master key", async () => {
+    const w = fakeWorld();
+    const s = syncOf({});
+    const v = verifyRows(w.userId, w.list, s, memoryStore());
+    w.mk.fill(0);
+    expect(() => indexFiles(w.vault, s, v, new Map(), new Map())).toThrow("zero_key");
+  });
+
   it("opens the GitHub access from a storage link a listed engine signed — nothing else", async () => {
     const w = fakeWorld();
     const link = await linkRow(w);

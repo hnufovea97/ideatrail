@@ -11,9 +11,14 @@ export function relockKind(purpose: string): number {
   return 0x80 + i + 1;
 }
 
+/** Throws on an all-zero key: a key wiped in place by a lock must never encrypt anything that leaves the device. */
+export function assertLiveKey(key: Uint8Array): void {
+  if (key.every((b) => b === 0)) throw new Error("zero_key");
+}
+
 /** Encrypt the browser's own data under subkey(purpose) with a fresh random nonce (spec §5). */
 export const relock = (key: Uint8Array, purpose: Purpose, a: AAD, pt: Uint8Array): Uint8Array =>
-  lockRaw(key, relockKind(purpose), buildAAD(purpose, a), pt, freshNonce());
+  (assertLiveKey(key), lockRaw(key, relockKind(purpose), buildAAD(purpose, a), pt, freshNonce()));
 
 export const unlock = (key: Uint8Array, purpose: Purpose, a: AAD, blob: Uint8Array): Uint8Array =>
   unlockRaw(key, relockKind(purpose), buildAAD(purpose, a), blob);

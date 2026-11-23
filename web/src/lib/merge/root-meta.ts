@@ -2,7 +2,7 @@
 // The version in the AAD and in the plaintext must both equal the row's meta_version — the server cannot pair an old
 // blob with a new number; a whole old row is caught by the it.mv mark.
 import { fromB64u, toB64u, utf8 } from "@ideatrail/crypto/bytes";
-import { relock, unlock } from "@ideatrail/crypto/relock";
+import { assertLiveKey, relock, unlock } from "@ideatrail/crypto/relock";
 import { subkey } from "@ideatrail/crypto/subkey";
 import type { VersionStore } from "../engine-list";
 import type { ChainIssue } from "../sync/chain";
@@ -24,6 +24,7 @@ const isCell = (c: unknown): c is Cell => isObj(c) && "value" in c && typeof c.a
 const isRanges = (r: unknown): r is Ranges => Array.isArray(r) && r.every((x) => Array.isArray(x) && x.length === 2 && x.every((s) => typeof s === "string" && SEQ.test(s)));
 
 export function sealRootMeta(mk: Uint8Array, userId: string, rootId: string, meta: RootMetaV1): string {
+  assertLiveKey(mk); // a locked (wiped) vault: subkey() of zeros would still give a key the server can derive
   const pt = utf8(JSON.stringify(meta));
   if (pt.length > MAX_ROOT_META_PLAIN) throw new Error("root_meta_too_large");
   const k = subkey(mk, "root_meta");

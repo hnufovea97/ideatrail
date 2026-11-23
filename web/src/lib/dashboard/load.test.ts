@@ -9,11 +9,12 @@ import { emptySync } from "../sync/store";
 import { fakeGithub } from "../testing/fake-github";
 import { FakeServer } from "../testing/fake-server";
 import { deltaRow, fakeWorld, linkRow, recordRow, rootRow } from "../testing/fake-world";
+import { wipeVault } from "../unlock";
 import { refresh, type LoadDeps } from "./load";
 
 const noGithub: Fetch = async () => { throw new Error("GitHub must not be called"); };
 const deps = (server: FakeServer, github: Fetch = noGithub): LoadDeps =>
-  ({ api: createApi("http://fake.test", server.fetch), github, marks: memoryStore(), now: () => new Date(2026, 10, 23, 9, 12) });
+  ({ api: createApi("http://fake.test", server.fetch), github, marks: memoryStore(), now: () => new Date(2026, 10, 23, 9, 12), alive: () => true });
 
 describe("one dashboard refresh", () => {
   it("a clean account: '정상', the idea, no GitHub call", async () => {
@@ -61,5 +62,46 @@ describe("one dashboard refresh", () => {
     expect(gh.calls.some((c) => c.method === "PATCH")).toBe(true);
     const again = await refresh(deps(server, noGithub), w.vault, out.sync);
     expect(again.mirror).toBe("none"); // nothing new merged: no write
+  });
+
+  async function withOpenFragment() {
+    const w = fakeWorld();
+    const root = newId();
+    const server = new FakeServer();
+    server.add({ roots: [rootRow(root)], records: [await recordRow(w, { rootId: root, seq: 1 })],
+      deltas: [await deltaRow(w, { rootId: root, seq: 2, body: { op: "tags", value: ["협의"] } })], links: [await linkRow(w)] });
+    return { w, server };
+  }
+
+  it("a lock landing just before the save: no seal, no save, no GitHub write", async () => {
+    const { w, server } = await withOpenFragment();
+    const gh = fakeGithub();
+    const ctl = new AbortController();
+    let checks = 0;
+    const alive = () => {
+      if (++checks === 1) { ctl.abort(); wipeVault(w.vault); } // the lock: abort first, then wipe the keys in place
+      return !ctl.signal.aborted;
+    };
+    await refresh({ ...deps(server, gh.fetch), alive }, w.vault, emptySync()).catch(() => undefined);
+    expect(checks).toBeGreaterThan(0);
+    expect(server.saves).toBe(0);
+    expect(gh.calls).toEqual([]);
+  });
+
+  it("a lock after the save but before the mirror: no GitHub write", async () => {
+    const { w, server } = await withOpenFragment();
+    const gh = fakeGithub();
+    const ctl = new AbortController();
+    const d = { ...deps(server, gh.fetch), alive: () => !ctl.signal.aborted };
+    const save = server.fetch;
+    d.api = createApi("http://fake.test", async (input, init) => {
+      const res = await save(input, init);
+      if (init?.method === "POST") { ctl.abort(); wipeVault(w.vault); }
+      return res;
+    });
+    const out = await refresh(d, w.vault, emptySync());
+    expect(server.saves).toBe(1);
+    expect(gh.calls).toEqual([]);
+    expect(out.mirror).toBe("none");
   });
 });

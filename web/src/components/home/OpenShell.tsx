@@ -8,11 +8,12 @@ import { emptySync, type SyncState } from "../../lib/sync/store";
 import { SYNC_MS } from "../../lib/timing";
 import type { DashboardVault } from "../../lib/unlock";
 
-interface Props { api: Api; vault: DashboardVault; onLock(): void }
+/** `signal` is aborted by the lock before it wipes the keys: a refresh in flight then writes nothing. */
+interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onLock(): void }
 const CHECKING: ChainStatus = { state: "checking" };
 
 /** The unlocked page. M5a shows the chain line and the idea count; the home UI (5.4) renders `loaded.ideas` in M5b. */
-export function OpenShell({ api, vault, onLock }: Props) {
+export function OpenShell({ api, vault, signal, onLock }: Props) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [offline, setOffline] = useState(false);
   const sync = useRef<SyncState>(emptySync());
@@ -20,7 +21,7 @@ export function OpenShell({ api, vault, onLock }: Props) {
   useEffect(() => {
     let live = true;
     let running = false;
-    const deps: LoadDeps = { api, github: (input, init) => fetch(input, init), marks: browserStore(), now: () => new Date() };
+    const deps: LoadDeps = { api, github: (input, init) => fetch(input, init), marks: browserStore(), now: () => new Date(), alive: () => live && !signal.aborted };
     const run = () => {
       if (running || document.visibilityState !== "visible") return;
       running = true;
@@ -41,7 +42,7 @@ export function OpenShell({ api, vault, onLock }: Props) {
       clearInterval(t);
       document.removeEventListener("visibilitychange", run);
     };
-  }, [api, vault]);
+  }, [api, vault, signal]);
 
   const chain = loaded?.chain ?? CHECKING;
   return (

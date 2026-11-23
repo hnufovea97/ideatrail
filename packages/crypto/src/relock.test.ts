@@ -50,11 +50,17 @@ describe("nonce source", () => {
   afterEach(() => vi.restoreAllMocks());
   it("every relock draws a fresh 24-byte nonce from crypto.getRandomValues", () => {
     const spy = vi.spyOn(globalThis.crypto, "getRandomValues");
-    const key = new Uint8Array(32);
+    const key = new Uint8Array(32).fill(7); // any live key (an all-zero key is refused)
     const a = relock(key, PURPOSES[0], {}, utf8("x"));
     const b = relock(key, PURPOSES[0], {}, utf8("x"));
     expect(spy).toHaveBeenCalledTimes(2);
     expect(spy.mock.calls.every(([arr]) => (arr as Uint8Array).length === 24)).toBe(true);
     expect(toHex(a.subarray(4, 28))).not.toBe(toHex(b.subarray(4, 28)));
+  });
+});
+
+describe("relock refuses a wiped key (defense in depth, M5a)", () => {
+  it("throws zero_key instead of encrypting under an all-zero key", () => {
+    expect(() => relock(new Uint8Array(32), "root_meta", { userId: "01jcm3v8q7s2kx4f9d6b5n0ta1" }, new Uint8Array([1]))).toThrow("zero_key");
   });
 });

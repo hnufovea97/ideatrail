@@ -1,7 +1,7 @@
 // index/roots.it1 and index/records.it1 (spec §12, §15 M5a): the whole merged list info, relocked with
 // subkey(MK,"index_roots" | "index_records"), AAD {user_id}. Rewritten whole after each saved merge.
 import { utf8 } from "@ideatrail/crypto/bytes";
-import { relock } from "@ideatrail/crypto/relock";
+import { assertLiveKey, relock } from "@ideatrail/crypto/relock";
 import { subkey } from "@ideatrail/crypto/subkey";
 import type { RootMetaV1 } from "../merge/lww";
 import type { RecordMeta } from "../model/meta";
@@ -12,6 +12,7 @@ export const INDEX_ROOTS = "index/roots.it1";
 export const INDEX_RECORDS = "index/records.it1";
 
 function lock(v: { userId: string; mk: Uint8Array }, purpose: "index_roots" | "index_records", body: unknown): Uint8Array {
+  assertLiveKey(v.mk); // never relock under a key derived from a wiped master key
   const k = subkey(v.mk, purpose);
   try {
     return relock(k, purpose, { userId: v.userId }, utf8(JSON.stringify(body)));

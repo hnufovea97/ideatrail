@@ -11,15 +11,16 @@ import { pull } from "../sync/pull";
 import type { SyncState } from "../sync/store";
 import type { DashboardVault } from "../unlock";
 
-export interface LoadDeps { api: Api; github: Fetch; marks: VersionStore; now: () => Date }
+/** `alive` is false once the dashboard locked: a refresh in flight then seals, saves and mirrors nothing. */
+export interface LoadDeps { api: Api; github: Fetch; marks: VersionStore; now: () => Date; alive: () => boolean }
 export type MirrorResult = "none" | "done" | "failed";
 export interface Loaded { sync: SyncState; ideas: readonly IdeaView[]; chain: ChainStatus; mirror: MirrorResult }
 
 async function mirror(d: LoadDeps, v: DashboardVault, merged: Merged, built: Built): Promise<MirrorResult> {
-  if (merged.saved.length === 0) return "none";
+  if (merged.saved.length === 0 || !d.alive()) return "none";
   try {
     const access = await openRepoAccess(v, v.engineList, merged.sync.links.values());
-    if (!access) return "none"; // GitHub not connected yet: D1 only (spec §3.1.10 E)
+    if (!access || !d.alive()) return "none"; // GitHub not connected yet: D1 only (spec §3.1.10 E)
     await commitIndex(d.github, access, indexFiles(v, merged.sync, merged.verified, merged.metas, built.metas));
     return "done";
   } catch {
@@ -28,7 +29,8 @@ async function mirror(d: LoadDeps, v: DashboardVault, merged: Merged, built: Bui
 }
 
 export async function refresh(d: LoadDeps, v: DashboardVault, prev: SyncState): Promise<Loaded> {
-  const merged = await mergeAll(d.api, v, d.marks, await pull(d.api, prev));
+  const merged = await mergeAll(d.api, v, d.marks, await pull(d.api, prev), d.alive);
+  if (!d.alive()) return { sync: merged.sync, ideas: [], chain: { state: "checking" }, mirror: "none" }; // locked: drop everything
   const built = await buildModel(v, merged.sync, merged.verified, merged.metas);
   return {
     sync: merged.sync,
