@@ -25,6 +25,7 @@ export function startAutoLock(minutes: number, onLock: () => void): AutoLock {
   return {
     touch: () => {
       if (done) return;
+      if (Date.now() - last >= limit) return check(); // the limit passed while timers slept: activity cannot undo it
       last = Date.now();
       arm();
     },

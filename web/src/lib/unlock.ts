@@ -13,7 +13,6 @@ import { assertWithPrf, type Unlocked } from "./webauthn";
 
 export const DEFAULT_LOCK_MINUTES = 5;
 const MIN_LOCK_MINUTES = 1;
-const MAX_LOCK_MINUTES = 60;
 
 export interface DashboardVault extends Vault { engineList: EngineList; autoLockMinutes: number }
 
@@ -40,8 +39,9 @@ export function wipeVault(v: Vault): void {
   v.akPriv.fill(0);
 }
 
+/** The server's users.auto_lock_minutes may only shorten the default (an unread server value must not keep keys longer). */
 const clampMinutes = (m: unknown): number =>
-  Number.isInteger(m) ? Math.min(MAX_LOCK_MINUTES, Math.max(MIN_LOCK_MINUTES, m as number)) : DEFAULT_LOCK_MINUTES;
+  typeof m === "number" && Number.isInteger(m) ? Math.min(DEFAULT_LOCK_MINUTES, Math.max(MIN_LOCK_MINUTES, m)) : DEFAULT_LOCK_MINUTES;
 
 function apiReason(e: unknown, refused: UnlockReason): UnlockFailure {
   if (e instanceof ApiFailure && e.code === "offline") return new UnlockFailure("offline");

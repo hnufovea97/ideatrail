@@ -79,10 +79,10 @@ describe("open the vault after the passkey (5.1)", () => {
     const a = account();
     expect(await reasonOf(openVault(fakeApi(a).api, prepared, got(new Uint8Array(32).fill(8)), memoryStore()))).toBe("failed");
   });
-  it("auto-lock minutes are clamped to 1–60, default 5", async () => {
-    for (const [given, want] of [[0, 1], [999, 60], [undefined, 5], [15, 15]] as const) {
+  it("auto-lock minutes: the server may only lower the 5-minute default (1–5); anything odd is 5", async () => {
+    for (const [given, want] of [[0, 1], [999, 5], [undefined, 5], [15, 5], [3, 3], [2.5, 5], ["3", 5]] as const) {
       const a = account();
-      const v = await openVault(fakeApi(a, { account: async () => ({ ...a.info, auto_lock_minutes: given }) }).api, prepared, got(), memoryStore());
+      const v = await openVault(fakeApi(a, { account: async () => ({ ...a.info, auto_lock_minutes: given as number }) }).api, prepared, got(), memoryStore());
       expect(v.autoLockMinutes).toBe(want);
     }
   });

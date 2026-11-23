@@ -20,6 +20,14 @@ describe("auto-lock (5.1)", () => {
     expect(zero(v.mk) && zero(v.akPriv)).toBe(true);
     expect(locks).toBe(1);
   });
+  it("activity after the limit has already passed (a sleeping tab) locks instead of pushing it back", () => {
+    vi.useFakeTimers();
+    let locks = 0;
+    const lock = startAutoLock(5, () => locks++);
+    vi.setSystemTime(Date.now() + 6 * MIN); // the clock jumps, the timer has not fired
+    lock.touch();
+    expect(locks).toBe(1);
+  });
   it("activity pushes the lock back", () => {
     vi.useFakeTimers();
     let locks = 0;
