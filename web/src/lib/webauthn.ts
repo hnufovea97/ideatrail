@@ -73,6 +73,26 @@ export async function assertWithPasskey(o: RequestOptionsJSON, nav: CredentialsC
   return assertionJSON(asCredential(c));
 }
 
+export interface Unlocked { assertion: AssertionJSON; rawId: Uint8Array; prf: Uint8Array | null }
+
+/**
+ * Login = unlock (UX "기기 잠금 한 번 = 로그인 + 열쇠 풀기"): the server's challenge plus the PRF salt in one get.
+ * The PRF output stays here; assertionJSON always sends `clientExtensionResults: {}`. Starts synchronously.
+ */
+export async function assertWithPrf(o: RequestOptionsJSON, nav: CredentialsContainer = navigator.credentials): Promise<Unlocked> {
+  const c = asCredential(await nav.get({
+    publicKey: {
+      challenge: ab(fromB64u(o.challenge)),
+      rpId: o.rpId,
+      timeout: o.timeout,
+      userVerification: "required",
+      allowCredentials: (o.allowCredentials ?? []).map((x) => ({ type: "public-key" as const, id: ab(fromB64u(x.id)) })),
+      extensions: prfInput(),
+    },
+  }));
+  return { assertion: assertionJSON(c), rawId: new Uint8Array(c.rawId), prf: prfOf(c) };
+}
+
 /** What /register/verify receives. Extension results are always {} — the PRF output never leaves the browser. */
 export function registrationJSON(c: PublicKeyCredential): RegistrationJSON {
   const r = c.response as AuthenticatorAttestationResponse;
