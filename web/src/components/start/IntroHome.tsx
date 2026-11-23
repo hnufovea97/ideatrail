@@ -32,7 +32,7 @@ export function IntroHome() {
       <p class={server ? "server-note on" : "server-note"} aria-live="polite">{server ? h.serverNote : h.deviceNote}</p>
       <div class="mini-card">
         <p class="mini-name"><Locked server={server}>{h.name}</Locked> <span class="lock" role="img" aria-label="잠김">🔒</span></p>
-        <p class="mini-dates">{h.labels.first} {h.first} · {h.labels.last} {h.last}</p>
+        <p class="mini-dates">{h.labels.first} {h.first} / {h.labels.last} {h.last}</p>
         <p class="mini-note"><Locked server={server}>{h.nameNote}</Locked></p>
         <ol class="mini-bar" aria-label={`단계 ${h.current + 1}/${h.stages.length}`}>
           {h.stages.map((s, i) => (

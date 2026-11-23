@@ -74,6 +74,7 @@ describe("screen copy", () => {
   it("first-screen home example follows the prototype home with today's decisions (ADR-0018)", () => {
     const h = COPY.intro.home;
     expect(h.stages).toEqual(["착상", "기획 중", "기획 확정", "개발 중", "MVP 완료"]);
+    for (const d of [h.first, h.last]) expect(d).toMatch(/^\d{2}\.\d{2}\.\d{2}$/); // founder: 최초 기록 26.09.03 / 마지막 기록
     for (const v of h.versions) expect(v.fp).toMatch(/^[0-9a-f]{3}…[0-9a-f]{3}$/); // start and end only
     expect(h.versions.map((v) => v.chain).sort()).toEqual(["done", "pending"]);
     expect(h.chain).toEqual({ done: "블록체인 확산됨", pending: "블록체인 진행 중" });

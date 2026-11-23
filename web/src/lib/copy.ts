@@ -33,18 +33,18 @@ export const COPY = {
       title: "나중엔 이렇게 한눈에 봐요 (예시 · 곧 생겨요)", // 새 문구
       name: "가계부 앱",
       nameNote: "이 이름은 이 기기에서 풀었어요", // 새 문구
-      first: "11월 3일",
-      last: "11월 18일",
+      first: "26.11.03",
+      last: "26.11.18",
       labels: { first: "최초 기록", last: "마지막 기록", decided: "결정", deferred: "미룸", turn: "변곡점", file: "원래 위치" },
       stages: ["착상", "기획 중", "기획 확정", "개발 중", "MVP 완료"],
       current: 2,
-      stageRange: "11월 10일 – 18일",
+      stageRange: "11.10 – 11.18",
       decided: 2,
       deferred: 1,
       turn: "카드 연동 빼기",
       versions: [
-        { when: "11월 18일", what: "개선 1 · 카드 연동 빼기", file: "결정-카드연동.md", fp: "a3f…9c1", chain: "pending" },
-        { when: "11월 10일", what: "초안", file: "기획-초안.md", fp: "5d2…0b3", chain: "done" },
+        { when: "11.18", what: "개선 1 · 카드 연동 빼기", file: "결정-카드연동.md", fp: "a3f…9c1", chain: "pending" },
+        { when: "11.10", what: "초안", file: "기획-초안.md", fp: "5d2…0b3", chain: "done" },
       ],
       chain: { done: "블록체인 확산됨", pending: "블록체인 진행 중" },
       toggle: "Ideatrail 서버가 가진 데이터", // 새 문구

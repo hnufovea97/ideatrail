@@ -141,7 +141,7 @@ function renderList(){
   <span class="nm"><span class="lk">${esc(d.name)}</span>${lock(d.pri)}</span>
   <span class="small"><span class="lk">${d.stage}/5 ${STAGES[d.stage-1]}</span></span>
   <span class="mini" aria-hidden="true"><i style="width:${d.stage*20}%"></i></span>
-  <span class="small">최초 ${d.first.slice(5)} · 마지막 ${d.last.slice(5)}</span></button>`).join(""):`<p class="empty">${tab==="pub"?"공유 가능으로 둔 기록이 없어요. 기록은 기본으로 나만 봐요.":"나만 보는 기록이 없어요."}</p>`;
+  <span class="small">최초 기록 ${d.first.slice(2)} / 마지막 기록 ${d.last.slice(2)}</span></button>`).join(""):`<p class="empty">${tab==="pub"?"공유 가능으로 둔 기록이 없어요. 기록은 기본으로 나만 봐요.":"나만 보는 기록이 없어요."}</p>`;
 }
 function renderDetail(){
  const d=IDEAS[sel],st=d.stages[selStage];
@@ -154,7 +154,7 @@ function renderDetail(){
  $("detail").innerHTML=`<div><h2><span class="lk">${esc(d.name)}</span>${lock(d.pri)}</h2>
   <p class="tags lk">${d.tags.map(t=>"#"+esc(t)).join(" ")} · 결정 ${sum(d,"decided")} · 미룸 ${sum(d,"deferred")} · Claude Code가 기록</p>
   <p class="how lk">이 제목은 이 기기에서 풀었어요 · <a href="#how" onclick="return false">어떻게?</a></p></div>
-  <div class="dates"><span class="date"><b>최초 기록</b>${d.first}</span><span class="date"><b>마지막 기록</b>${d.last}</span></div>
+  <div class="dates"><span class="date"><b>최초 기록</b>${d.first.slice(2)}</span><span class="date"><b>마지막 기록</b>${d.last.slice(2)}</span></div>
   <div class="bar" role="group" aria-label="단계 ${d.stage}/5">${segs}</div>${panel}`;
 }
 function render(){renderList();renderDetail()}
