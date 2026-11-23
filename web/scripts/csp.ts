@@ -10,6 +10,8 @@ const INLINE_SCRIPT = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
 const INLINE_STYLE = /<style[^>]*>([\s\S]*?)<\/style>/gi;
 const META_CHARSET = /<meta charset="utf-8"\s*\/?>/i;
 
+const GITHUB_API = "https://api.github.com"; // index/ mirror (M5a) and originals (M5b); data only, never scripts
+
 const sha = (s: string) => `'sha256-${createHash("sha256").update(s, "utf8").digest("base64")}'`;
 const hashesOf = (html: string, re: RegExp) => [...new Set([...html.matchAll(re)].map((m) => sha(m[1])))];
 
@@ -19,7 +21,7 @@ export function policyFor(html: string, apiBase: string): string {
   const styles = ["'self'", ...hashesOf(html, INLINE_STYLE)].join(" ");
   return [
     "default-src 'none'", `script-src ${scripts}`, `style-src ${styles}`, "img-src 'self'", "font-src 'self'",
-    `connect-src 'self' ${api}`, "manifest-src 'self'", "base-uri 'none'", "form-action 'none'", "object-src 'none'",
+    `connect-src 'self' ${api} ${GITHUB_API}`, "manifest-src 'self'", "base-uri 'none'", "form-action 'none'", "object-src 'none'",
   ].join("; ") + ";";
 }
 
@@ -30,7 +32,7 @@ export function injectMeta(html: string, policy: string): string {
 }
 
 /** Pages that hold secrets in memory: never stored by a cache (both URL forms Pages may serve). */
-const NO_STORE = ["/start", "/start/", "/connect", "/connect/"];
+const NO_STORE = ["/start", "/start/", "/connect", "/connect/", "/home", "/home/"];
 
 /** Cloudflare Pages `_headers`: what <meta> cannot carry, for every path, plus no-store for the signup pages. */
 export function headersFile(csp: string): string {
@@ -77,7 +79,7 @@ function unionFrom(policies: string[], apiBase: string): string {
   const api = new URL(apiBase).origin;
   return [
     "default-src 'none'", `script-src 'self' ${pick("script-src").join(" ")}`.trim(), `style-src 'self' ${pick("style-src").join(" ")}`.trim(),
-    "img-src 'self'", "font-src 'self'", `connect-src 'self' ${api}`, "manifest-src 'self'", "base-uri 'none'", "form-action 'none'", "object-src 'none'",
+    "img-src 'self'", "font-src 'self'", `connect-src 'self' ${api} ${GITHUB_API}`, "manifest-src 'self'", "base-uri 'none'", "form-action 'none'", "object-src 'none'",
   ].join("; ") + ";";
 }
 

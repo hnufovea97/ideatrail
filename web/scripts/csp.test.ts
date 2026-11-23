@@ -11,7 +11,7 @@ describe("CSP for built pages", () => {
     const p = policyFor(html, "http://localhost:8787");
     expect(p).toContain(`script-src 'self' ${hash('customElements.define("x",class{})')}`);
     expect(p).toContain(`style-src 'self' ${hash("astro-island{display:contents}")}`);
-    expect(p).toContain("connect-src 'self' http://localhost:8787;");
+    expect(p).toContain("connect-src 'self' http://localhost:8787 https://api.github.com;");
     expect(p).toContain("default-src 'none'");
     expect(p).not.toContain("unsafe-inline");
   });
@@ -33,7 +33,7 @@ describe("CSP for built pages", () => {
     expect(all).toContain("  Permissions-Policy: publickey-credentials-create=(self), publickey-credentials-get=(self)");
     expect(all).toContain("  X-Content-Type-Options: nosniff");
     expect(all).toContain("  Referrer-Policy: no-referrer");
-    for (const p of ["/start", "/start/", "/connect", "/connect/"]) expect(block(p)).toContain("  Cache-Control: no-store");
+    for (const p of ["/start", "/start/", "/connect", "/connect/", "/home", "/home/"]) expect(block(p)).toContain("  Cache-Control: no-store");
     expect(all).not.toContain("Cache-Control");
   });
 });

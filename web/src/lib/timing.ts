@@ -3,3 +3,5 @@ export const GITHUB_WAIT_MS = 16 * 60_000; // engine device-code budget (M3b: 16
 export const DEVICE_ADD_TTL_MS = 2 * 60_000; // spec §10-1: the device-add session lives 2 minutes
 export const FOLDERS_WAIT_MS = 2 * 60_000;
 export const STEPUP_REFRESH_MS = 100_000; // server step-up challenge lives 2 minutes
+export const LOGIN_REFRESH_MS = 4 * 60_000; // server login challenge lives 5 minutes (api/src/auth/challenges.ts)
+export const SYNC_MS = 60_000; // while open and visible

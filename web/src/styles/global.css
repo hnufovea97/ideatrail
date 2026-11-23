@@ -92,3 +92,10 @@ input[type="text"] { font: inherit; padding: 10px; border-radius: 8px; border: 1
 .locked { transition: filter 0.2s; }
 .locked.blur { filter: blur(5px); user-select: none; }
 @media (prefers-reduced-motion: reduce) { .locked { transition: none; } }
+
+/* M5a dashboard: privacy blur on app switch (lib/blur.ts) */
+.blur-cover { display: none; position: fixed; inset: 0; z-index: 10; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--muted); }
+.blur-cover svg { width: 40px; height: 40px; }
+html.privacy-blur .blur-cover { display: grid; }
+html.privacy-blur main { filter: blur(24px); }
+.banner.warn { border-color: var(--warn); color: var(--warn); font-weight: 600; }

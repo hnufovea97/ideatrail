@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { COPY, CHECKLIST, didLine, errorMessage } from "./copy";
 import { initialState } from "./signup/machine";
 import { ApiFailure } from "./api";
+import type { UnlockReason } from "./unlock";
 
 const allStrings = (v: unknown): string[] =>
   typeof v === "string" ? [v] : typeof v === "function" ? [String((v as (n: number) => string)(7))] : v && typeof v === "object" ? Object.values(v).flatMap(allStrings) : [];
@@ -88,5 +89,14 @@ describe("screen copy", () => {
     expect(h.serverNote).not.toMatch(/클라우드|NAS/); // the engine refuses cloud-synced folders
     expect(h.serverFirst).toBe(true);
     expect(h.nameNote).toContain("이 기기에서 풀었어요");
+  });
+  it("dashboard words: one line per unlock reason, and the warning never says 정상", () => {
+    const reasons: Record<UnlockReason, string> = COPY.dash.errors; // compile-time: every reason has a sentence
+    for (const s of Object.values(reasons)) expect(s.length).toBeGreaterThan(0);
+    expect(COPY.dash.chain.warn).not.toContain("정상");
+    expect(COPY.dash.chain.checking).not.toContain("정상");
+    expect(COPY.dash.chain.ok("9:12")).toBe("기록 사슬 정상 · 마지막 확인 9:12");
+    expect(COPY.dash.lockedIdle(5)).toBe("5분 동안 쓰지 않아서 잠갔어요. 다시 열어 주세요");
+    expect(COPY.dash.open).toBe("이 기기로 열기");
   });
 });

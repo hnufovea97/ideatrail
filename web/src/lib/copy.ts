@@ -222,6 +222,32 @@ export const COPY = {
     generic: "잠시 문제가 생겼어요. 다시 해 볼까요?", // 새 문구
     verify_unsure: "연결을 확인하고 다시 해 주세요", // 새 문구: 등록 응답이 끊김, 아무것도 지우지 않음
   },
+  // M5a 대시보드. UX ④ 로그인 문장은 주어 규칙에 맞춰 바꿈("우리도 못 봐요"·"내 생각의 기록" → 아래), 기술 낱말 "엔진"은 쓰지 않음
+  dash: {
+    lockTitle: "생각의 기록", // UX "내 생각의 기록"에서 '내' 뺌
+    lockLead: "기록 내용은 이 기기에서만 풀려요. 기기 잠금 한 번이면 다 보여요.", // 새 문구
+    open: "이 기기로 열기",
+    openHint: "Touch ID·얼굴·PIN·컴퓨터 암호 중 이 기기에 설정된 것", // UX ④ 작은 글씨 ("지문" 대신 Touch ID — founder D2)
+    opening: "기기 안에서 푸는 중…",
+    lockNow: "지금 잠그기", // 새 문구
+    lockedIdle: (m: number) => `${m}분 동안 쓰지 않아서 잠갔어요. 다시 열어 주세요`, // 새 문구
+    ideas: (n: number) => `아이디어 ${n}개`,
+    cover: "화면을 가려 두었어요", // 새 문구 (흐림 가림막)
+    chain: {
+      ok: (time: string) => `기록 사슬 정상 · 마지막 확인 ${time}`,
+      checking: "기록 사슬을 확인하고 있어요…", // 새 문구
+      warn: "기록이 빠졌을 수 있어요. 서버 쪽 문제일 수 있어요. 기록한 컴퓨터에서 Claude Code를 한 번 열어 주세요", // UX 오류표, '엔진' → Claude Code
+    },
+    errors: {
+      passkey_cancel: "기기 잠금 확인이 안 됐어요. 다시 해 볼까요?",
+      prf_missing: "이 브라우저에선 열쇠로 내용을 열 수 없어요. Chrome이나 Safari 최신 버전으로 열어 주세요",
+      not_registered: "이 기기는 아직 등록 안 됐어요. 쓰던 기기에서 '기기 추가'를 눌러 주세요",
+      offline: "인터넷이 끊겼어요. 연결되면 다시 불러올게요",
+      account_mismatch: "서버에 있는 계정 열쇠가 이 기기에서 푼 것과 달라 열지 않았어요. 잠시 뒤 다시 해 주세요", // 새 문구
+      engine_list_rollback: "서버가 예전 기록 도우미 목록을 보여 줘서 열지 않았어요. 쓰던 다른 기기에서 열어 확인해 주세요", // 새 문구
+      failed: "잠시 문제가 생겼어요. 다시 해 볼까요?",
+    },
+  },
 } as const;
 
 /** The "방금 한 일" line for the screen after a finished step; nothing after a skip. */

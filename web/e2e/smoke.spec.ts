@@ -3,12 +3,12 @@ import { expectClean, watch } from "./helpers/guards";
 
 test("pages load with a CSP meta, no violations and no foreign requests", async ({ page }) => {
   const w = await watch(page);
-  for (const path of ["/start", "/connect"]) {
+  for (const path of ["/start", "/connect", "/home"]) {
     await page.goto(path);
     await expect(page.locator("h1")).toBeVisible();
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content");
     expect(csp).toContain("default-src 'none'");
-    expect(csp).toContain("connect-src 'self' http://localhost:8787;");
+    expect(csp).toContain("connect-src 'self' http://localhost:8787 https://api.github.com;");
     await expectClean(page, w);
   }
 });
