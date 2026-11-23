@@ -82,7 +82,8 @@ describe("screen copy", () => {
     expect(h.toggle).toBe("Ideatrail 서버가 가진 데이터");
     expect(h.serverNote).toMatch(/선명한 글자는 Ideatrail이 보관하는 데이터/);
     expect(h.serverNote).toMatch(/흐린 글자는 사용자의 컴퓨터와 GitHub/);
-    expect(h.serverNote).toContain("잠긴 채로만"); // true: names exist on the server, locked
+    expect(h.serverNote).toContain("잠금을 풀 때만 보여요");
+    expect(h.serverNote).toContain("Ideatrail은 어떤 경우에도 내용을 알 수 없어요"); // founder 2026-11-23: a promise every later feature must keep
     expect(h.serverNote).not.toMatch(/클라우드|NAS/); // the engine refuses cloud-synced folders
     expect(h.serverFirst).toBe(true);
     expect(h.nameNote).toContain("이 기기에서 풀었어요");

@@ -50,7 +50,7 @@ export const COPY = {
       toggle: "Ideatrail 서버가 가진 데이터", // 새 문구
       serverFirst: true, // founder: 처음엔 서버 눈으로 보여 줌
       deviceNote: "지금은 이 기기에서 풀어 본 모습이에요. 다시 켜면 Ideatrail이 보관하는 데이터만 선명하게 남아요", // 새 문구
-      serverNote: "선명한 글자는 Ideatrail이 보관하는 데이터예요. 흐린 글자는 사용자의 컴퓨터와 GitHub에 있는 개인 데이터라, Ideatrail은 잠긴 채로만 갖고 있어 읽을 수 없어요", // 새 문구
+      serverNote: "선명한 글자는 Ideatrail이 보관하는 데이터예요. 흐린 글자는 사용자의 컴퓨터와 GitHub에 있는 개인 데이터로, 사용자가 기기에서 잠금을 풀 때만 보여요. Ideatrail은 어떤 경우에도 내용을 알 수 없어요", // 새 문구
     },
     benefitsTitle: "써 보면 좋은 점", // 새 문구
     benefits: [
