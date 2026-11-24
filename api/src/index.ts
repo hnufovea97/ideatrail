@@ -14,6 +14,7 @@ import { approvalRoutes, inboxRoutes } from "./routes/approvals";
 import { syncRoutes } from "./routes/sync";
 import { rootRoutes, prefsRoutes, eventRoutes, visibilityRoutes } from "./routes/roots";
 import { engineRoutes, deleteAccountHandlers } from "./routes/engines";
+import { credentialRoutes } from "./routes/credentials";
 import type { Fetcher } from "./github";
 import { runCron } from "./cron";
 import { anchorRoutes, importAllowanceRoutes, repoHeadRoutes, storageLinkRoutes } from "./routes/anchors";
@@ -56,6 +57,7 @@ export function createApp(deps: AppDeps = {}) {
   app.route("/v1/prefs", prefsRoutes(limiter));
   app.route("/v1/events", eventRoutes(limiter));
   app.route("/v1/engines", engineRoutes(deps.fetcher));
+  app.route("/v1/credentials", credentialRoutes());
   app.delete("/v1/account", ...deleteAccountHandlers(deps.fetcher));
   app.post("/v1/logout", ...logoutHandlers);
 

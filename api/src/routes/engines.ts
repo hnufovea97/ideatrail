@@ -59,6 +59,19 @@ export function engineRoutes(fetcher?: Fetcher) {
     return c.json({ engine_id: engineId, revoked: true, github_revoked: githubRevoked });
   });
 
+  /** Pause by the account owner (no step-up: stopping is the safe direction). Only resume asks for the device lock. */
+  r.post("/:id/pause", browserWrite, requireConfirmed, async (c) => {
+    const userId = c.get("userId")!;
+    const engineId = c.req.param("id");
+    await writeWithCursor(c.env.DB, userId, [
+      c.env.DB.prepare(`UPDATE engines SET paused = 1, pause_reason = 'user', change_seq = ${CURSOR_SQL}
+                        WHERE engine_id = ? AND user_id = ? AND revoked_at IS NULL`).bind(userId, engineId, userId),
+      guard(c.env.DB),
+      c.env.DB.prepare("INSERT INTO audit_log (user_id, actor, action, target_id, at) VALUES (?, 'browser', 'engine.pause', ?, ?)").bind(userId, engineId, nowIso()),
+    ], notFound());
+    return c.json({ paused: true });
+  });
+
   /** Un-pause after the "is this engine yours?" check. Revoked engines stay revoked (no resurrection). */
   r.post("/:id/resume", browserWrite, requireConfirmed, requireStepup, async (c) => {
     const userId = c.get("userId")!;

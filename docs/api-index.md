@@ -41,8 +41,10 @@
 | POST | `/v1/roots/:id/meta` | 세션 | 합친 목록 정보 저장 (meta_version 조건부) | roots, meta_deltas |
 | POST | `/v1/visibility` | 세션 + 재확인 | 공개·비공개 전환 | roots, records |
 | POST | `/v1/engines/:id/revoke` | 세션 + 재확인 | 엔진 끊기: 서명 열쇠 폐기 + (본문의) 그 엔진 출입증으로 GitHub 취소 1회 후 버림 + 그 엔진을 뺀 새 `engine_list`·`engine_list_version`(이전+1) 조건부 저장 | engines, storage_links, users |
+| POST | `/v1/engines/:id/pause` | 세션 | 사용자 일시 정지(`pause_reason=user`), 단계 확인 없음 — 멈추기는 안전 쪽 | engines |
 | POST | `/v1/engines/:id/resume` | 세션 | 일시 정지 풀기 | engines |
-| PUT | `/v1/prefs` | 세션 | 보기 설정·기억 메모·점검 카드 상태(모두 봉인) | users |
+| POST | `/v1/credentials/:id/remove` | 세션 + 재확인 | 기기 잠금 하나 빼기(봉투 함께 삭제). 마지막 1대면 409 `last_device` | passkey_credentials, key_envelopes |
+| PUT | `/v1/prefs` | 세션 | 보기 설정·기억 메모·점검 카드 상태(모두 봉인), 자동 잠금 분(1·3·5) | users |
 | DELETE | `/v1/account` | 세션 + 재확인 | 계정 지우기(감사 로그·사용 지표 개인 줄 포함) | 전부 |
 | POST | `/v1/events` | 세션 | 사용 지표(내용 없음) | usage_events |
 | (Cron) | 매 n분 | — | 대기 영수증의 확정본 받아 오기 — 한 번에 기록 **50 ÷ 달력 서버 수** 개 이하(하위 요청 50 상한) | anchors |

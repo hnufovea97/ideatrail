@@ -72,16 +72,17 @@ const zPrefs = z.object({
   view_prefs: zSealedMax(RELOCK.prefs, MAX_META).optional(),
   recall_notes: zSealedMax(RELOCK.recall_notes, MAX_META).optional(),
   reminder_state: zSealedMax(RELOCK.reminder_state, MAX_META).optional(),
-}).refine((v) => v.view_prefs || v.recall_notes || v.reminder_state, "nothing to save");
+  auto_lock_minutes: z.union([z.literal(1), z.literal(3), z.literal(5)]).optional(),
+}).refine((v) => v.view_prefs || v.recall_notes || v.reminder_state || v.auto_lock_minutes !== undefined, "nothing to save");
 
-/** PUT /v1/prefs — relocked view settings, recall notes, reminder state (any subset). */
+/** PUT /v1/prefs — relocked view settings, recall notes, reminder state (any subset), plus the auto-lock minutes (1, 3 or 5). */
 export function prefsRoutes(getLimiter: (env: Bindings) => Limiter) {
   const r = new Hono<AppEnv>();
   r.put("/", browserWrite, requireConfirmed, userWriteLimit(getLimiter), async (c) => {
     const b = await readJson(c, zPrefs);
     await c.env.DB.prepare(
-      "UPDATE users SET view_prefs = COALESCE(?, view_prefs), recall_notes = COALESCE(?, recall_notes), reminder_state = COALESCE(?, reminder_state) WHERE user_id = ?",
-    ).bind(b.view_prefs ?? null, b.recall_notes ?? null, b.reminder_state ?? null, c.get("userId")).run();
+      "UPDATE users SET view_prefs = COALESCE(?, view_prefs), recall_notes = COALESCE(?, recall_notes), reminder_state = COALESCE(?, reminder_state), auto_lock_minutes = COALESCE(?, auto_lock_minutes) WHERE user_id = ?",
+    ).bind(b.view_prefs ?? null, b.recall_notes ?? null, b.reminder_state ?? null, b.auto_lock_minutes ?? null, c.get("userId")).run();
     return c.json({ saved: true });
   });
   return r;

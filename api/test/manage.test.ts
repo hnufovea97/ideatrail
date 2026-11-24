@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
 import { toB64u } from "@ideatrail/crypto/bytes";
 import { newId } from "@ideatrail/crypto/ids";
-import { signUp } from "./browser";
+import { browser, signUp } from "./browser";
 import { createApp } from "../src/index";
 import { engineClient, seedEngine } from "./engine";
 import { recordBody, sealed } from "./fixtures";
@@ -153,5 +153,77 @@ describe("engine revoke / resume, account delete (2.10, 2.13, S6)", () => {
       expect(await one(`SELECT COUNT(*) AS n FROM ${t} WHERE user_id = ?`, s.userId), t).toEqual({ n: 0 });
     }
     expect((await s.b.call("GET", "/v1/account")).status).toBe(401);
+  });
+});
+
+describe("user pause, device removal, auto-lock minutes (M5d)", () => {
+  it("pause: engine records get 423, no step-up needed; resume needs one; other account 404; revoked 404", async () => {
+    const s = await setup();
+    const pause = `/v1/engines/${s.e.engineId}/pause`;
+    expect((await s.call("POST", pause, {})).status).toBe(200);
+    expect(await one("SELECT paused, pause_reason FROM engines WHERE engine_id = ?", s.e.engineId)).toEqual({ paused: 1, pause_reason: "user" });
+    expect((await s.c.post("/v1/records", recordBody({ log_seq: "2" }))).status).toBe(423);
+    expect(await one("SELECT COUNT(*) AS n FROM audit_log WHERE user_id = ? AND action = 'engine.pause'", s.userId)).toEqual({ n: 1 });
+    const resume = `/v1/engines/${s.e.engineId}/resume`;
+    expect((await s.call("POST", resume, { assertion: await s.stepup("POST", resume) })).status).toBe(200);
+    expect((await s.c.post("/v1/records", recordBody({ log_seq: "2" }))).status).toBe(201);
+    const other = await setup();
+    expect((await s.call("POST", `/v1/engines/${other.e.engineId}/pause`, {})).status).toBe(404);
+    const rev = `/v1/engines/${s.e.engineId}/revoke`;
+    await s.call("POST", rev, { engine_list: sealed(0x88), engine_list_version: 2, assertion: await s.stepup("POST", rev) });
+    expect((await s.call("POST", pause, {})).status).toBe(404);
+  });
+
+  it("remove a device: needs step-up, deletes the row and its envelope, refuses the last one, 404 for others", async () => {
+    const s = await setup();
+    const creds = (await env.DB.prepare("SELECT credential_id FROM passkey_credentials WHERE user_id = ?").bind(s.userId).all<{ credential_id: string }>()).results;
+    expect(creds).toHaveLength(1);
+    const only = `/v1/credentials/${creds[0].credential_id}/remove`;
+    expect((await s.call("POST", only, {})).status).toBe(401);
+    const last = await s.call("POST", only, { assertion: await s.stepup("POST", only) });
+    expect(last.status).toBe(409);
+    expect((await json(last)).error?.code).toBe("last_device");
+
+    await env.DB.prepare("INSERT INTO passkey_credentials (credential_id, user_id, public_key, sign_count, created_at) VALUES ('second-cred', ?, x'00', 0, '2026-11-01T00:00:00Z')").bind(s.userId).run();
+    await env.DB.prepare("INSERT INTO key_envelopes (envelope_id, user_id, method, credential_id, wrapped_master_key, created_at) VALUES ('env-second', ?, 'passkey', 'second-cred', x'00', '2026-11-01T00:00:00Z')").bind(s.userId).run();
+    const second = "/v1/credentials/second-cred/remove";
+    expect((await s.call("POST", second, { assertion: await s.stepup("POST", second) })).status).toBe(200);
+    expect(await one("SELECT COUNT(*) AS n FROM passkey_credentials WHERE user_id = ?", s.userId)).toEqual({ n: 1 });
+    expect(await one("SELECT COUNT(*) AS n FROM key_envelopes WHERE envelope_id = 'env-second'")).toEqual({ n: 0 });
+
+    const other = await setup();
+    const otherCred = (await one("SELECT credential_id FROM passkey_credentials WHERE user_id = ?", other.userId)) as { credential_id: string };
+    const theirs = `/v1/credentials/${otherCred.credential_id}/remove`;
+    expect((await s.call("POST", theirs, { assertion: await s.stepup("POST", theirs) })).status).toBe(404);
+  });
+
+  it("removing a device ends the account's other sessions; the current one keeps working; a refused removal ends none", async () => {
+    const s = await setup();
+    const other = browser();
+    const o = await json(await other.call("POST", "/v1/webauthn/login/options", {}));
+    const login = await other.call("POST", "/v1/webauthn/login/verify", { challenge_id: o.challenge_id, response: await s.auth.login(o.options as { challenge: string }) });
+    expect(login.status).toBe(200);
+    expect((await other.call("GET", "/v1/account")).status).toBe(200);
+
+    const only = (await one("SELECT credential_id FROM passkey_credentials WHERE user_id = ?", s.userId)) as { credential_id: string };
+    const refused = `/v1/credentials/${only.credential_id}/remove`;
+    expect((await s.call("POST", refused, { assertion: await s.stepup("POST", refused) })).status).toBe(409);
+    expect((await other.call("GET", "/v1/account")).status).toBe(200);
+
+    await env.DB.prepare("INSERT INTO passkey_credentials (credential_id, user_id, public_key, sign_count, created_at) VALUES ('third-cred', ?, x'00', 0, '2026-11-01T00:00:00Z')").bind(s.userId).run();
+    const path = "/v1/credentials/third-cred/remove";
+    expect((await s.call("POST", path, { assertion: await s.stepup("POST", path) })).status).toBe(200);
+    expect((await other.call("GET", "/v1/account")).status).toBe(401);
+    expect((await s.call("GET", "/v1/account")).status).toBe(200);
+  });
+
+  it("prefs: auto_lock_minutes only 1, 3 or 5; works alone", async () => {
+    const s = await setup();
+    for (const m of [1, 3, 5]) {
+      expect((await s.call("PUT", "/v1/prefs", { auto_lock_minutes: m })).status).toBe(200);
+      expect(await one("SELECT auto_lock_minutes AS m FROM users WHERE user_id = ?", s.userId)).toEqual({ m });
+    }
+    for (const bad of [0, 2, 4, 10, "3", 1.5]) expect((await s.call("PUT", "/v1/prefs", { auto_lock_minutes: bad })).status).toBe(400);
+    expect(await one("SELECT auto_lock_minutes AS m FROM users WHERE user_id = ?", s.userId)).toEqual({ m: 5 });
   });
 });

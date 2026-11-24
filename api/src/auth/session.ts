@@ -58,3 +58,9 @@ export async function endSession(c: Context<AppEnv>) {
   if (token) await c.env.DB.prepare("DELETE FROM sessions WHERE session_id = ?").bind(await hashToken(token)).run();
   deleteCookie(c, COOKIE, { prefix: "host", path: "/", secure: true });
 }
+
+/** Hash id of this request's own session (null without a cookie). */
+export async function currentSessionId(c: Context<AppEnv>): Promise<string | null> {
+  const token = getCookie(c, COOKIE, "host");
+  return token ? hashToken(token) : null;
+}
