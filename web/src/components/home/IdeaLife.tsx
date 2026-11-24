@@ -11,9 +11,10 @@ import { LockIcon } from "./LockIcon";
 import { RoutineCard } from "./RoutineCard";
 import { StageRename } from "./StageRename";
 import { VersionRows } from "./VersionRows";
+import type { SourceTools } from "./VersionDetail";
 
 interface Props {
-  idea: IdeaView; server: boolean; now: Date; routineOn: boolean; feedbackFolded: boolean;
+  idea: IdeaView; tools: SourceTools; server: boolean; now: Date; routineOn: boolean; feedbackFolded: boolean;
   onBack(): void; onRoutine(on: boolean): void; onFoldFeedback(folded: boolean): void; onRename(rootId: string, names: readonly string[]): Promise<void>;
 }
 
@@ -31,7 +32,7 @@ function Counts({ decided, deferred, turn, server }: { decided: number | null; d
   );
 }
 
-function StagePanel({ row, server }: { row: StageRow; server: boolean }) {
+function StagePanel({ row, server, tools }: { row: StageRow; server: boolean; tools: SourceTools }) {
   const l = COPY.life;
   if (!row.reached) return <div class="panel"><p class="small">{l.notYet}</p></div>;
   return (
@@ -42,13 +43,13 @@ function StagePanel({ row, server }: { row: StageRow; server: boolean }) {
         {row.estimated ? <span class="hint"><Locked server={server}>{l.estimated}</Locked></span> : null}
         <Counts decided={row.decided} deferred={row.deferred} turn={row.turn} server={server} />
       </p>
-      {row.versions.length > 0 ? <VersionRows rows={row.versions} server={server} /> : <p class="small">{l.skipped}</p>}
+      {row.versions.length > 0 ? <VersionRows rows={row.versions} server={server} tools={tools} /> : <p class="small">{l.skipped}</p>}
     </div>
   );
 }
 
 /** Idea life (UX ②): header · dates · five stage cells (tap to open) · stage panel · routine check card. */
-export function IdeaLife({ idea, server, now, routineOn, feedbackFolded, onBack, onRoutine, onFoldFeedback, onRename }: Props) {
+export function IdeaLife({ idea, tools, server, now, routineOn, feedbackFolded, onBack, onRoutine, onFoldFeedback, onRename }: Props) {
   const l = COPY.life;
   const life = useMemo(() => lifeOf(idea), [idea]);
   const [open, setOpen] = useState<StageNo>(idea.locked.stage);
@@ -88,7 +89,7 @@ export function IdeaLife({ idea, server, now, routineOn, feedbackFolded, onBack,
       {server ? null : renaming
         ? <StageRename names={stageNames(idea)} onSave={(names) => onRename(idea.rootId, names)} onClose={() => setRenaming(false)} />
         : <p class="rename-row"><button type="button" class="link" onClick={() => setRenaming(true)}>{l.rename.open}</button></p>}
-      <StagePanel row={row} server={server} />
+      <StagePanel row={row} server={server} tools={tools} />
       {routineOn
         ? <RoutineCard card={routineCard(idea, feedbackFolded)} server={server} onHide={() => onRoutine(false)} onFoldFeedback={onFoldFeedback} />
         : <p class="routine-off small">{l.routine.hiddenNote} <button type="button" class="link" onClick={() => onRoutine(true)}>{l.routine.show}</button></p>}

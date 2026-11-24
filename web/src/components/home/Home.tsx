@@ -7,8 +7,9 @@ import type { IdeaView } from "../../lib/model/read-model";
 import { ServerToggle } from "../ui/ServerToggle";
 import { IdeaCard } from "./IdeaCard";
 import { IdeaLife } from "./IdeaLife";
+import type { SourceTools } from "./VersionDetail";
 
-interface Props { ideas: readonly IdeaView[]; userId: string; store: VersionStore; now: Date; onRename(rootId: string, names: readonly string[]): Promise<void> }
+interface Props { ideas: readonly IdeaView[]; tools: SourceTools; userId: string; store: VersionStore; now: Date; onRename(rootId: string, names: readonly string[]): Promise<void> }
 
 function emptyText(ideas: readonly IdeaView[], tab: Tab, query: string): string {
   const e = COPY.home.empty;
@@ -18,7 +19,7 @@ function emptyText(ideas: readonly IdeaView[], tab: Tab, query: string): string 
 }
 
 /** The unlocked home (ADR-0018): server-view switch · tabs · search · sort · cards, and the chosen idea's life. */
-export function Home({ ideas, userId, store, now, onRename }: Props) {
+export function Home({ ideas, tools, userId, store, now, onRename }: Props) {
   const h = COPY.home;
   const [server, setServer] = useState(true); // ADR-0018: on by default, every time the home opens
   const [tab, setTab] = useState<Tab>("all");
@@ -75,7 +76,7 @@ export function Home({ ideas, userId, store, now, onRename }: Props) {
         </section>
         <section class="home-detail" aria-live="polite">
           {chosen
-            ? <IdeaLife key={chosen.rootId} idea={chosen} server={server} now={now} routineOn={routineOn} feedbackFolded={folded.has(chosen.rootId)}
+            ? <IdeaLife key={chosen.rootId} idea={chosen} tools={tools} server={server} now={now} routineOn={routineOn} feedbackFolded={folded.has(chosen.rootId)}
                 onBack={() => setPicked(null)} onRename={onRename} onRoutine={changeRoutine} onFoldFeedback={(f) => setFolded(setFeedbackHidden(store, userId, chosen.rootId, f))} />
             : <p class="empty">{h.pick}</p>}
         </section>

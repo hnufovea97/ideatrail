@@ -77,3 +77,47 @@ export async function commitIndex(f: Fetch, a: RepoAccess, files: Readonly<Recor
     }
   }
 }
+
+/** Biggest answer a proofs/ file read accepts: a sealed original is at most 25 MB (engine MaxOriginalTotal) plus its tar and seal overhead. */
+export const MAX_READ_BYTES = 30 << 20;
+const REPO_PATH = /^[A-Za-z0-9._/-]{1,200}$/;
+
+/** Read one file of the repo as raw bytes (the dashboard's only GitHub read). null = the file is not there (404).
+ * The token goes only in the Authorization header; an over-size answer is cut off and refused. */
+export async function readRepoFile(f: Fetch, a: RepoAccess, path: string, signal?: AbortSignal): Promise<Uint8Array | null> {
+  if (!FULL_NAME.test(a.fullName) || !REPO_PATH.test(path) || path.split("/").some((s) => s === "" || s === "." || s === "..")) throw new GithubFailure(0, "bad_repo");
+  let res: Response;
+  try {
+    res = await f(`${GITHUB_API}/repos/${a.fullName}/contents/${path}`, {
+      method: "GET", signal, credentials: "omit", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer",
+      headers: { accept: "application/vnd.github.raw+json", authorization: `Bearer ${a.token}`, "x-github-api-version": "2022-11-28" },
+    });
+  } catch {
+    throw new GithubFailure(0, "offline");
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) throw new GithubFailure(res.status, "github_refused");
+  if (Number(res.headers.get("content-length") ?? 0) > MAX_READ_BYTES) throw new GithubFailure(res.status, "bad_response");
+  try {
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("no body");
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      if (total > MAX_READ_BYTES) {
+        void reader.cancel();
+        throw new Error("too big");
+      }
+      chunks.push(value);
+    }
+    const out = new Uint8Array(total);
+    let at = 0;
+    for (const c of chunks) { out.set(c, at); at += c.length; }
+    return out;
+  } catch {
+    throw new GithubFailure(res.status, "bad_response");
+  }
+}

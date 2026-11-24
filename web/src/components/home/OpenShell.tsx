@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { fromB64u } from "@ideatrail/crypto/bytes";
 import type { Api } from "../../lib/api";
 import { COPY } from "../../lib/copy";
 import { refresh, refreshFailure, type Loaded, type LoadDeps, type RefreshFailure } from "../../lib/dashboard/load";
@@ -9,7 +10,10 @@ import { chainLine, type ChainStatus } from "../../lib/sync/chain";
 import { emptySync, type SyncState } from "../../lib/sync/store";
 import { SYNC_MS } from "../../lib/timing";
 import type { DashboardVault } from "../../lib/unlock";
+import { loadSource } from "../../lib/versions/source";
+import { useGithubLink } from "../start/useGithubLink";
 import { Home } from "./Home";
+import type { SourceTools } from "./VersionDetail";
 
 /** `signal` is aborted by the lock before it wipes the keys: a refresh in flight then writes nothing. */
 interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onLock(): void }
@@ -22,6 +26,8 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
   const sync = useRef<SyncState>(emptySync());
   const mirrorDirty = useRef(false); // a saved merge not yet in index/: every later refresh retries until "done"
   const refreshNow = useRef<() => void>(() => undefined);
+  const justLinked = useRef(false); // the GitHub link was made: the next finished refresh brings it in, then open versions look again
+  const [linkTick, setLinkTick] = useState(0);
 
   useEffect(() => {
     let live = true;
@@ -43,6 +49,10 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
           mirrorDirty.current = l.mirrorDirty;
           setLoaded(l);
           setFailure(null);
+          if (justLinked.current) {
+            justLinked.current = false;
+            setLinkTick((n) => n + 1);
+          }
         }, (e: unknown) => { if (live) setFailure(refreshFailure(e)); })
         .finally(() => {
           running = false;
@@ -73,6 +83,15 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
     mirrorDirty.current = true;
     refreshNow.current();
   };
+  const engine = vault.engineList.engines.find((e) => e.revoked_at === undefined && e.revoked_after_seq === undefined && e.revoked_digest === undefined) ?? null;
+  const link = useGithubLink(api, { vault, engine, kemPub: engine ? fromB64u(engine.kem_pubkey) : new Uint8Array() }, () => {
+    justLinked.current = true;
+    refreshNow.current();
+  });
+  const tools: SourceTools = {
+    load: (recordId) => loadSource({ vault, links: sync.current.links.values(), github: (input, init) => fetch(input, init), signal }, recordId),
+    connect: link, tick: linkTick,
+  };
   return (
     <main class="screen dash">
       <header class="dash-head">
@@ -82,7 +101,7 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
       </header>
       {chain.state === "warn" ? <p class="banner warn" role="alert">{chainLine(chain)}</p> : null}
       {loaded?.mirror === "failed" ? <p class="small">{COPY.dash.mirrorFailed}</p> : null}
-      {loaded ? <Home ideas={loaded.ideas} userId={vault.userId} store={store} now={new Date()} onRename={rename} /> : <p class="small">{COPY.home.loading}</p>}
+      {loaded ? <Home ideas={loaded.ideas} tools={tools} userId={vault.userId} store={store} now={new Date()} onRename={rename} /> : <p class="small">{COPY.home.loading}</p>}
     </main>
   );
 }

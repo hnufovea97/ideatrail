@@ -63,3 +63,35 @@ test("no score, grade or percent anywhere on the home or idea life (CLAUDE.md ru
   const text = await page.locator("main").innerText();
   expect(text).not.toMatch(/점수|등급|%/);
 });
+
+test("a version row opens to a GitHub-not-linked notice with a connect button; the server's view never opens it (5.13)", async ({ page }) => {
+  await openHome(page);
+  await page.locator(".cards .card").first().click();
+  await expect(page.getByRole("button", { name: "원문 보기" })).toHaveCount(0); // server view is on at first
+  await deviceView(page);
+  await page.locator(".cards .card").filter({ hasText: BUDGET }).click();
+  const row = page.locator(".ver").first();
+  await row.getByRole("button", { name: "원문 보기" }).click();
+  await expect(row.getByText("원문은 GitHub 증명 보관함을 만든 뒤에 볼 수 있어요")).toBeVisible();
+  await expect(row.getByRole("button", { name: "GitHub에 보관함 만들기" })).toBeVisible();
+  await row.getByRole("button", { name: "접기" }).click();
+  await expect(row.getByText("원문은 GitHub 증명 보관함을 만든 뒤에 볼 수 있어요")).toHaveCount(0);
+});
+
+test("[GitHub에 보관함 만들기] on a version asks the engine, and once linked the row looks in the repo again (5.13)", async ({ page }) => {
+  const engine = await openHome(page);
+  const asked: string[] = [];
+  await page.route("https://api.github.com/**", (route) => { asked.push(route.request().url()); return route.fulfill({ status: 404, json: {} }); });
+  await deviceView(page);
+  await page.locator(".cards .card").filter({ hasText: BUDGET }).click();
+  const row = page.locator(".ver").first();
+  await row.getByRole("button", { name: "원문 보기" }).click();
+  await row.getByRole("button", { name: "GitHub에 보관함 만들기" }).click();
+  await expect(row.getByRole("status")).toContainText("GitHub 화면에서 코드를");
+  expect((await engine.readInbox()).map((m) => m.body.type)).toEqual(["connect_github"]);
+  expect(asked).toEqual([]);
+  await engine.putStorageLink();
+  await expect(row.getByText("아직 GitHub에 올라가는 중이에요. 잠시 뒤에 다시 열어 보세요")).toBeVisible();
+  expect(asked.length).toBeGreaterThan(0);
+  expect(asked.every((u) => u.includes("/contents/proofs/"))).toBe(true);
+});

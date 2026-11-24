@@ -8,7 +8,10 @@ import { GITHUB_WAIT_MS, POLL_MS } from "../../lib/timing";
 import { usePolling } from "../ui/usePolling";
 
 /** Ask the engine to start GitHub device flow, then wait for its signed storage link. */
-export function useGithubLink(api: Api, ctx: SignupContext, onLinked: () => void) {
+/** What the link needs from the signup context; the dashboard passes its own vault and first engine. */
+export type LinkTarget = Pick<SignupContext, "vault" | "engine" | "kemPub">;
+
+export function useGithubLink(api: Api, ctx: LinkTarget, onLinked: () => void) {
   const [phase, setPhase] = useState<"idle" | "waiting">("idle");
   const [error, setError] = useState<string | null>(null);
   const cursor = useRef(0);

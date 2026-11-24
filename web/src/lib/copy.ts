@@ -335,6 +335,16 @@ export const COPY = {
     notYet: "아직 이 단계에 오지 않았어요",
     skipped: "이 단계는 기록 없이 지나갔어요", // 새 문구
     file: "원래 위치",
+    source: { // 새 문구 (5.13·5.6: 버전 한 줄을 펼치면 GitHub에서 원문을 가져와요)
+      open: "원문 보기",
+      close: "접기",
+      checking: "GitHub에서 찾는 중이에요",
+      unlinked: "원문은 GitHub 증명 보관함을 만든 뒤에 볼 수 있어요",
+      connect: "GitHub에 보관함 만들기",
+      notYet: "아직 GitHub에 올라가는 중이에요. 잠시 뒤에 다시 열어 보세요",
+      found: "GitHub 증명 보관함에 올라가 있어요",
+      failed: "GitHub에서 가져오지 못했어요. 연결을 확인하고 다시 해 보세요",
+    },
     fingerprint: "지문 앞뒤 3자리",
     recordN: (n: number) => `기록 ${n}`, // 새 문구: 버전 이름이 없는 옛 기록
     routine: {

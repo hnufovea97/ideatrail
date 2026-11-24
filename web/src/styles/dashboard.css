@@ -91,6 +91,9 @@ main.dash h1, main.dash h2, main.dash h3 { color: var(--text); font-weight: 500;
 .ver-when { color: var(--text-sub); font-size: 13px; }
 .ver-what { min-width: 0; overflow-wrap: anywhere; }
 .ver-file { display: block; font-size: 12px; color: var(--text-sub); }
+.ver-toggle { grid-column: 2; justify-self: start; font-size: 13px; }
+.ver-open { grid-column: 1 / -1; padding-top: 4px; }
+.ver-detail { display: grid; gap: 6px; justify-items: start; }
 .ver-proof { display: grid; gap: 3px; justify-items: end; }
 .fp { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
 .routine { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }

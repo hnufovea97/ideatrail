@@ -8,7 +8,7 @@ import { openRecordMeta } from "../model/meta";
 import { verifyRows } from "../sync/verify";
 import { fakeGithub } from "../testing/fake-github";
 import { fakeWorld, linkRow, recordRow, rootRow, syncOf } from "../testing/fake-world";
-import { commitIndex, COMMIT_ATTEMPTS, GithubFailure, INDEX_MESSAGE, type RepoAccess } from "./github";
+import { commitIndex, COMMIT_ATTEMPTS, GithubFailure, INDEX_MESSAGE, readRepoFile, type RepoAccess } from "./github";
 import { INDEX_RECORDS, INDEX_ROOTS, indexFiles } from "./index-files";
 import { openRepoAccess } from "./storage";
 
@@ -95,5 +95,21 @@ describe("index/ mirror (spec §12, §15 M5a)", () => {
     const revoked = (extra: Record<string, string>) => ({ ...w.list, engines: [{ ...w.engine.entry, ...extra }] });
     expect(await openRepoAccess(w.vault, revoked({ revoked_at: "2026-11-20T00:00:00Z", revoked_after_seq: "9" }), [link])).toBeNull();
     expect(await openRepoAccess(w.vault, revoked({ revoked_after_seq: "9" }), [link])).toBeNull(); // a disconnected engine's access is never used
+  });
+});
+
+describe("readRepoFile (5.6)", () => {
+  it("raw bytes for a file, null for a 404, the token only in the header", async () => {
+    const gh = fakeGithub({ files: { "proofs/a/bundle.json": new Uint8Array([1, 2, 3]) } });
+    expect(await readRepoFile(gh.fetch, ACCESS, "proofs/a/bundle.json")).toEqual(new Uint8Array([1, 2, 3]));
+    expect(await readRepoFile(gh.fetch, ACCESS, "proofs/b/bundle.json")).toBeNull();
+    expect(gh.calls.every((c) => c.method === "GET" && c.auth === `Bearer ${ACCESS.token}` && !c.path.includes(ACCESS.token))).toBe(true);
+  });
+  it("refuses a path that climbs out and turns a GitHub refusal into GithubFailure without the token", async () => {
+    const gh = fakeGithub({ contentsStatus: 403 });
+    expect((await readRepoFile(gh.fetch, ACCESS, "proofs/../x").catch((e) => e)).code).toBe("bad_repo");
+    const err = await readRepoFile(gh.fetch, ACCESS, "proofs/a/bundle.json").catch((e) => e);
+    expect(err).toBeInstanceOf(GithubFailure);
+    expect(`${err.message}${err.stack}`).not.toContain(ACCESS.token);
   });
 });
