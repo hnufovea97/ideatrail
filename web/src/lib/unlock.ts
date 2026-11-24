@@ -17,7 +17,7 @@ const MIN_LOCK_MINUTES = 1;
 
 export interface DashboardVault extends Vault { engineList: EngineList; autoLockMinutes: number }
 
-export type UnlockReason = "passkey_cancel" | "prf_missing" | "not_registered" | "retry" | "offline" | "account_mismatch" | "engine_list_rollback" | "failed";
+export type UnlockReason = "passkey_cancel" | "prf_missing" | "not_registered" | "retry" | "offline" | "account_mismatch" | "engine_list_rollback" | "browser_unsupported" | "failed";
 
 export class UnlockFailure extends Error {
   constructor(readonly reason: UnlockReason) {
@@ -154,6 +154,7 @@ export async function openVault(api: Api, p: PreparedLogin, got: Unlocked, store
 export function unlockReason(e: unknown): UnlockReason {
   if (e instanceof UnlockFailure) return e.reason;
   if (e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "AbortError")) return "passkey_cancel";
+  if (e instanceof DOMException && e.name === "NotReadableError") return "browser_unsupported"; // app browsers (G2: KakaoTalk)
   return "failed";
 }
 

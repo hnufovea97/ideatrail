@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { Api } from "../../lib/api";
 import { COPY } from "../../lib/copy";
 import { browserStore } from "../../lib/engine-list";
+import { externalOpenUrl, inAppBrowser } from "../../lib/inapp";
 import { LOGIN_REFRESH_MS } from "../../lib/timing";
 import { askPasskey, failureCode, isFresh, openVault, prepareLogin, settleOpened, unlockReason, type DashboardVault, type PreparedLogin } from "../../lib/unlock";
 import { Screen } from "../ui/Screen";
@@ -66,10 +67,14 @@ export function LockScreen({ api, notice, onOpen }: Props) {
       );
   };
 
+  const inApp = typeof navigator === "undefined" ? null : inAppBrowser(navigator.userAgent);
+  const outside = inApp ? externalOpenUrl(inApp, location.href) : null;
   return (
     <Screen title={COPY.dash.lockTitle} why={COPY.dash.lockLead} error={error?.text ?? null} status={busy ? COPY.dash.opening : notice}>
       <button type="button" class="primary" onClick={open} disabled={!prepared || busy}>{COPY.dash.open}</button>
       <p class="small">{COPY.dash.openHint}</p>
+      {inApp ? <p class="small" role="note">{COPY.dash.inApp[inApp]}</p> : null}
+      {outside ? <a class="button" href={outside}>{COPY.dash.inApp.openOutside}</a> : null}
     </Screen>
   );
 }

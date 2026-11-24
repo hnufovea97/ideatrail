@@ -136,3 +136,10 @@ describe("failureCode (G2: show which error, never its message)", () => {
     expect(failureCode(e)).toBe("unknown");
   });
 });
+
+describe("unlockReason: a browser that cannot reach the passkey (G2)", () => {
+  it("NotReadableError means this browser, not a retry", async () => {
+    const { unlockReason } = await import("./unlock");
+    expect(unlockReason(new DOMException("", "NotReadableError"))).toBe("browser_unsupported");
+  });
+});
