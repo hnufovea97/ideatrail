@@ -2,10 +2,11 @@ import { useMemo, useState } from "preact/hooks";
 import { COPY } from "../../lib/copy";
 import type { VersionStore } from "../../lib/engine-list";
 import { DEFAULT_SORT, SORT_KEYS, TABS, isSortKey, listIdeas, type SortKey, type Tab } from "../../lib/home/list";
-import { loadOpened, loadSort, noteOpened, saveSort } from "../../lib/home/prefs";
+import { feedbackHidden, loadOpened, loadSort, noteOpened, routineShown, saveSort, setFeedbackHidden, setRoutineShown } from "../../lib/home/prefs";
 import type { IdeaView } from "../../lib/model/read-model";
 import { ServerToggle } from "../ui/ServerToggle";
 import { IdeaCard } from "./IdeaCard";
+import { IdeaLife } from "./IdeaLife";
 
 interface Props { ideas: readonly IdeaView[]; userId: string; store: VersionStore; now: Date }
 
@@ -17,7 +18,7 @@ function emptyText(ideas: readonly IdeaView[], tab: Tab, query: string): string 
 }
 
 /** The unlocked home (ADR-0018): server-view switch · tabs · search · sort · cards, and the chosen idea's life. */
-export function Home({ ideas, userId, store }: Props) {
+export function Home({ ideas, userId, store, now }: Props) {
   const h = COPY.home;
   const [server, setServer] = useState(true); // ADR-0018: on by default, every time the home opens
   const [tab, setTab] = useState<Tab>("all");
@@ -25,6 +26,8 @@ export function Home({ ideas, userId, store }: Props) {
   const [sort, setSort] = useState<SortKey>(() => loadSort(store, userId));
   const [opened, setOpened] = useState(() => loadOpened(store, userId));
   const [picked, setPicked] = useState<string | null>(null);
+  const [routineOn, setRoutineOn] = useState(() => routineShown(store, userId));
+  const [folded, setFolded] = useState(() => feedbackHidden(store, userId));
 
   const shown = useMemo(() => listIdeas(ideas, { tab, query, sort, opened }), [ideas, tab, query, sort, opened]);
   const chosen = ideas.find((i) => i.rootId === picked) ?? null;
@@ -37,6 +40,10 @@ export function Home({ ideas, userId, store }: Props) {
     const next = isSortKey(v) ? v : DEFAULT_SORT;
     saveSort(store, userId, next);
     setSort(next);
+  };
+  const changeRoutine = (on: boolean) => {
+    setRoutineShown(store, userId, on);
+    setRoutineOn(on);
   };
 
   return (
@@ -67,7 +74,10 @@ export function Home({ ideas, userId, store }: Props) {
             : <p class="empty">{emptyText(ideas, tab, query)}</p>}
         </section>
         <section class="home-detail" aria-live="polite">
-          <p class="empty">{h.pick}</p>
+          {chosen
+            ? <IdeaLife key={chosen.rootId} idea={chosen} server={server} now={now} routineOn={routineOn} feedbackFolded={folded.has(chosen.rootId)}
+                onBack={() => setPicked(null)} onRoutine={changeRoutine} onFoldFeedback={(f) => setFolded(setFeedbackHidden(store, userId, chosen.rootId, f))} />
+            : <p class="empty">{h.pick}</p>}
         </section>
       </div>
     </div>
