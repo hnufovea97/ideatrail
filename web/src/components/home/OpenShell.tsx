@@ -131,7 +131,7 @@ export function OpenShell({ api, vault, signal, onLock, onVault, onGone }: Props
       {loaded?.mirror === "failed" ? <p class="small">{COPY.dash.mirrorFailed}</p> : null}
       {view === "approvals" ? <Approvals api={api} vault={vault} items={pending} onDecided={loadApprovals} onBack={() => setView("home")} /> : null}
       {view === "settings" && loaded ? (
-        <Settings api={api} vault={vault} sync={loaded.sync} onVault={onVault} onRefresh={() => refreshNow.current()} onBack={() => setView("home")} />
+        <Settings api={api} vault={vault} sync={loaded.sync} store={store} onVault={onVault} onRefresh={() => refreshNow.current()} onDeleted={onGone} onBack={() => setView("home")} />
       ) : null}
       {view === "home" && ideas ? <Home ideas={ideas} tools={tools} userId={vault.userId} store={store} now={new Date()} onRename={rename} /> : null}
       {view === "home" && !ideas ? <p class="small">{COPY.home.loading}</p> : null}
