@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -71,6 +72,28 @@ func TestToolListStaysInTokenBudget(t *testing.T) {
 	for _, k := range []string{"decided", "deferred", "turn", "label"} {
 		if _, ok := recordSchema["properties"].(map[string]any)[k]; !ok {
 			t.Errorf("record schema is missing %q", k)
+		}
+	}
+}
+
+// ADR-0020: the record tool takes five stage names, only meant for an idea's first record.
+func TestStagesSchemaAndRefusals(t *testing.T) {
+	st, ok := recordSchema["properties"].(map[string]any)["stages"].(map[string]any)
+	if !ok || st["type"] != "array" || st["minItems"] != 5 || st["maxItems"] != 5 {
+		t.Fatalf("stages schema %v", st)
+	}
+	if d, _ := st["description"].(string); !strings.Contains(d, "irst record") {
+		t.Fatalf("description %q", d)
+	}
+	e := newEnv(t, true)
+	p := filepath.Join(e.folder, "plan.md")
+	_ = os.WriteFile(p, []byte("# plan"), 0o600)
+	for name, s := range map[string][]string{
+		"four": {"a", "b", "c", "d"}, "six": {"a", "b", "c", "d", "e", "f"},
+		"thirteen": {"a", "b", "c", "d", strings.Repeat("가", 13)}, "newline": {"a", "b", "c", "d", "e\nf"},
+	} {
+		if out, isErr := e.call(t, "record", map[string]any{"paths": []string{p}, "note": "x", "stages": s}); !isErr && out != msgBadInput {
+			t.Errorf("%s accepted: %q", name, out)
 		}
 	}
 }

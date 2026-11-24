@@ -12,7 +12,7 @@ import (
 )
 
 // Delta ops (spec §15). The engine never reads list info back; it only appends sealed changes.
-var deltaOps = map[string]bool{"tags": true, "routine": true, "milestone": true, "title": true}
+var deltaOps = map[string]bool{"tags": true, "routine": true, "milestone": true, "title": true, "stages": true}
 
 var ErrBadDelta = errors.New("unknown change type")
 

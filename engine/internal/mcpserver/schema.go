@@ -23,6 +23,9 @@ var recordSchema = map[string]any{
 		"deferred": map[string]any{"type": "integer", "minimum": 0, "maximum": 999, "description": "How many were put off for later"},
 		"turn":     map[string]any{"type": "string", "maxLength": 40, "description": "One line if the direction changed; else omit"},
 		"label":    map[string]any{"type": "string", "maxLength": 20, "description": "Version name, e.g. 개요, 초안, 개선 1"},
+		// ADR-0020: sent as one sealed fragment, not in the record itself.
+		"stages": map[string]any{"type": "array", "items": map[string]any{"type": "string", "maxLength": 12}, "minItems": 5, "maxItems": 5,
+			"description": "First record of an idea only: 5 short stage names fitting the work (e.g. writing: 착상·개요·초고·퇴고·발행)."},
 	},
 	"required":             []string{"paths", "note"},
 	"additionalProperties": false,

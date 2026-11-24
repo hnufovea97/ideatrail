@@ -15,6 +15,9 @@ const (
 	maxTurnLen  = 40
 	maxLabelLen = 20
 	linePunct   = "?!~.,·-()/:"
+
+	stageCount   = 5 // ADR-0020: the five stage names the AI gives once, on an idea's first record
+	maxStageName = 12
 )
 
 // plainLine reports whether s is one short plain line with at least one letter or digit.
@@ -39,8 +42,24 @@ func lineOK(s string, max int) bool {
 	return s == "" || (utf8.RuneCountInString(s) <= max && plainLine(s))
 }
 
+// stagesOK: none given, or exactly five names of 1-12 characters, each a plain line without padding spaces.
+func stagesOK(names []string) bool {
+	if len(names) == 0 {
+		return true
+	}
+	if len(names) != stageCount {
+		return false
+	}
+	for _, n := range names {
+		if n == "" || n != strings.TrimSpace(n) || !lineOK(n, maxStageName) {
+			return false
+		}
+	}
+	return true
+}
+
 func (in Input) aiFieldsOK() bool {
-	return countOK(in.Decided) && countOK(in.Deferred) && lineOK(in.Turn, maxTurnLen) && lineOK(in.Label, maxLabelLen)
+	return stagesOK(in.Stages) && countOK(in.Decided) && countOK(in.Deferred) && lineOK(in.Turn, maxTurnLen) && lineOK(in.Label, maxLabelLen)
 }
 
 // withAIFields adds only the fields the AI gave, so older readers see the same shape as before.

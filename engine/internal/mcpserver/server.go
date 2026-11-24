@@ -160,12 +160,13 @@ type recordIn struct {
 	Deferred         *int             `json:"deferred,omitempty"`
 	Turn             string           `json:"turn,omitempty"`
 	Label            string           `json:"label,omitempty"`
+	Stages           []string         `json:"stages,omitempty"`
 }
 
 // input maps the tool arguments onto the pipeline input; the pipeline checks every value again.
 func (in recordIn) input(paths []string) record.Input {
 	return record.Input{Paths: paths, Note: in.Note, Milestone: in.Milestone, MilestoneCertain: in.MilestoneCertain,
-		Routine: in.Routine, Tags: in.Tags, Decided: in.Decided, Deferred: in.Deferred, Turn: in.Turn, Label: in.Label}
+		Routine: in.Routine, Tags: in.Tags, Decided: in.Decided, Deferred: in.Deferred, Turn: in.Turn, Label: in.Label, Stages: in.Stages}
 }
 
 func (e *Engine) recordTool(ctx context.Context, in recordIn) string {

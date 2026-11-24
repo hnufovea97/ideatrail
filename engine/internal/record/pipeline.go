@@ -88,11 +88,12 @@ type Input struct {
 	MilestoneCertain bool
 	Routine          []Routine
 	Tags             []string
-	Decided          *int   // ADR-0019: things decided in this record (0-999), nil = not given
-	Deferred         *int   // things put off (0-999), nil = not given
-	Turn             string // one line (<=40) when the direction changed, "" = none
-	Label            string // version name (<=20), e.g. "개선 1", "" = none
-	Import           bool   // signup first import: uses the server's import allowance, not the hourly cap
+	Decided          *int     // ADR-0019: things decided in this record (0-999), nil = not given
+	Deferred         *int     // things put off (0-999), nil = not given
+	Turn             string   // one line (<=40) when the direction changed, "" = none
+	Label            string   // version name (<=20), e.g. "개선 1", "" = none
+	Stages           []string // ADR-0020: five stage names (<=12 each), only on an idea's first record; sent as one sealed kind 4 "stages" fragment
+	Import           bool     // signup first import: uses the server's import allowance, not the hourly cap
 }
 
 // Result is safe to show: ids, a status code and the idea title — no paths or secrets.
@@ -243,6 +244,12 @@ func Record(ctx context.Context, d Deps, in Input) (*Result, error) {
 		return nil, err
 	}
 	res.Status = Flush(ctx, d)
+	if len(in.Stages) > 0 {
+		// The record is already safe; the names are a separate sealed fragment, never plain anywhere.
+		if _, derr := Delta(ctx, d, col.RootID, "stages", in.Stages, ""); derr != nil && res.Warning == "" {
+			res.Warning = "stages_not_sent"
+		}
+	}
 	return res, nil
 }
 
