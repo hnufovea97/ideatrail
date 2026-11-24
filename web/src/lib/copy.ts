@@ -246,7 +246,6 @@ export const COPY = {
     opening: "기기 안에서 푸는 중…",
     lockNow: "지금 잠그기", // 새 문구
     lockedIdle: (m: number) => `${m}분 동안 쓰지 않아서 잠갔어요. 다시 열어 주세요`, // 새 문구
-    ideas: (n: number) => `아이디어 ${n}개`,
     cover: "화면을 가려 두었어요", // 새 문구 (흐림 가림막)
     mirrorFailed: "증명 보관함에 목록 사본을 아직 못 썼어요. 다음 확인 때 다시 해 볼게요", // 새 문구 (GitHub 거울 실패)
     chain: {

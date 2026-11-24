@@ -1,12 +1,18 @@
 // Plays the engine side of spec §8, §9 and §15 with real signatures and seals. Keys live only in
 // this test process's memory.
-import { fromB64u, fromHex, toB64u, utf8 } from "@ideatrail/crypto/bytes";
+import { fromB64u, fromHex, toB64u, toHex, utf8 } from "@ideatrail/crypto/bytes";
 import { newId } from "@ideatrail/crypto/ids";
 import { newKemKeyPair, randomKey, signPublicKey } from "@ideatrail/crypto/keypair";
 import { bytesEqual, pairMac } from "@ideatrail/crypto/mac";
 import { KIND, open, openAuth, seal } from "@ideatrail/crypto/seal";
 import { messageFor, sign } from "@ideatrail/crypto/sign";
 import { API, APP } from "./guards";
+
+/** One record as GET /v1/sync returns it (api/src/routes/sync.ts records columns). */
+export interface SyncRecord {
+  record_id: string; root_id: string; parent_ids: string; commitment: string; recorded_at: string; engine_id: string; log_seq: string;
+  engine_sig: string; list_meta: string; body_hash: string; nonce_hash: string; deleted_at: null; change_seq: number;
+}
 
 export interface SuggestedFolder { path: string; name: string; files: number; current?: boolean }
 export interface InboxMessage { msg_id: string; body: Record<string, unknown> }
@@ -115,6 +121,19 @@ export class FakeEngine {
       if (!del.ok) throw new Error(`inbox delete ${del.status}`);
     }
     return out;
+  }
+
+  /** A record row signed and sealed like engine/internal/record (kind 1 list meta, §8 record signature over D1's hashes).
+   *  E2E only: tests add it to the sync answer, so no Bitcoin calendar is needed (the API checks receipts on upload). */
+  async recordRow(o: { rootId: string; seq: number; recordedAt: string; meta: Record<string, unknown>; changeSeq: number }): Promise<SyncRecord> {
+    const recordId = newId();
+    const sealed = await seal(KIND.record_meta, this.ak(), { userId: this.userId, rootId: o.rootId, recordId, version: "0" }, utf8(JSON.stringify(o.meta)));
+    const hex = () => toHex(randomKey());
+    const commitment = hex(), body_hash = hex(), nonce_hash = hex();
+    const engine_sig = sign(this.seed, messageFor({ type: "record_hashed", userId: this.userId, rootId: o.rootId, recordId, parents: [], commitmentHex: commitment,
+      metaSealed: sealed, bodyHashHex: body_hash, nonceHashHex: nonce_hash, logSeq: BigInt(o.seq), recordedAt: o.recordedAt }));
+    return { record_id: recordId, root_id: o.rootId, parent_ids: "-", commitment, recorded_at: o.recordedAt, engine_id: this.engineId, log_seq: String(o.seq),
+      engine_sig, list_meta: toB64u(sealed), body_hash, nonce_hash, deleted_at: null, change_seq: o.changeSeq };
   }
 
   /** Spec §4 kind 6 + §8 storage_link signature, as the engine does after GitHub device flow. */

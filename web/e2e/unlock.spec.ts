@@ -19,7 +19,7 @@ test("opens with the device lock: one get with PRF, nothing of it on the wire", 
   await page.getByRole("button", { name: OPEN }).click();
   await expect(page.getByRole("button", { name: LOCK })).toBeVisible();
   await expect(page.getByText(/^기록 사슬 정상 · 마지막 확인 \d{1,2}:\d{2}$/)).toBeVisible();
-  await expect(page.getByText("아이디어 0개")).toBeVisible();
+  await expect(page.getByText("아직 기록이 없어요. Claude Code에서 “기록해 줘”라고 하면 여기에 쌓여요")).toBeVisible();
   const verify = w.requests.find((r) => r.url.endsWith("/v1/webauthn/login/verify"));
   expect(JSON.parse(verify!.body).response.clientExtensionResults).toEqual({});
   expect(w.requests.filter((r) => r.body.includes('"prf"'))).toEqual([]);

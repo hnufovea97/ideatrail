@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Api } from "../../lib/api";
 import { COPY } from "../../lib/copy";
 import { refresh, refreshFailure, type Loaded, type LoadDeps, type RefreshFailure } from "../../lib/dashboard/load";
@@ -8,12 +8,13 @@ import { chainLine, type ChainStatus } from "../../lib/sync/chain";
 import { emptySync, type SyncState } from "../../lib/sync/store";
 import { SYNC_MS } from "../../lib/timing";
 import type { DashboardVault } from "../../lib/unlock";
+import { Home } from "./Home";
 
 /** `signal` is aborted by the lock before it wipes the keys: a refresh in flight then writes nothing. */
 interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onLock(): void }
 const CHECKING: ChainStatus = { state: "checking" };
 
-/** The unlocked page. M5a shows the chain line and the idea count; the home UI (5.4) renders `loaded.ideas` in M5b. */
+/** The unlocked page: the chain line and the home (5.4·5.5) drawn from `loaded.ideas`. */
 export function OpenShell({ api, vault, signal, onLock }: Props) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failure, setFailure] = useState<RefreshFailure | null>(null);
@@ -50,15 +51,17 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
   }, [api, vault, signal]);
 
   const chain = loaded?.chain ?? CHECKING;
+  const store = useMemo(() => browserStore(), []);
   return (
     <main class="screen dash">
-      <h1 tabIndex={-1}>{COPY.dash.lockTitle}</h1>
-      {chain.state === "warn"
-        ? <p class="banner warn" role="alert">{chainLine(chain)}</p>
-        : <p class="small" role="status">{failure ? COPY.dash.errors[failure] : chainLine(chain)}</p>}
-      {loaded ? <p>{COPY.dash.ideas(loaded.ideas.length)}</p> : null}
+      <header class="dash-head">
+        <h1 tabIndex={-1}>{COPY.dash.lockTitle}</h1>
+        <p class="small chain-line" role="status">{failure ? COPY.dash.errors[failure] : chain.state === "warn" ? "" : chainLine(chain)}</p>
+        <button type="button" class="lock-now" onClick={onLock}>{COPY.dash.lockNow}</button>
+      </header>
+      {chain.state === "warn" ? <p class="banner warn" role="alert">{chainLine(chain)}</p> : null}
       {loaded?.mirror === "failed" ? <p class="small">{COPY.dash.mirrorFailed}</p> : null}
-      <button type="button" onClick={onLock}>{COPY.dash.lockNow}</button>
+      {loaded ? <Home ideas={loaded.ideas} userId={vault.userId} store={store} now={new Date()} /> : <p class="small">{COPY.home.loading}</p>}
     </main>
   );
 }
