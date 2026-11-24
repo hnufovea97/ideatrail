@@ -121,3 +121,18 @@ describe("open the vault after the passkey (5.1)", () => {
     expect([taken, w.mk[0]]).toEqual([1, 1]);
   });
 });
+
+describe("failureCode (G2: show which error, never its message)", () => {
+  it("gives the error name only, for DOMException and Error", async () => {
+    const { failureCode } = await import("./unlock");
+    expect(failureCode(new DOMException("secret detail", "SecurityError"))).toBe("SecurityError");
+    expect(failureCode(new TypeError("x is undefined"))).toBe("TypeError");
+  });
+  it("drops odd names and non-errors", async () => {
+    const { failureCode } = await import("./unlock");
+    expect(failureCode("boom")).toBe("unknown");
+    const e = new Error("m");
+    e.name = "a b<c>\n";
+    expect(failureCode(e)).toBe("unknown");
+  });
+});

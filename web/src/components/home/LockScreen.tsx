@@ -3,7 +3,7 @@ import type { Api } from "../../lib/api";
 import { COPY } from "../../lib/copy";
 import { browserStore } from "../../lib/engine-list";
 import { LOGIN_REFRESH_MS } from "../../lib/timing";
-import { askPasskey, isFresh, openVault, prepareLogin, settleOpened, unlockReason, type DashboardVault, type PreparedLogin } from "../../lib/unlock";
+import { askPasskey, failureCode, isFresh, openVault, prepareLogin, settleOpened, unlockReason, type DashboardVault, type PreparedLogin } from "../../lib/unlock";
 import { Screen } from "../ui/Screen";
 
 interface Props { api: Api; notice: string | null; onOpen(v: DashboardVault): void }
@@ -57,7 +57,9 @@ export function LockScreen({ api, notice, onOpen }: Props) {
         (v) => settleOpened(alive.current, v, onOpen), // unmounted meanwhile: the keys are wiped, not dropped
         (e: unknown) => {
           if (!alive.current) return;
-          setError({ text: COPY.dash.errors[unlockReason(e)], from: "open" });
+          const reason = unlockReason(e);
+          const code = reason === "failed" ? ` (${COPY.dash.errorCode} ${failureCode(e)})` : "";
+          setError({ text: COPY.dash.errors[reason] + code, from: "open" });
           setBusy(false);
           void load();
         },

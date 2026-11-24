@@ -156,3 +156,10 @@ export function unlockReason(e: unknown): UnlockReason {
   if (e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "AbortError")) return "passkey_cancel";
   return "failed";
 }
+
+const CODE_NAME = /^[A-Za-z_]{1,40}$/;
+/** A short, safe label for an unexpected failure (the error's name only, never its message), shown so a phone report can be traced. */
+export function failureCode(e: unknown): string {
+  const name = e instanceof Error || e instanceof DOMException ? e.name : "";
+  return CODE_NAME.test(name) ? name : "unknown";
+}
