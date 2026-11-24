@@ -237,8 +237,11 @@ func TestPairingPostsTheSignupListAndTheWatcherStopsOnClose(t *testing.T) {
 	if time.Since(start) > 2*time.Second {
 		t.Fatal("the watcher did not stop on Close")
 	}
+	// A request already on the wire when Close returned may still reach the handler; let it land
+	// first. A watcher still polling (every 2ms) would then add many more reads in the window below.
+	time.Sleep(20 * time.Millisecond)
 	reads := inboxReads.Load()
-	time.Sleep(30 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	if inboxReads.Load() != reads {
 		t.Fatal("the watcher kept reading the inbox after Close")
 	}
