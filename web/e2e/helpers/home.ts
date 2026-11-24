@@ -4,6 +4,7 @@ import { expect, type Page } from "@playwright/test";
 import { fromHex, toB64u, toHex } from "@ideatrail/crypto/bytes";
 import { newId } from "@ideatrail/crypto/ids";
 import { serializeTimestamp } from "@ideatrail/crypto/ots";
+import type { VirtualAuthenticator } from "./authenticator";
 import type { FakeEngine } from "./fake-engine";
 import { openSignup, passStepOne } from "./flow";
 import { APP } from "./guards";
@@ -135,7 +136,12 @@ export async function seedIdeas(page: Page, engine: FakeEngine): Promise<void> {
 
 /** Sign up (step 1), leave for /home with the three ideas waiting, and open with the device lock. */
 export async function openHome(page: Page): Promise<FakeEngine> {
-  const { engine } = await openSignup(page, { prf: true });
+  return (await openHomeWith(page)).engine;
+}
+
+/** Same, and also hands back the virtual authenticator (to make the device lock fail on purpose). */
+export async function openHomeWith(page: Page): Promise<{ engine: FakeEngine; auth: VirtualAuthenticator }> {
+  const { engine, auth } = await openSignup(page, { prf: true });
   await passStepOne(page, engine);
   await seedIdeas(page, engine);
   page.once("dialog", (d) => void d.accept());
@@ -143,7 +149,7 @@ export async function openHome(page: Page): Promise<FakeEngine> {
   await page.getByRole("button", { name: OPEN }).click();
   await expect(page.getByText(/^기록 사슬 정상 · 마지막 확인/)).toBeVisible();
   await expect(page.getByText("3개", { exact: true })).toBeVisible();
-  return engine;
+  return { engine, auth };
 }
 
 /** Turn the server-view switch off so the names are readable (and reachable by role). */

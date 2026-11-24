@@ -26,6 +26,8 @@ export interface RecordRow {
 export interface DeltaRow { delta_id: string; root_id: string; engine_id: string; log_seq: string; sealed_delta: string; engine_sig: string; created_at: string; merged_at: string | null; change_seq: number }
 export interface AnchorRow { record_id: string; status: "pending" | "confirmed"; block_height: number | null; complete_receipt: string | null; change_seq: number }
 export type LinkRow = StorageLinkRow & { change_seq: number };
+/** The server's view of an engine (display only: names and keys come from the signed engine list). */
+export interface EngineRow { engine_id: string; paused: 0 | 1; pause_reason: string | null; created_at: string; revoked_at: string | null; change_seq: number }
 
 const SHAPES = {
   roots: { root_id: id, visibility: oneOf("private", "public"), meta_version: count, list_meta: orNull(b64u), created_at: time, deleted_at: orNull(time), change_seq: count },
@@ -33,11 +35,12 @@ const SHAPES = {
     list_meta: b64u, body_hash: hex64, nonce_hash: hex64, deleted_at: orNull(time), change_seq: count },
   deltas: { delta_id: id, root_id: id, engine_id: id, log_seq: seq, sealed_delta: b64u, engine_sig: b64u, created_at: time, merged_at: orNull(time), change_seq: count },
   anchors: { record_id: id, status: oneOf("pending", "confirmed"), block_height: orNull(count), complete_receipt: orNull(receipt), change_seq: count },
+  engines: { engine_id: id, paused: (v: unknown) => v === 0 || v === 1, pause_reason: orNull((v) => typeof v === "string" && v.length <= 40), created_at: time, revoked_at: orNull(time), change_seq: count },
   storage_links: { link_id: id, engine_id: id, provider: oneOf("github"), enc_token: orNull(b64u), engine_sig: b64u, created_at: time, revoked_at: orNull(time), change_seq: count },
 } as const satisfies Record<string, Record<string, Check>>;
 
 export type Table = keyof typeof SHAPES;
-export interface Page { roots: RootRow[]; records: RecordRow[]; deltas: DeltaRow[]; anchors: AnchorRow[]; storage_links: LinkRow[]; bad: Table[] }
+export interface Page { roots: RootRow[]; records: RecordRow[]; deltas: DeltaRow[]; anchors: AnchorRow[]; engines: EngineRow[]; storage_links: LinkRow[]; bad: Table[] }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -61,5 +64,5 @@ export function parsePage(changes: Record<string, unknown>): Page {
     if (rows.some((r) => r === null)) bad.push(t);
     return rows.filter((r): r is T => r !== null);
   };
-  return { roots: take("roots"), records: take("records"), deltas: take("deltas"), anchors: take("anchors"), storage_links: take("storage_links"), bad };
+  return { roots: take("roots"), records: take("records"), deltas: take("deltas"), anchors: take("anchors"), engines: take("engines"), storage_links: take("storage_links"), bad };
 }

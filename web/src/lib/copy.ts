@@ -271,6 +271,97 @@ export const COPY = {
     },
     errorCode: "오류 표시:", // 새 문구 (G2: 원인 찾기용, 오류 이름만)
   },
+  // M5d 승인·기록 도우미 관리·설정. 새 문구는 모두 "새 문구"
+  manage: {
+    settingsOpen: "설정", // 새 문구
+    back: "돌아가기", // 새 문구
+    banner: (n: number) => `승인을 기다리는 요청이 ${n}개 있어요`, // 새 문구
+    bannerAction: "보기", // 새 문구
+    stepupAhead: "누르면 Touch ID나 컴퓨터 암호를 한 번 물어요", // 새 문구
+    approvals: {
+      title: "승인을 기다리는 요청", // 새 문구
+      none: "기다리는 요청이 없어요", // 새 문구
+      kinds: { import: "가져오기", add_folder: "폴더 추가", forget_original: "원문 지우기", disconnect: "연결 끊기" },
+      from: (name: string) => `${name}에서 온 요청`, // 새 문구
+      files: (n: number) => `문서 ${n}개`,
+      noFolders: "고른 폴더가 없어요", // 새 문구
+      expires: (when: string) => `${when}까지 답해 주세요`, // 새 문구
+      approve: "허락하기", // 새 문구
+      reject: "거절하기", // 새 문구
+      list: "요청 목록", // 새 문구
+    },
+    engines: {
+      title: "이 컴퓨터의 기록 도우미", // 새 문구
+      none: "연결된 기록 도우미가 없어요. 다른 컴퓨터에서 연결할 때까지 대시보드는 보기만 돼요", // 새 문구
+      added: (d: string) => `연결한 날 ${d}`, // 새 문구
+      last: (d: string, n: number) => `마지막 기록 ${d} · 기록 ${n}개`, // 새 문구
+      noRecords: "아직 기록이 없어요", // 새 문구
+      running: "잘 돌고 있어요", // 새 문구
+      pausedUser: "잠시 멈춰 둔 상태예요", // 새 문구
+      pausedAuto: "기록이 갑자기 많아져서 멈췄어요", // 새 문구
+      disconnected: "끊김", // 새 문구
+      pause: "잠시 멈추기", // 새 문구
+      resume: "다시 켜기", // 새 문구
+      disconnect: "연결 끊기", // 새 문구
+      confirmDisconnect: "이 컴퓨터의 기록 도우미를 끊을게요. 기록을 남기던 열쇠를 폐기하고, 그 도우미의 GitHub 출입증도 자동으로 취소해요. 이미 남긴 기록은 그대로 확인돼요", // 새 문구
+      lastOne: "다른 컴퓨터에서 연결할 때까지 대시보드는 보기만 돼요", // 새 문구
+      confirmYes: "끊기", // 새 문구
+      cancel: "그만두기", // 새 문구
+      notLoaded: "기록을 아직 다 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요", // 새 문구
+    },
+    autoLock: {
+      title: "자동 잠금", // 새 문구
+      why: "쓰지 않으면 이 시간 뒤에 저절로 잠겨요", // 새 문구
+      minutes: (m: number) => `${m}분`,
+      saved: "저장했어요", // 새 문구
+    },
+    routine: {
+      title: "루틴 점검 보기", // 새 문구
+      label: "아이디어 카드에 루틴 점검 보이기", // 새 문구
+      note: "이 기기에만 저장돼요. 끄면 화면에서만 숨기고, 기록은 그대로 채워져요", // 새 문구
+    },
+    recovery: {
+      title: "비상 열쇠", // 새 문구
+      none: "아직 만들지 않았어요", // 새 문구
+      made: (d: string) => `${d}에 만들었어요`, // 새 문구
+      make: "만들기", // 새 문구
+      remake: "다시 만들기", // 새 문구
+      remakeNote: "다시 만들면 예전 비상 열쇠는 쓸 수 없게 돼요", // 새 문구
+    },
+    devices: {
+      title: "기기 목록", // 새 문구
+      thisOne: "이 기기", // 새 문구
+      added: (d: string) => `등록 ${d}`, // 새 문구
+      lastUsed: (d: string) => `마지막 사용 ${d}`, // 새 문구
+      neverUsed: "아직 쓴 적 없어요", // 새 문구
+      remove: "이 기기 빼기", // 새 문구
+      confirm: "이 기기의 기기 잠금을 빼면 이 기기로는 더 열 수 없어요. 다른 기기에서 열고 있는 화면도 닫혀요", // 새 문구
+      confirmThis: "지금 쓰는 기기를 빼는 거예요. 빼고 나면 이 기기로는 열 수 없어요", // 새 문구
+      confirmYes: "빼기", // 새 문구
+      lastDevice: "마지막 남은 기기 잠금은 뺄 수 없어요. 다른 기기를 먼저 추가해 주세요", // 새 문구
+    },
+    account: {
+      title: "계정 지우기", // 새 문구
+      why: "지우기 전에 무엇이 사라지고 무엇이 남는지 확인해 주세요", // 새 문구
+      removedHead: "지워지는 것", // 새 문구
+      removed: "Ideatrail 서버의 계정·목록·열쇠 보관본·사용 지표·감사 기록. 개인을 구분할 수 없는 합계만 남아요", // 새 문구
+      keptHead: "남는 것", // 새 문구
+      keptChain: "블록체인에 남은 지문. 영구적이고, 누구 것인지는 알 수 없어요", // 새 문구
+      keptGithub: "사용자의 GitHub에 있는 증명 묶음과 원문. 사용자 소유라 그대로 있어요", // 새 문구
+      keepBundles: "증명 묶음을 따로 보관해 두세요. 계정을 지운 뒤에는 이 화면에서 볼 수 없어요", // 새 문구
+      start: "계정 지우기", // 새 문구
+      confirm: "정말 지울까요? 되돌릴 수 없어요", // 새 문구
+      yes: "계정 지우기", // 새 문구
+      notice: "계정을 지웠어요. 이 기기에 남은 열쇠도 지웠어요", // 새 문구
+    },
+    errors: {
+      last_device: "마지막 남은 기기 잠금은 뺄 수 없어요. 다른 기기를 먼저 추가해 주세요",
+      engine_list_conflict: "다른 기기에서 목록이 바뀌었어요. 다시 열어서 해 주세요", // 새 문구
+      approval_closed: "이미 답했거나 기한이 지난 요청이에요. 목록을 새로 불러왔어요", // 새 문구
+      not_found: "찾을 수 없어요. 목록을 새로 불러왔어요", // 새 문구
+      mismatch: "앞 4자리가 달라요. 보관한 비상 열쇠를 다시 확인해 주세요",
+    },
+  },
   // M5b 홈 (ADR-0018 시제품 모양). 새 문구는 모두 "새 문구" — 미리보기 docs/manual/홈-화면-미리보기.html과 같은 말
   home: {
     toggle: SERVER_TOGGLE,
@@ -402,6 +493,26 @@ export const didLine = (s: SignupState): string | null => (s.justDid ? COPY.did[
 
 /** A fixed sentence for any failure. Server messages and exception text never reach the screen. */
 export function errorMessage(e: unknown): string {
+  return baseError(e);
+}
+
+/** Like errorMessage, plus the sentences the dashboard's management screens have for their own server codes. */
+export function manageError(e: unknown): string {
+  if (e instanceof ApiFailure) {
+    const known: Record<string, string> = {
+      last_device: COPY.manage.errors.last_device,
+      engine_list_conflict: COPY.manage.errors.engine_list_conflict,
+      approval_closed: COPY.manage.errors.approval_closed,
+      engine_not_found: COPY.manage.errors.not_found,
+      not_found: COPY.manage.errors.not_found,
+      credential_not_found: COPY.manage.errors.not_found,
+    };
+    if (e.code in known) return known[e.code];
+  }
+  return baseError(e);
+}
+
+function baseError(e: unknown): string {
   if (e instanceof ApiFailure) {
     if (e.code === "offline") return COPY.errors.offline;
     if (e.code === "device_add_expired") return COPY.connect.expired;

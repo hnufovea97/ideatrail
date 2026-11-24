@@ -15,7 +15,7 @@ const MAX_FILES = 1_000_000;
 
 export interface SuggestedFolder { path: string; name: string; files: number; current: boolean }
 
-function signedByEngine(r: ApprovalRow, pub: Uint8Array, userId: string): boolean {
+export function signedByEngine(r: ApprovalRow, pub: Uint8Array, userId: string): boolean {
   try {
     return verify(pub, messageFor({ type: "approval", userId, approvalId: r.approval_id, kind: r.kind, summarySealed: fromB64u(r.summary), apprSeq: BigInt(r.appr_seq) }), r.engine_sig);
   } catch {
@@ -31,7 +31,7 @@ export function signupApproval(rows: ApprovalRow[], engine: EngineEntry, userId:
   return valid.reduce<ApprovalRow | null>((best, r) => (best === null || BigInt(r.appr_seq) > BigInt(best.appr_seq) ? r : best), null);
 }
 
-function toFolder(x: unknown): SuggestedFolder[] {
+export function toFolder(x: unknown): SuggestedFolder[] {
   const f = x as Record<string, unknown> | null;
   if (!f || typeof f.path !== "string" || f.path.length === 0 || f.path.length > MAX_PATH || typeof f.name !== "string") return [];
   if (!Number.isInteger(f.files) || (f.files as number) < 0 || (f.files as number) > MAX_FILES) return [];

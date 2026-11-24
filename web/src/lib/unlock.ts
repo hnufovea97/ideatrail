@@ -1,6 +1,6 @@
 // Login = unlock (UX: "기기 잠금 한 번 = 로그인 + 열쇠 풀기", spec §11). The keys live only in the returned object,
 // in memory, until wipeVault. Every temporary key (PRF output, wrap key, subkey) is zeroed right after use.
-import { fromB64u } from "@ideatrail/crypto/bytes";
+import { fromB64u, toB64u } from "@ideatrail/crypto/bytes";
 import { prfWrapKey, unwrapMasterKey } from "@ideatrail/crypto/envelope";
 import { kemPublicOf } from "@ideatrail/crypto/keypair";
 import { bytesEqual } from "@ideatrail/crypto/mac";
@@ -15,7 +15,8 @@ import { assertWithPrf, type Unlocked } from "./webauthn";
 export const DEFAULT_LOCK_MINUTES = 5;
 const MIN_LOCK_MINUTES = 1;
 
-export interface DashboardVault extends Vault { engineList: EngineList; autoLockMinutes: number }
+/** `credentialId`: the device lock used to open (server credential_id), so settings can mark "이 기기". */
+export interface DashboardVault extends Vault { engineList: EngineList; autoLockMinutes: number; credentialId?: string }
 
 export type UnlockReason = "passkey_cancel" | "prf_missing" | "not_registered" | "retry" | "offline" | "account_mismatch" | "engine_list_rollback" | "browser_unsupported" | "failed";
 
@@ -69,14 +70,14 @@ function apiReason(e: unknown): UnlockFailure {
   return new UnlockFailure(e instanceof ApiFailure && e.code === "offline" ? "offline" : "failed");
 }
 
-async function openMasterKey(api: Api, p: PreparedLogin, got: Unlocked): Promise<{ userId: string; mk: Uint8Array }> {
+async function openMasterKey(api: Api, p: PreparedLogin, got: Unlocked): Promise<{ userId: string; mk: Uint8Array; credentialId: string }> {
   const prf = got.prf;
   if (!prf) throw new UnlockFailure("prf_missing");
   try {
     const login = await api.loginVerify({ challenge_id: p.challenge_id, response: got.assertion }).catch((e: unknown) => { throw verifyReason(e); });
     const wrap = prfWrapKey(prf, got.rawId);
     try {
-      return { userId: login.user_id, mk: unwrapMasterKey(wrap, login.user_id, login.envelope.envelope_id, fromB64u(login.envelope.wrapped_master_key)) };
+      return { userId: login.user_id, credentialId: toB64u(got.rawId), mk: unwrapMasterKey(wrap, login.user_id, login.envelope.envelope_id, fromB64u(login.envelope.wrapped_master_key)) };
     } catch {
       throw new UnlockFailure("failed"); // decrypt_failed: one reason, no oracle
     } finally {
@@ -135,12 +136,12 @@ function openList(mk: Uint8Array, userId: string, acct: AccountInfo, store: Vers
 
 /** After the passkey: verify on the server, unwrap MK, open the account key and the engine list. */
 export async function openVault(api: Api, p: PreparedLogin, got: Unlocked, store: VersionStore): Promise<DashboardVault> {
-  const { userId, mk } = await openMasterKey(api, p, got);
+  const { userId, mk, credentialId } = await openMasterKey(api, p, got);
   try {
     const acct = await api.account().catch((e: unknown) => { throw apiReason(e); });
     const { akPriv, akPub } = openAccountKey(mk, userId, acct);
     try {
-      return { userId, mk, akPriv, akPub, engineList: openList(mk, userId, acct, store), autoLockMinutes: clampMinutes(acct.auto_lock_minutes) };
+      return { userId, mk, akPriv, akPub, engineList: openList(mk, userId, acct, store), autoLockMinutes: clampMinutes(acct.auto_lock_minutes), credentialId };
     } catch (e) {
       akPriv.fill(0);
       throw e;

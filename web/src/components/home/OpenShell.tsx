@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { fromB64u } from "@ideatrail/crypto/bytes";
 import type { Api } from "../../lib/api";
+import { openApprovals, type OpenApproval } from "../../lib/approvals";
 import { COPY } from "../../lib/copy";
 import { refresh, refreshFailure, type Loaded, type LoadDeps, type RefreshFailure } from "../../lib/dashboard/load";
 import { browserStore } from "../../lib/engine-list";
@@ -15,15 +16,18 @@ import { SYNC_MS } from "../../lib/timing";
 import type { DashboardVault } from "../../lib/unlock";
 import { loadSource, refOf } from "../../lib/versions/source";
 import { useGithubLink } from "../start/useGithubLink";
+import { Approvals } from "./Approvals";
 import { Home } from "./Home";
+import { Settings } from "./Settings";
 import type { SourceTools } from "./VersionDetail";
 
 /** `signal` is aborted by the lock before it wipes the keys: a refresh in flight then writes nothing. */
-interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onLock(): void }
+interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onLock(): void; onVault(v: DashboardVault): void; onGone(): void }
+type View = "home" | "approvals" | "settings";
 const CHECKING: ChainStatus = { state: "checking" };
 
 /** The unlocked page: the chain line and the home (5.4·5.5) drawn from `loaded.ideas`. */
-export function OpenShell({ api, vault, signal, onLock }: Props) {
+export function OpenShell({ api, vault, signal, onLock, onVault, onGone }: Props) {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [failure, setFailure] = useState<RefreshFailure | null>(null);
   const sync = useRef<SyncState>(emptySync());
@@ -33,6 +37,13 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
   const [linkTick, setLinkTick] = useState(0);
   const confirmations = useRef<ConfirmSession | null>(null); // this session's two-explorer results (5.7), memory only
   const [confirmTick, setConfirmTick] = useState(0);
+  const [view, setView] = useState<View>("home");
+  const [pending, setPending] = useState<readonly OpenApproval[]>([]);
+
+  /** The waiting requests: only those a live engine signed and this account can open (5.9a). A failed load keeps the last list. */
+  const loadApprovals = useCallback(() => {
+    void api.approvals().then((r) => openApprovals(r.approvals, vault.engineList, vault)).then((items) => { if (!signal.aborted) setPending(items); }, () => undefined);
+  }, [api, vault, signal]);
 
   useEffect(() => {
     let live = true;
@@ -57,6 +68,7 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
           setLoaded(l);
           void session.check(l.ideas, signal).then((changed) => { if (changed && live) setConfirmTick((n) => n + 1); }, () => undefined);
           setFailure(null);
+          loadApprovals();
           if (justLinked.current) {
             justLinked.current = false;
             setLinkTick((n) => n + 1);
@@ -82,7 +94,7 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
       clearInterval(t);
       document.removeEventListener("visibilitychange", run);
     };
-  }, [api, vault, signal]);
+  }, [api, vault, signal, loadApprovals]);
 
   const chain = loaded?.chain ?? CHECKING;
   // 확산됨 only where this browser checked the block at both explorers; the server's "confirmed" alone reads 확인 중
@@ -109,11 +121,20 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
       <header class="dash-head">
         <h1 tabIndex={-1}>{COPY.dash.lockTitle}</h1>
         <p class="small chain-line" role="status">{failure ? COPY.dash.errors[failure] : chain.state === "warn" ? "" : chainLine(chain)}</p>
+        <button type="button" class="lock-now" onClick={() => setView("settings")}>{COPY.manage.settingsOpen}</button>
         <button type="button" class="lock-now" onClick={onLock}>{COPY.dash.lockNow}</button>
       </header>
       {chain.state === "warn" ? <p class="banner warn" role="alert">{chainLine(chain)}</p> : null}
+      {pending.length > 0 && view !== "approvals" ? (
+        <p class="banner" role="status">{COPY.manage.banner(pending.length)} <button type="button" class="link" onClick={() => { setView("approvals"); loadApprovals(); }}>{COPY.manage.bannerAction}</button></p>
+      ) : null}
       {loaded?.mirror === "failed" ? <p class="small">{COPY.dash.mirrorFailed}</p> : null}
-      {ideas ? <Home ideas={ideas} tools={tools} userId={vault.userId} store={store} now={new Date()} onRename={rename} /> : <p class="small">{COPY.home.loading}</p>}
+      {view === "approvals" ? <Approvals api={api} vault={vault} items={pending} onDecided={loadApprovals} onBack={() => setView("home")} /> : null}
+      {view === "settings" && loaded ? (
+        <Settings api={api} vault={vault} sync={loaded.sync} onVault={onVault} onRefresh={() => refreshNow.current()} onBack={() => setView("home")} />
+      ) : null}
+      {view === "home" && ideas ? <Home ideas={ideas} tools={tools} userId={vault.userId} store={store} now={new Date()} onRename={rename} /> : null}
+      {view === "home" && !ideas ? <p class="small">{COPY.home.loading}</p> : null}
     </main>
   );
 }

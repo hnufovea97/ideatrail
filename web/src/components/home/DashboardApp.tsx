@@ -26,6 +26,14 @@ export default function DashboardApp() {
     void api.logout({ keepalive: closing }).catch(() => undefined); // best effort: the keys are already gone
   }, [api]);
 
+  /** The account was deleted on the server: keys out of memory, back to the lock screen with one line. */
+  const gone = useCallback((v: DashboardVault) => {
+    opened.current.abort();
+    wipeVault(v);
+    setVault(null);
+    setNotice(COPY.manage.account.notice);
+  }, []);
+
   useEffect(() => {
     if (!vault) return;
     const auto = startAutoLock(vault.autoLockMinutes, () => lock(vault, true));
@@ -43,7 +51,7 @@ export default function DashboardApp() {
     <>
       <div class="blur-cover" aria-hidden="true"><LockIcon /><span class="sr-only">{COPY.dash.cover}</span></div>
       {vault
-        ? <OpenShell api={api} vault={vault} signal={opened.current.signal} onLock={() => lock(vault, false)} />
+        ? <OpenShell api={api} vault={vault} signal={opened.current.signal} onLock={() => lock(vault, false)} onVault={setVault} onGone={() => gone(vault)} />
         : <LockScreen api={api} notice={notice} onOpen={(v) => { opened.current = new AbortController(); setNotice(null); setVault(v); }} />}
     </>
   );

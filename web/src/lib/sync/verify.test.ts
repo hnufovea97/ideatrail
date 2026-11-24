@@ -158,7 +158,7 @@ describe("sync verification (5.2)", () => {
 
   it("malformed rows from the server are reported", async () => {
     const w = fakeWorld();
-    const s = applyPage(syncOf({}), { roots: [], records: [], deltas: [], anchors: [], storage_links: [], bad: ["records"] }, 0, true);
+    const s = applyPage(syncOf({}), { roots: [], records: [], deltas: [], anchors: [], engines: [], storage_links: [], bad: ["records"] }, 0, true);
     expect(verifyRows(w.userId, w.list, s, memoryStore()).issues).toEqual([{ kind: "bad_row", table: "records" }]);
   });
 

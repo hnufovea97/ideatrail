@@ -77,6 +77,6 @@ export const anchorRow = (recordId: string, over: Partial<AnchorRow> = {}): Anch
   ({ record_id: recordId, status: "pending", block_height: null, complete_receipt: null, change_seq: nextChange(), ...over });
 
 export function syncOf(rows: { roots?: RootRow[]; records?: RecordRow[]; deltas?: DeltaRow[]; anchors?: AnchorRow[]; links?: LinkRow[] }, complete = true): SyncState {
-  const page = { roots: rows.roots ?? [], records: rows.records ?? [], deltas: rows.deltas ?? [], anchors: rows.anchors ?? [], storage_links: rows.links ?? [], bad: [] };
+  const page = { roots: rows.roots ?? [], records: rows.records ?? [], deltas: rows.deltas ?? [], anchors: rows.anchors ?? [], engines: [], storage_links: rows.links ?? [], bad: [] };
   return applyPage(emptySync(), page, changeSeq, complete);
 }

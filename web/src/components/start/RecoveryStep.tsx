@@ -11,7 +11,7 @@ import { ERROR_ID, Screen } from "../ui/Screen";
 type Phase = "choose" | "show" | "check";
 
 /** One span per group (the hyphen stays with it, so the text is the key as written); never translated. */
-const groups = (display: string) => {
+export const groups = (display: string) => {
   const parts = display.split("-");
   return parts.map((g, i) => <span key={i} translate={false} lang="en">{i < parts.length - 1 ? `${g}-` : g}</span>);
 };

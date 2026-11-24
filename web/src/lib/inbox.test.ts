@@ -27,3 +27,15 @@ describe("engine inbox messages (kind 7, Auth mode — spec §4, §15)", () => {
     await expect(openAuth(KIND.engine_inbox, ek.priv, ak.pub, { userId: USER, recordId: m.msg_id }, fromB64u(m.sealed))).rejects.toThrow();
   });
 });
+
+describe("approval_result (M5d)", () => {
+  it("is bound to its approval id and carries only the decision", async () => {
+    const ek = newKemKeyPair();
+    const ak = newKemKeyPair();
+    const v = { userId: USER, mk: randomKey(), akPriv: ak.priv, akPub: ak.pub };
+    const m = await sealInbox(v, ek.pub, { type: "approval_result", approval_id: APPROVAL, decision: "approved" }, new Date("2026-11-24T01:02:03Z"));
+    const pt = await openAuth(KIND.engine_inbox, ek.priv, ak.pub, { userId: USER, rootId: APPROVAL, recordId: m.msg_id }, fromB64u(m.sealed));
+    expect(JSON.parse(new TextDecoder().decode(pt))).toEqual({ v: 1, type: "approval_result", approval_id: APPROVAL, decision: "approved", issued_at: "2026-11-24T01:02:03Z" });
+    await expect(openAuth(KIND.engine_inbox, ek.priv, ak.pub, { userId: USER, recordId: m.msg_id }, fromB64u(m.sealed))).rejects.toThrow();
+  });
+});

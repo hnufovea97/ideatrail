@@ -1,5 +1,5 @@
 // What this tab has received, in memory only (dropped on lock). Updates always build new maps.
-import type { AnchorRow, DeltaRow, LinkRow, Page, RecordRow, RootRow, Table } from "./rows";
+import type { AnchorRow, DeltaRow, EngineRow, LinkRow, Page, RecordRow, RootRow, Table } from "./rows";
 
 export interface SyncState {
   readonly cursor: number;
@@ -8,11 +8,12 @@ export interface SyncState {
   readonly records: ReadonlyMap<string, RecordRow>;
   readonly deltas: ReadonlyMap<string, DeltaRow>;
   readonly anchors: ReadonlyMap<string, AnchorRow>;
+  readonly engines: ReadonlyMap<string, EngineRow>;
   readonly links: ReadonlyMap<string, LinkRow>;
   readonly bad: readonly Table[];
 }
 
-export const emptySync = (): SyncState => ({ cursor: 0, complete: false, roots: new Map(), records: new Map(), deltas: new Map(), anchors: new Map(), links: new Map(), bad: [] });
+export const emptySync = (): SyncState => ({ cursor: 0, complete: false, roots: new Map(), records: new Map(), deltas: new Map(), anchors: new Map(), engines: new Map(), links: new Map(), bad: [] });
 
 function upsert<T extends { change_seq: number }>(m: ReadonlyMap<string, T>, rows: readonly T[], key: (r: T) => string): ReadonlyMap<string, T> {
   if (rows.length === 0) return m;
@@ -32,6 +33,7 @@ export function applyPage(s: SyncState, p: Page, cursor: number, complete: boole
     records: upsert(s.records, p.records, (r) => r.record_id),
     deltas: upsert(s.deltas, p.deltas, (r) => r.delta_id),
     anchors: upsert(s.anchors, p.anchors, (r) => r.record_id),
+    engines: upsert(s.engines, p.engines, (r) => r.engine_id),
     links: upsert(s.links, p.storage_links, (r) => r.engine_id), // one link per engine (D1 UNIQUE(engine_id))
     bad: [...new Set([...s.bad, ...p.bad])],
   };

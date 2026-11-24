@@ -12,6 +12,12 @@ export class ApiFailure extends Error {
 const ID = /^[0-9a-hjkmnp-tv-z]{26}$/;
 const CODE = /^[a-z_]{1,40}$/;
 
+const CREDENTIAL = /^[A-Za-z0-9_-]{1,512}$/;
+const credentialPath = (s: string): string => {
+  if (!CREDENTIAL.test(s)) throw new ApiFailure(0, "bad_id");
+  return s;
+};
+
 const id = (s: string): string => {
   if (!ID.test(s)) throw new ApiFailure(0, "bad_id");
   return s;
@@ -97,7 +103,14 @@ export interface RegisterVerifyBody {
 export interface AccountInfo {
   user_id: string; engine_list: string | null; engine_list_version: number; confirmed_at: string | null; recovery_key_status: string;
   account_pubkey?: string | null; wrapped_account_privkey?: string | null; auto_lock_minutes?: number;
+  created_at?: string;
+  envelopes?: EnvelopeMeta[]; credentials?: CredentialMeta[];
 }
+export interface EnvelopeMeta { envelope_id: string; method: "passkey" | "recovery"; created_at: string; last_used_at: string | null }
+export interface CredentialMeta { credential_id: string; aaguid: string | null; created_at: string; last_used_at: string | null }
+export type StepupMethod = "POST" | "PUT" | "DELETE";
+export interface RevokeBody { engine_list: string; engine_list_version: number; github_token?: string; assertion: StepupAssertion }
+export interface DeleteAccountBody { github_tokens?: string[]; assertion: StepupAssertion }
 export interface DeliverBody { payload: string; mac: string; engine_list: string; engine_list_version: number }
 export interface RecoveryBody { envelope_id: string; method: "recovery"; wrapped_master_key: string; lookup_hash: string; verify_pubkey: string }
 export interface DeviceAddState { joined: boolean; t_pub: string | null; join_mac: string | null; key_uploaded: boolean; used: boolean; expires_at: string }
@@ -111,8 +124,8 @@ export interface RootMetaBody { list_meta: string; meta_version: number; merged_
 
 export function createApi(base: string, f: Fetch = (input, init) => fetch(input, init)) {
   const get = <T>(path: string, headers?: Record<string, string>, check?: Check) => call<T>(f, base, "GET", path, undefined, headers, check);
-  const send = <T>(method: "POST" | "PUT", path: string, body: unknown) => call<T>(f, base, method, path, body);
-  const sendChecked = <T>(method: "POST" | "PUT", path: string, body: unknown, check: Check) => call<T>(f, base, method, path, body, {}, check);
+  const send = <T>(method: "POST" | "PUT" | "DELETE", path: string, body: unknown) => call<T>(f, base, method, path, body);
+  const sendChecked = <T>(method: "POST" | "PUT" | "DELETE", path: string, body: unknown, check: Check) => call<T>(f, base, method, path, body, {}, check);
   // Methods that take an id are async so a bad id rejects (like any other ApiFailure) instead of throwing.
   return {
     pairing: async (s: string) => get<PairingInfo>(`/v1/pairing/${id(s)}`, undefined, (d) => typeof d.delivered === "boolean"),
@@ -122,7 +135,7 @@ export function createApi(base: string, f: Fetch = (input, init) => fetch(input,
     confirm: () => send<{ confirmed: true }>("POST", "/v1/account/confirm", {}),
     account: () => get<AccountInfo>("/v1/account", undefined, (d) => isCount(d.engine_list_version)),
     deliver: async (s: string, body: DeliverBody) => send<{ engine_id: string; engine_list_version: number }>("POST", `/v1/pairing/${id(s)}/deliver`, body),
-    stepupOptions: (method: "POST" | "PUT", path: string) => send<{ challenge_id: string; options: RequestOptionsJSON }>("POST", "/v1/webauthn/stepup/options", { method, path }),
+    stepupOptions: (method: StepupMethod, path: string) => send<{ challenge_id: string; options: RequestOptionsJSON }>("POST", "/v1/webauthn/stepup/options", { method, path }),
     putRecovery: (body: RecoveryBody & { assertion: StepupAssertion }) => send<{ envelope_id: string }>("PUT", "/v1/envelopes", body),
     deviceAddStart: () => send<{ session_id: string; expires_at: string }>("POST", "/v1/device-add", {}),
     deviceAddState: async (d: string) => get<DeviceAddState>(`/v1/device-add/${id(d)}`),
@@ -143,6 +156,15 @@ export function createApi(base: string, f: Fetch = (input, init) => fetch(input,
         && typeof d.envelope.envelope_id === "string" && ID.test(d.envelope.envelope_id) && typeof d.envelope.wrapped_master_key === "string"),
     saveRootMeta: async (rootId: string, body: RootMetaBody) =>
       sendChecked<{ meta_version: number }>("POST", `/v1/roots/${id(rootId)}/meta`, body, (d) => isCount(d.meta_version)),
+    revokeEngine: async (engineId: string, body: RevokeBody) =>
+      sendChecked<{ revoked: true }>("POST", `/v1/engines/${id(engineId)}/revoke`, body, (d) => d.revoked === true),
+    pauseEngine: async (engineId: string) => sendChecked<{ paused: true }>("POST", `/v1/engines/${id(engineId)}/pause`, {}, (d) => d.paused === true),
+    resumeEngine: async (engineId: string, assertion: StepupAssertion) =>
+      sendChecked<{ resumed: true }>("POST", `/v1/engines/${id(engineId)}/resume`, { assertion }, (d) => d.resumed === true),
+    removeCredential: async (credentialId: string, assertion: StepupAssertion) =>
+      sendChecked<{ removed: true }>("POST", `/v1/credentials/${credentialPath(credentialId)}/remove`, { assertion }, (d) => d.removed === true),
+    savePrefs: (body: { auto_lock_minutes: 1 | 3 | 5 }) => sendChecked<{ saved: true }>("PUT", "/v1/prefs", body, (d) => d.saved === true),
+    deleteAccount: (body: DeleteAccountBody) => sendChecked<{ deleted: true }>("DELETE", "/v1/account", body, (d) => d.deleted === true),
     /** `keepalive`: sent from pagehide, so the request outlives the closing page. */
     logout: (o: { keepalive?: boolean } = {}) => call<{ signed_out: true }>(f, base, "POST", "/v1/logout", {}, {}, undefined, o.keepalive),
   };

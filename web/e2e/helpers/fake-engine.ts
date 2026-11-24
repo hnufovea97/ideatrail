@@ -102,6 +102,21 @@ export class FakeEngine {
     return approvalId;
   }
 
+  /** A signed approval of the given kind (kind 10 summary, spec §8 approval signature). Returns the HTTP status and the id. */
+  async postApproval(kind: "import" | "add_folder" | "forget_original" | "disconnect", folders: { path: string; name: string; files: number }[]): Promise<{ status: number; approvalId: string }> {
+    const approvalId = newId();
+    const summary = await seal(KIND.approval_summary, this.ak(), { userId: this.userId, rootId: approvalId, version: "0" }, utf8(JSON.stringify({ v: 1, folders })));
+    const apprSeq = this.apprSeq++;
+    const sig = sign(this.seed, messageFor({ type: "approval", userId: this.userId, approvalId, kind, summarySealed: summary, apprSeq }));
+    const r = await this.signed("POST", "/v1/approvals", { approval_id: approvalId, kind, summary: toB64u(summary), appr_seq: apprSeq.toString(), engine_sig: sig });
+    return { status: r.status, approvalId };
+  }
+
+  /** One signed request, to see whether the server still accepts this engine's key (200 = yes; 401/403 = revoked). */
+  async probe(): Promise<number> {
+    return (await this.signed("GET", "/v1/inbox")).status;
+  }
+
   /** Read, open (Auth mode: must come from the pinned account key) and delete inbox messages. */
   async readInbox(approvalIds: string[] = []): Promise<InboxMessage[]> {
     const r = await this.signed("GET", "/v1/inbox");

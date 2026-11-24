@@ -127,3 +127,12 @@ main.dash h1, main.dash h2, main.dash h3 { color: var(--text); font-weight: 500;
 .dl { display: block; }
 .dl.add { background: var(--ok-bg); }
 .dl.del { background: var(--err-bg); }
+/* M5d: approvals, settings, engine rows */
+.manage { display: grid; gap: 12px; margin-top: 12px; max-width: 720px; }
+.manage section { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.manage ul.plain, ul.plain { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.row-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.row-actions button { width: auto; min-height: 44px; margin: 0; padding: 8px 14px; }
+.row-actions button[aria-pressed="true"] { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-strong); }
+.plain-table { border-collapse: collapse; width: 100%; }
+.plain-table th, .plain-table td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--line); }
