@@ -4,7 +4,7 @@ import type { Fetcher } from "./github";
 import { CURSOR_SQL } from "./db/change";
 import { isoAt, nowIso } from "./db/values";
 import { calendarHost, timestampUrl } from "./ots/calendars";
-import { bitcoinHeight, MAX_RECEIPT_BYTES, mergeInto, parseTimestamp, pendingPoints, serializeTimestamp } from "./ots/tree";
+import { bitcoinHeight, MAX_RECEIPT_BYTES, mergeInto, parseTimestamp, pendingPoints, serializeTimestamp } from "@ideatrail/crypto/ots";
 
 /** Free plan: 50 outbound subrequests per invocation; keep 2 spare. */
 export const FETCH_BUDGET = 48;

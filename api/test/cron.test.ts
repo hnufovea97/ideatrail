@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fromHex, toB64u } from "@ideatrail/crypto/bytes";
 import fx from "../../spec/vectors/ots/receipts.json";
-import { parseTimestamp, serializeTimestamp } from "../src/ots/tree";
+import { parseTimestamp, serializeTimestamp } from "@ideatrail/crypto/ots";
 import { newId } from "@ideatrail/crypto/ids";
 import { FETCH_BUDGET, nextInterval, runCron } from "../src/cron";
 import { inSeconds, isoAt } from "../src/db/values";

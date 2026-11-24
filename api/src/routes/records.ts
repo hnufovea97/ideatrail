@@ -9,7 +9,7 @@ import { CURSOR_SQL, guard, writeWithCursor } from "../db/change";
 import { checkEngineQuota, countEngineWrite, engineSlowDown } from "../db/quota";
 import { inSeconds, nowIso, toBytes } from "../db/values";
 import { calendarHost, checkPendingReceipt } from "../ots/calendars";
-import { OtsError } from "../ots/tree";
+import { OtsError } from "@ideatrail/crypto/ots";
 import { idConflict, isConstraintError, requireEngineAccount } from "./engine-common";
 
 const KIND_RECORD_META = 1;

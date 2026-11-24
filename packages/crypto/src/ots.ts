@@ -2,7 +2,7 @@
 // Only what calendars actually emit is accepted: sha256 / append / prepend operations and
 // pending / bitcoin attestations. Anything else is rejected, as are oversized or deep trees.
 import { sha256 } from "@noble/hashes/sha2.js";
-import { concat } from "@ideatrail/crypto/bytes";
+import { concat } from "./bytes";
 
 export const MAX_RECEIPT_BYTES = 8 * 1024;
 const MAX_DEPTH = 256; // real calendar+bitcoin paths exceed 64 ops; size cap bounds the rest
@@ -210,4 +210,17 @@ export function mergeInto(node: Timestamp, upgrade: Timestamp): void {
   if (!sameBytes(node.msg, upgrade.msg)) throw bad("upgrade is for another message");
   node.ops.push(...upgrade.ops);
   for (const a of upgrade.attestations) if (a.kind === "bitcoin") node.attestations.push(a);
+}
+
+export interface BitcoinPoint { height: number; msg: Uint8Array }
+
+/** Every bitcoin attestation with the message it vouches for (the block's merkle root, in internal byte order), lowest height first. */
+export function bitcoinPoints(t: Timestamp): BitcoinPoint[] {
+  const out: BitcoinPoint[] = [];
+  const walk = (n: Timestamp) => {
+    for (const a of n.attestations) if (a.kind === "bitcoin") out.push({ height: a.height, msg: n.msg });
+    for (const { next } of n.ops) walk(next);
+  };
+  walk(t);
+  return out.sort((a, b) => a.height - b.height);
 }

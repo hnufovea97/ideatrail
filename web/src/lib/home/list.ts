@@ -1,5 +1,6 @@
 // Home list (ADR-0018, UX ① 정렬): tabs, #tag + stage search and the five sorts — all on this device, after unlock.
 import type { IdeaView } from "../model/read-model";
+import { chainOf, type ChainState } from "./life";
 import { stageNameOf } from "../model/stage-names";
 
 export const TABS = ["all", "shared", "mine"] as const;
@@ -46,6 +47,10 @@ export function listIdeas(ideas: readonly IdeaView[], q: ListQuery): IdeaView[] 
   return ideas.filter((i) => inTab(i, q.tab) && matchesQuery(i, q.query)).sort(comparator(q.sort, q.opened));
 }
 
-/** The card badge: every version in a block (server's word until 5.7 checks two explorers — ADR-0013 M5b). */
-export const ideaChain = (idea: IdeaView): "done" | "pending" =>
-  idea.versions.length > 0 && idea.versions.every((v) => v.server.anchor === "server_confirmed") ? "done" : "pending";
+/** The card badge: "done" only when the browser checked every version's block (5.7); the worst state wins otherwise. */
+export function ideaChain(idea: IdeaView): ChainState {
+  const states = idea.versions.map(chainOf);
+  if (states.length > 0 && states.every((s) => s === "done")) return "done";
+  for (const worst of ["mismatch", "invalid", "pending", "checking"] as const) if (states.includes(worst)) return worst;
+  return "pending";
+}

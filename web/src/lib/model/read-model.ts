@@ -12,12 +12,13 @@ import { stagesOf, type StageNo, type StagePoint, type StageSpan } from "./stage
 import { stageNamesOf } from "../merge/stages";
 import { DEFAULT_STAGE_PRESET, type StagePreset } from "./stage-names";
 
-/** "server_confirmed" is the server's word only; 5.7 checks two explorers before anything says 확정/확산됨. */
-export type AnchorView = "pending" | "server_confirmed";
+/** "server_confirmed" is the server's word only. The rest come from the browser's own two-explorer check (lib/proof/overlay.ts):
+ * only "confirmed" may say 확정/확산됨; "mismatch" = the explorers disagree, "invalid" = the receipt does not hold. */
+export type AnchorView = "pending" | "server_confirmed" | "confirmed" | "mismatch" | "invalid";
 
 export interface VersionView {
   recordId: string; rootId: string; parentIds: readonly string[];
-  server: { recordedAt: string; commitment: string; fingerprint: string; anchor: AnchorView; blockHeight: number | null; engineId: string; logSeq: string; deletedMark: boolean };
+  server: { recordedAt: string; commitment: string; fingerprint: string; anchor: AnchorView; blockHeight: number | null; receipt: string | null; engineId: string; logSeq: string; deletedMark: boolean };
   locked: {
     title: string; milestone: Milestone; milestoneCertain: boolean; files: readonly FileEntry[]; moreFiles: number; mainFile: string | null;
     tags: readonly string[]; routine: readonly RoutineMark[]; decided: number | null; deferred: number | null; turn: string | null;
@@ -86,7 +87,7 @@ function versionOf(row: RecordRow, m: RecordMeta, anchor: AnchorRow | undefined)
     recordId: row.record_id, rootId: row.root_id, parentIds: row.parent_ids === "-" ? [] : row.parent_ids.split(","),
     server: {
       recordedAt: row.recorded_at, commitment: row.commitment, fingerprint: fingerprint(row.commitment),
-      anchor: anchor?.status === "confirmed" ? "server_confirmed" : "pending", blockHeight: anchor?.block_height ?? null,
+      anchor: anchor?.status === "confirmed" ? "server_confirmed" : "pending", blockHeight: anchor?.block_height ?? null, receipt: anchor?.complete_receipt ?? null,
       engineId: row.engine_id, logSeq: row.log_seq, deletedMark: row.deleted_at !== null,
     },
     locked: {

@@ -293,7 +293,12 @@ export const COPY = {
     stageOf: (no: number, name: string) => `${no}/5 ${name}`,
     dates: (first: string, last: string) => `최초 기록 ${first} / 마지막 기록 ${last}`,
     mine: "나만 보기", // 자물쇠 그림의 읽기 이름
-    chain: CHAIN,
+    chain: {
+      ...CHAIN,
+      checking: "블록체인 확인 중", // 새 문구 (서버는 '확정'이라 했지만 이 브라우저가 아직 두 곳에서 확인하지 못함)
+      mismatch: "블록체인 확인이 서로 달라요", // 새 문구 (두 탐색기 값이 다름)
+      invalid: "블록체인 증명을 확인할 수 없어요", // 새 문구 (영수증이 블록과 안 맞음)
+    },
     empty: {
       none: "아직 기록이 없어요. Claude Code에서 “기록해 줘”라고 하면 여기에 쌓여요", // 새 문구 (UX 빈 상태, 가입을 마친 사람용)
       shared: "공유 가능으로 둔 기록이 없어요. 기록은 기본으로 나만 봐요.", // 새 문구

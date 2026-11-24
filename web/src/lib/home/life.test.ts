@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { idea, stage, version } from "./fixtures";
-import { lifeOf } from "./life";
+import { chainOf, lifeOf } from "./life";
 
 const SEOUL = "Asia/Seoul";
 
 describe("idea life", () => {
   const v1 = version({ recordId: "01jcm3v8q7s2kx4f9d6b5n0ta1", at: "2026-11-03T00:00:00Z", label: null, anchor: "server_confirmed", file: "아이디어-메모.md" });
-  const v2 = version({ recordId: "01jcm3v8q7s2kx4f9d6b5n0ta2", at: "2026-11-10T00:00:00Z", label: "초안", anchor: "server_confirmed" });
+  const v2 = version({ recordId: "01jcm3v8q7s2kx4f9d6b5n0ta2", at: "2026-11-10T00:00:00Z", label: "초안", anchor: "confirmed" });
   const v3 = version({ recordId: "01jcm3v8q7s2kx4f9d6b5n0ta3", at: "2026-11-18T00:00:00Z", label: "개선 1", anchor: "pending", file: "결정-카드연동.md" });
   const subject = idea({
     stage: 3, versions: [v3, v2, v1],
@@ -27,6 +27,13 @@ describe("idea life", () => {
     expect(s3.versions.map((v) => [v.when, v.name, v.file, v.fingerprint, v.chain])).toEqual([
       ["11.18", "개선 1", "결정-카드연동.md", "a3f…9c1", "pending"], ["11.10", "초안", "docs/plan.md", "a3f…9c1", "done"]]);
     expect(life.stages[1].estimated).toBe(true);
+  });
+  it("shows 확산됨 only for a browser-checked block; the server's word alone is 확인 중", () => {
+    expect(chainOf(version({ anchor: "confirmed" }))).toBe("done");
+    expect(chainOf(version({ anchor: "server_confirmed" }))).toBe("checking");
+    expect(chainOf(version({ anchor: "pending" }))).toBe("pending");
+    expect(chainOf(version({ anchor: "mismatch" }))).toBe("mismatch");
+    expect(chainOf(version({ anchor: "invalid" }))).toBe("invalid");
   });
   it("keeps 결정·미룸 per stage, sums them for the idea, and the turn stays in its stage", () => {
     const life = lifeOf(subject, SEOUL);

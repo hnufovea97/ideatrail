@@ -1,15 +1,15 @@
 // vitest only — IdeaView values shaped exactly like model/read-model.ts builds them.
-import type { IdeaView, StageView, VersionView } from "../model/read-model";
+import type { AnchorView, IdeaView, StageView, VersionView } from "../model/read-model";
 import type { StageNo } from "../model/stage";
 import { ROUTINE_SLOTS } from "../model/meta";
 
 let n = 0;
 const id = () => `01jcm3v8q7s2kx4f9d6b5n${String(++n).padStart(4, "0")}`.slice(0, 26);
 
-export function version(over: { at?: string; label?: string | null; anchor?: "pending" | "server_confirmed"; file?: string | null; recordId?: string } = {}): VersionView {
+export function version(over: { at?: string; label?: string | null; anchor?: AnchorView; file?: string | null; recordId?: string } = {}): VersionView {
   return {
     recordId: over.recordId ?? id(), rootId: "r", parentIds: [],
-    server: { recordedAt: over.at ?? "2026-11-10T00:00:00Z", commitment: "a3f".padEnd(61, "0") + "9c1", fingerprint: "a3f…9c1", anchor: over.anchor ?? "pending", blockHeight: null, engineId: "e", logSeq: "1", deletedMark: false },
+    server: { recordedAt: over.at ?? "2026-11-10T00:00:00Z", commitment: "a3f".padEnd(61, "0") + "9c1", fingerprint: "a3f…9c1", anchor: over.anchor ?? "pending", blockHeight: null, receipt: null, engineId: "e", logSeq: "1", deletedMark: false },
     locked: { title: "가계부 앱", milestone: "none", milestoneCertain: false, files: [], moreFiles: 0, mainFile: over.file === undefined ? "docs/plan.md" : over.file,
       tags: [], routine: [], decided: null, deferred: null, turn: null, label: over.label === undefined ? null : over.label },
   };

@@ -12,10 +12,13 @@ const META_CHARSET = /<meta charset="utf-8"\s*\/?>/i;
 
 /** index/ mirror (M5a) and originals (M5b); data only, never scripts. csp.test ties it to src/lib/mirror/github.ts. */
 export const GITHUB_API = "https://api.github.com";
-/** Only the page that holds the open keys talks to GitHub (sec L5). */
+/** The two block explorers the browser asks itself before it says 확정 (5.7, plan D1); csp.test ties them to src/lib/proof/explorers.ts. */
+export const EXPLORER_ORIGINS = ["https://blockstream.info", "https://mempool.space"] as const;
+/** Only the page that holds the open keys talks to GitHub (sec L5) and to the explorers. */
 const GITHUB_PAGES = ["/home", "/home/"];
+const HOME_CONNECT = [GITHUB_API, ...EXPLORER_ORIGINS];
 
-export const connectExtraFor = (route: string): string[] => (GITHUB_PAGES.includes(route) ? [GITHUB_API] : []);
+export const connectExtraFor = (route: string): string[] => (GITHUB_PAGES.includes(route) ? HOME_CONNECT : []);
 
 const sha = (s: string) => `'sha256-${createHash("sha256").update(s, "utf8").digest("base64")}'`;
 const hashesOf = (html: string, re: RegExp) => [...new Set([...html.matchAll(re)].map((m) => sha(m[1])))];
@@ -82,7 +85,7 @@ function main() {
   }
   if (policies.length === 0) throw new Error("no pages built");
   // Deploy headers apply to every path: the union of all page hashes, plus what <meta> cannot carry; /home adds GitHub.
-  writeFileSync(join(dist, "_headers"), headersFile(unionFrom(policies, apiBase), unionFrom(policies, apiBase, [GITHUB_API])));
+  writeFileSync(join(dist, "_headers"), headersFile(unionFrom(policies, apiBase), unionFrom(policies, apiBase, HOME_CONNECT)));
   console.log(`csp: ${policies.length} pages`);
 }
 

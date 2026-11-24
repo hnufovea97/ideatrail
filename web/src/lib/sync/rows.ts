@@ -12,6 +12,8 @@ const PARENTS = /^(-|[0-9a-hjkmnp-tv-z]{26}(,[0-9a-hjkmnp-tv-z]{26}){0,15})$/;
 type Check = (v: unknown) => boolean;
 const matches = (re: RegExp): Check => (v) => typeof v === "string" && re.test(v);
 const id = matches(ID), seq = matches(SEQ), time = matches(TIME), hex64 = matches(HEX64), b64u = matches(B64U);
+/** A serialized OTS tree (<= MAX_RECEIPT_BYTES = 8 KiB) in base64url; the browser parses it later, here only shape and size. */
+const receipt: Check = (v) => typeof v === "string" && v.length <= 11_000 && B64U.test(v);
 const orNull = (c: Check): Check => (v) => v === null || c(v);
 const count: Check = (v) => Number.isSafeInteger(v) && (v as number) >= 0;
 const oneOf = (...xs: string[]): Check => (v) => typeof v === "string" && xs.includes(v);
@@ -22,7 +24,7 @@ export interface RecordRow {
   engine_sig: string; list_meta: string; body_hash: string; nonce_hash: string; deleted_at: string | null; change_seq: number;
 }
 export interface DeltaRow { delta_id: string; root_id: string; engine_id: string; log_seq: string; sealed_delta: string; engine_sig: string; created_at: string; merged_at: string | null; change_seq: number }
-export interface AnchorRow { record_id: string; status: "pending" | "confirmed"; block_height: number | null; change_seq: number }
+export interface AnchorRow { record_id: string; status: "pending" | "confirmed"; block_height: number | null; complete_receipt: string | null; change_seq: number }
 export type LinkRow = StorageLinkRow & { change_seq: number };
 
 const SHAPES = {
@@ -30,7 +32,7 @@ const SHAPES = {
   records: { record_id: id, root_id: id, parent_ids: matches(PARENTS), commitment: hex64, recorded_at: time, engine_id: id, log_seq: seq, engine_sig: b64u,
     list_meta: b64u, body_hash: hex64, nonce_hash: hex64, deleted_at: orNull(time), change_seq: count },
   deltas: { delta_id: id, root_id: id, engine_id: id, log_seq: seq, sealed_delta: b64u, engine_sig: b64u, created_at: time, merged_at: orNull(time), change_seq: count },
-  anchors: { record_id: id, status: oneOf("pending", "confirmed"), block_height: orNull(count), change_seq: count },
+  anchors: { record_id: id, status: oneOf("pending", "confirmed"), block_height: orNull(count), complete_receipt: orNull(receipt), change_seq: count },
   storage_links: { link_id: id, engine_id: id, provider: oneOf("github"), enc_token: orNull(b64u), engine_sig: b64u, created_at: time, revoked_at: orNull(time), change_seq: count },
 } as const satisfies Record<string, Record<string, Check>>;
 

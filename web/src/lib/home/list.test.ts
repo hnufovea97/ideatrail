@@ -39,9 +39,14 @@ describe("home list", () => {
     listIdeas(all, q({ sort: "stage" }));
     expect(all.map((i) => i.rootId)).toEqual(before);
   });
-  it("shows the card badge as done only when every version is in a block", () => {
-    expect(ideaChain(idea({ versions: [version({ anchor: "server_confirmed" }), version({ anchor: "server_confirmed" })] }))).toBe("done");
-    expect(ideaChain(idea({ versions: [version({ anchor: "pending" }), version({ anchor: "server_confirmed" })] }))).toBe("pending");
+  it("shows the card badge as done only when the browser checked every version's block", () => {
+    const of = (...anchors: ("pending" | "server_confirmed" | "confirmed" | "mismatch" | "invalid")[]) => ideaChain(idea({ versions: anchors.map((anchor) => version({ anchor })) }));
+    expect(of("confirmed", "confirmed")).toBe("done");
+    expect(of("server_confirmed", "server_confirmed")).toBe("checking"); // the server's word alone is not enough
+    expect(of("confirmed", "server_confirmed")).toBe("checking");
+    expect(of("pending", "confirmed")).toBe("pending");
+    expect(of("confirmed", "mismatch")).toBe("mismatch");
+    expect(of("confirmed", "invalid")).toBe("invalid");
   });
 
   it("searches the idea's own stage name, not the preset's (ADR-0020)", () => {

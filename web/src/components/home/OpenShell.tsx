@@ -5,6 +5,9 @@ import { COPY } from "../../lib/copy";
 import { refresh, refreshFailure, type Loaded, type LoadDeps, type RefreshFailure } from "../../lib/dashboard/load";
 import { browserStore } from "../../lib/engine-list";
 import { saveStageNames } from "../../lib/merge/stages-save";
+import { browserExplorers } from "../../lib/proof/explorers";
+import { withConfirmations } from "../../lib/proof/overlay";
+import { ConfirmSession } from "../../lib/proof/session";
 import { RowCache } from "../../lib/sync/cache";
 import { chainLine, type ChainStatus } from "../../lib/sync/chain";
 import { emptySync, type SyncState } from "../../lib/sync/store";
@@ -28,11 +31,15 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
   const refreshNow = useRef<() => void>(() => undefined);
   const justLinked = useRef(false); // the GitHub link was made: the next finished refresh brings it in, then open versions look again
   const [linkTick, setLinkTick] = useState(0);
+  const confirmations = useRef<ConfirmSession | null>(null); // this session's two-explorer results (5.7), memory only
+  const [confirmTick, setConfirmTick] = useState(0);
 
   useEffect(() => {
     let live = true;
     let running = false;
     const cache = new RowCache(); // verified rows and opened metas of this open vault only
+    const session = new ConfirmSession(browserExplorers((input, init) => fetch(input, init)));
+    confirmations.current = session;
     const deps: LoadDeps = { api, github: (input, init) => fetch(input, init), marks: browserStore(), now: () => new Date(), alive: () => live && !signal.aborted, cache, signal };
     let again = false; // a save arrived while a refresh was running: go once more when it ends
     const run = () => {
@@ -48,6 +55,7 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
           sync.current = l.sync;
           mirrorDirty.current = l.mirrorDirty;
           setLoaded(l);
+          void session.check(l.ideas, signal).then((changed) => { if (changed && live) setConfirmTick((n) => n + 1); }, () => undefined);
           setFailure(null);
           if (justLinked.current) {
             justLinked.current = false;
@@ -69,12 +77,16 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
     return () => {
       live = false; // a refresh still in flight is dropped; its keys are the vault's, wiped by the lock
       cache.clear();
+      session.clear();
+      confirmations.current = null;
       clearInterval(t);
       document.removeEventListener("visibilitychange", run);
     };
   }, [api, vault, signal]);
 
   const chain = loaded?.chain ?? CHECKING;
+  // 확산됨 only where this browser checked the block at both explorers; the server's "confirmed" alone reads 확인 중
+  const ideas = useMemo(() => (loaded ? withConfirmations(loaded.ideas, confirmations.current?.results ?? new Map()) : null), [loaded, confirmTick]);
   const store = useMemo(() => browserStore(), []);
   /** The user's stage names (ADR-0020): sealed into the root meta here, then shown by the next refresh and written to index/. */
   const rename = async (rootId: string, names: readonly string[]) => {
@@ -101,7 +113,7 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
       </header>
       {chain.state === "warn" ? <p class="banner warn" role="alert">{chainLine(chain)}</p> : null}
       {loaded?.mirror === "failed" ? <p class="small">{COPY.dash.mirrorFailed}</p> : null}
-      {loaded ? <Home ideas={loaded.ideas} tools={tools} userId={vault.userId} store={store} now={new Date()} onRename={rename} /> : <p class="small">{COPY.home.loading}</p>}
+      {ideas ? <Home ideas={ideas} tools={tools} userId={vault.userId} store={store} now={new Date()} onRename={rename} /> : <p class="small">{COPY.home.loading}</p>}
     </main>
   );
 }

@@ -1,5 +1,5 @@
 import { concat, fromHex, toB64u, toHex } from "@ideatrail/crypto/bytes";
-import { parseOtsFile, pendingPoints, serializeTimestamp, type Timestamp } from "../src/ots/tree";
+import { parseOtsFile, pendingPoints, serializeTimestamp, type Timestamp } from "@ideatrail/crypto/ots";
 import { newId } from "@ideatrail/crypto/ids";
 import fx from "../../spec/vectors/ots/receipts.json";
 

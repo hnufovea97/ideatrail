@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { BUDGET, OPEN, PIANO, SWAP, deviceView, openHome } from "./helpers/home";
+import { BUDGET, OPEN, PIANO, SWAP, deviceView, openHome, tamperExplorers } from "./helpers/home";
 import { expectClean, watch } from "./helpers/guards";
 
 test.use({ timezoneId: "Asia/Seoul", viewport: { width: 1280, height: 900 } });
@@ -75,4 +75,20 @@ test("tabs, #tag search and sorts; the sort and the opening order stay on this d
   await page.getByRole("button", { name: "지금 잠그기" }).click();
   await page.getByRole("button", { name: OPEN }).click();
   await expect(page.getByRole("combobox", { name: "정렬" })).toHaveValue("opened");
+});
+
+test("확산됨 shows only after the browser's own check at both block explorers (5.7)", async ({ page }) => {
+  const w = await watch(page);
+  await openHome(page);
+  const swap = cards(page).filter({ hasText: SWAP });
+  await expect(swap.locator(".pill")).toHaveText("블록체인 확산됨");
+  expect(w.requests.filter((r) => /blockstream|mempool/.test(r.url)).map((r) => r.method)).not.toContain("POST");
+  await expectClean(page, w);
+});
+
+test("explorers that disagree: no 확산됨, the card says the two differ (5.7)", async ({ page }) => {
+  tamperExplorers.add(page);
+  await openHome(page);
+  await expect(cards(page).filter({ hasText: SWAP }).locator(".pill")).toHaveText("블록체인 확인이 서로 달라요");
+  await expect(page.getByText("블록체인 확산됨")).toHaveCount(0);
 });

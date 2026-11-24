@@ -14,7 +14,7 @@ describe("read model (ADR-0018 shape)", () => {
     const r1 = await recordRow(w, { rootId: root, seq: 1, recordedAt: "2026-11-03T00:00:00Z", meta: META({ routine: [{ slot: "problem", estimated: true }] }) });
     const r2 = await recordRow(w, { rootId: root, seq: 2, recordedAt: "2026-11-10T00:00:00Z",
       meta: META({ milestone: "plan_decided", milestone_certain: true, decided: 2, deferred: 1, turn: "카드 연동 빼기", label: "개선 1", tags: [], files: [{ path: "결정-카드연동.md", size: 5, original: true }] }) });
-    const s = syncOf({ roots: [rootRow(root, { visibility: "public" })], records: [r2, r1], anchors: [anchorRow(r1.record_id, { status: "confirmed", block_height: 870_000 })] });
+    const s = syncOf({ roots: [rootRow(root, { visibility: "public" })], records: [r2, r1], anchors: [anchorRow(r1.record_id, { status: "confirmed", block_height: 870_000, complete_receipt: "AAEC" })] });
     const { ideas, issues } = await buildModel(w.vault, s, verifyRows(w.userId, w.list, s, memoryStore()), new Map());
     expect(issues).toEqual([]);
     const idea = ideas[0];
@@ -25,8 +25,8 @@ describe("read model (ADR-0018 shape)", () => {
     expect(idea.locked.routine.find((r) => r.slot === "problem")).toEqual({ slot: "problem", filled: true, estimated: true, recordId: r1.record_id, at: "2026-11-03T00:00:00Z" });
     expect(idea.locked.routine.filter((r) => r.filled)).toHaveLength(1);
     expect(idea.versions.map((x) => x.recordId)).toEqual([r2.record_id, r1.record_id]);
-    expect(idea.versions[1].server).toMatchObject({ fingerprint: fingerprint(r1.commitment), anchor: "server_confirmed", blockHeight: 870_000, deletedMark: false });
-    expect(idea.versions[0].server.anchor).toBe("pending");
+    expect(idea.versions[1].server).toMatchObject({ fingerprint: fingerprint(r1.commitment), anchor: "server_confirmed", blockHeight: 870_000, receipt: "AAEC", deletedMark: false });
+    expect(idea.versions[0].server).toMatchObject({ anchor: "pending", receipt: null });
     expect(idea.versions[0].locked.mainFile).toBe("결정-카드연동.md");
     expect(idea.versions.map((x) => x.locked.label)).toEqual(["개선 1", null]); // F1 ①: version name for M5b
     expect(fingerprint("a3f00000000000000000000000000000000000000000000000000000000009c1")).toBe("a3f…9c1");

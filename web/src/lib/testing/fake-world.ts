@@ -74,7 +74,7 @@ export async function linkRow(w: World, repo = { token: "fake-token-for-tests", 
 export const rootRow = (rootId: string, over: Partial<RootRow> = {}): RootRow =>
   ({ root_id: rootId, visibility: "private", meta_version: 0, list_meta: null, created_at: "2026-11-10T00:00:00Z", deleted_at: null, change_seq: nextChange(), ...over });
 export const anchorRow = (recordId: string, over: Partial<AnchorRow> = {}): AnchorRow =>
-  ({ record_id: recordId, status: "pending", block_height: null, change_seq: nextChange(), ...over });
+  ({ record_id: recordId, status: "pending", block_height: null, complete_receipt: null, change_seq: nextChange(), ...over });
 
 export function syncOf(rows: { roots?: RootRow[]; records?: RecordRow[]; deltas?: DeltaRow[]; anchors?: AnchorRow[]; links?: LinkRow[] }, complete = true): SyncState {
   const page = { roots: rows.roots ?? [], records: rows.records ?? [], deltas: rows.deltas ?? [], anchors: rows.anchors ?? [], storage_links: rows.links ?? [], bad: [] };

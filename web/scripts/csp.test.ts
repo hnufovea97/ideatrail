@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { GITHUB_API as MIRROR_GITHUB_API } from "../src/lib/mirror/github";
-import { connectExtraFor, GITHUB_API, headersFile, injectMeta, policyFor } from "./csp";
+import { EXPLORER_ORIGINS as APP_EXPLORERS } from "../src/lib/proof/explorers";
+import { connectExtraFor, EXPLORER_ORIGINS, GITHUB_API, headersFile, injectMeta, policyFor } from "./csp";
 
 const hash = (s: string) => `'sha256-${createHash("sha256").update(s, "utf8").digest("base64")}'`;
 const html = `<!doctype html><html><head><meta charset="utf-8"><style>astro-island{display:contents}</style>` +
@@ -38,11 +39,13 @@ describe("CSP for built pages", () => {
     expect(all).not.toContain("Cache-Control");
   });
 
-  it("GitHub is reachable from /home only, the same origin the mirror writes to", () => {
+  it("GitHub and the two block explorers are reachable from /home only, the same origins the app code uses", () => {
     expect(GITHUB_API).toBe(MIRROR_GITHUB_API);
-    for (const route of ["/home", "/home/"]) expect(connectExtraFor(route)).toEqual([GITHUB_API]);
+    expect(EXPLORER_ORIGINS).toEqual(APP_EXPLORERS);
+    for (const route of ["/home", "/home/"]) expect(connectExtraFor(route)).toEqual([GITHUB_API, "https://blockstream.info", "https://mempool.space"]);
     for (const route of ["/start", "/connect", "/"]) expect(connectExtraFor(route)).toEqual([]);
-    expect(policyFor(html, "http://localhost:8787", connectExtraFor("/home"))).toContain("connect-src 'self' http://localhost:8787 https://api.github.com;");
+    expect(policyFor(html, "http://localhost:8787", connectExtraFor("/home"))).toContain(
+      "connect-src 'self' http://localhost:8787 https://api.github.com https://blockstream.info https://mempool.space;");
   });
   it("deploy headers: every path without GitHub; /home replaces the policy with its own that allows it", () => {
     const h = headersFile("connect-src 'self';", "connect-src 'self' https://api.github.com;");

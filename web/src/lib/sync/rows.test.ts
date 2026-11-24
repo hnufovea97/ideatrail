@@ -21,6 +21,14 @@ describe("sync rows (api/src/routes/sync.ts shapes)", () => {
       expect(p.bad).toEqual(["records"]);
     }
   });
+  it("anchors carry the complete receipt (base64url, capped) or null; anything else drops the row", () => {
+    const anchor = (over: Record<string, unknown> = {}) => ({ record_id: ID("a"), status: "confirmed", block_height: 870_000, complete_receipt: "AAEC", change_seq: 4, ...over });
+    expect(parsePage({ anchors: [anchor()] }).anchors[0].complete_receipt).toBe("AAEC");
+    expect(parsePage({ anchors: [anchor({ complete_receipt: null })] }).anchors).toHaveLength(1);
+    for (const bad of [{ complete_receipt: "a+b" }, { complete_receipt: "A".repeat(11_001) }, { complete_receipt: "" }, { complete_receipt: 5 }, { complete_receipt: undefined }]) {
+      expect(parsePage({ anchors: [anchor(bad)] }).bad).toEqual(["anchors"]);
+    }
+  });
   it("a table that is not a list is reported; missing tables are just empty", () => {
     const p = parsePage({ deltas: "nope" });
     expect(p.bad).toEqual(["deltas"]);

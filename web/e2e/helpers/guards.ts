@@ -2,7 +2,8 @@ import { expect, type Page } from "@playwright/test";
 
 export const APP = "http://localhost:4321";
 export const API = "http://localhost:8787";
-const ALLOWED = new Set([APP, API]);
+/** The two block explorers only answer the /home confirmation check (5.7); the specs route them to local fakes. */
+const ALLOWED = new Set([APP, API, "https://blockstream.info", "https://mempool.space"]);
 
 export interface Watch { requests: { url: string; method: string; body: string }[] }
 

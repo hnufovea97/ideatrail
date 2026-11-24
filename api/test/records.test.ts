@@ -133,7 +133,7 @@ describe("records: hardening (M2b review)", () => {
   });
 
   it("a pending receipt that already claims a bitcoin block, or has invalid UTF-8, is rejected (400, not 500)", async () => {
-    const { serializeTimestamp } = await import("../src/ots/tree");
+    const { serializeTimestamp } = await import("@ideatrail/crypto/ots");
     const { fromHex } = await import("@ideatrail/crypto/bytes");
     const fx = (await import("../../spec/vectors/ots/receipts.json")).default;
     const digest = fromHex(fx.digest_hex);

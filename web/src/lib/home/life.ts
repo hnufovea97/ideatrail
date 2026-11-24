@@ -6,7 +6,7 @@ import type { StageNo } from "../model/stage";
 import { stageNameOf } from "../model/stage-names";
 import { dayRange, monthDay } from "./format";
 
-export type ChainState = "done" | "pending";
+export type ChainState = "done" | "pending" | "checking" | "mismatch" | "invalid";
 export interface VersionRow { recordId: string; when: string; name: string; file: string | null; fingerprint: string; chain: ChainState }
 export interface StageRow {
   no: StageNo; name: string; reached: boolean; current: boolean; estimated: boolean;
@@ -16,7 +16,9 @@ export interface StageRow {
 export interface Life { stages: readonly StageRow[]; decided: number | null; deferred: number | null }
 
 const sumOrNull = (xs: readonly (number | null)[]) => (xs.some((x) => x !== null) ? xs.reduce<number>((a, x) => a + (x ?? 0), 0) : null);
-export const chainOf = (v: VersionView): ChainState => (v.server.anchor === "server_confirmed" ? "done" : "pending");
+/** 확산됨 ("done") only after the browser's own two-explorer check; the server's "confirmed" alone reads "확인 중" (ADR-0013/0018). */
+const CHAIN_OF = { confirmed: "done", server_confirmed: "checking", pending: "pending", mismatch: "mismatch", invalid: "invalid" } as const satisfies Record<VersionView["server"]["anchor"], ChainState>;
+export const chainOf = (v: VersionView): ChainState => CHAIN_OF[v.server.anchor];
 
 /** The version's own name (ADR-0019 label) or "기록 n" for records from before it (n counts from the first). */
 function versionRow(v: VersionView, ordinal: number, timeZone?: string): VersionRow {

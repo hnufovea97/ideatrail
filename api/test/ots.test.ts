@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { fromHex, toHex } from "@ideatrail/crypto/bytes";
 import fx from "../../spec/vectors/ots/receipts.json";
-import { bitcoinHeight, mergeInto, OtsError, parseOtsFile, parseTimestamp, pendingPoints, serializeTimestamp, type Timestamp } from "../src/ots/tree";
+import { bitcoinHeight, mergeInto, OtsError, parseOtsFile, parseTimestamp, pendingPoints, serializeTimestamp, type Timestamp } from "@ideatrail/crypto/ots";
 import { aliceUpgrade } from "./fixtures";
 
 const digest = fromHex(fx.digest_hex);

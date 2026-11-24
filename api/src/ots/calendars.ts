@@ -1,5 +1,5 @@
 import { toHex } from "@ideatrail/crypto/bytes";
-import { bitcoinHeight, OtsError, parseTimestamp, pendingPoints, type Timestamp } from "./tree";
+import { bitcoinHeight, OtsError, parseTimestamp, pendingPoints, type Timestamp } from "@ideatrail/crypto/ots";
 
 /** Exact hosts the server may contact (M0 S1 + public calendars). Nothing else, ever (SSRF). */
 export const CALENDAR_HOSTS = new Set([
