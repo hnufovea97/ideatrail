@@ -5,6 +5,7 @@ import { COPY } from "../../lib/copy";
 import { inAppBrowser } from "../../lib/inapp";
 import { abandonRecovery, finishRecovery, recoveryReason, startRecovery, type RecoveryState } from "../../lib/recovery-open";
 import { verifyFailure } from "../../lib/signup/pc-flow";
+import { RECOVERY_HOLD_MS } from "../../lib/timing";
 import { createPasskey, forgetCredential, readPrf, type Created } from "../../lib/webauthn";
 import { Screen } from "../ui/Screen";
 
@@ -25,18 +26,38 @@ export function RecoveryOpen({ api, onBack, onDone }: Props) {
 
   useEffect(() => {
     alive.current = true;
+    const onHide = () => { if (state.current) abandonRecovery(state.current); }; // the page is leaving: the key goes with it
+    window.addEventListener("pagehide", onHide);
     const inApp = inAppBrowser(navigator.userAgent);
     if (inApp) setBlocked(COPY.dash.inApp[inApp]);
     void prfSupport(window as unknown as CapabilityEnv).then((s) => { if (s === "no" && alive.current) setBlocked(COPY.stop.no_prf); });
     return () => {
       alive.current = false;
+      window.removeEventListener("pagehide", onHide);
       if (state.current) abandonRecovery(state.current); // the opened key never outlives this screen
       state.current = null;
     };
   }, []);
 
   const rpId = () => state.current?.options.options.rp.id ?? location.hostname;
-  const restart = (text: string) => { state.current = null; setPending(null); setPhase("input"); setError(text); };
+  /** Back to the key input: the opened key is wiped first, never just dropped. */
+  const restart = (text: string) => {
+    if (state.current) abandonRecovery(state.current);
+    state.current = null;
+    setPending(null);
+    setPhase("input");
+    setError(text);
+  };
+
+  // The opened key does not wait for ever: after 5 minutes on the lock step it is wiped and the typing starts over.
+  useEffect(() => {
+    if (phase === "input" || busy) return;
+    const t = setTimeout(() => {
+      if (pending) void forgetCredential(rpId(), pending.rawId); // made but never registered
+      restart(m.errors.expired);
+    }, RECOVERY_HOLD_MS);
+    return () => clearTimeout(t);
+  }, [phase, busy, pending]);
 
   const check = () => {
     if (busy || !typed.trim()) return;
@@ -69,8 +90,10 @@ export function RecoveryOpen({ api, onBack, onDone }: Props) {
     if (!s || busy) return;
     setBusy(true);
     setError(null);
+    const rp = s.options.options.rp.id ?? location.hostname;
     createPasskey(s.options.options)
       .then((c) => {
+        if (!alive.current) return forgetCredential(rp, c.rawId); // the screen is gone: nothing will register it
         if (c.prf) return finish(c, c.prf);
         setPending(c);
         setPhase("retry");
@@ -96,7 +119,7 @@ export function RecoveryOpen({ api, onBack, onDone }: Props) {
     return <Screen title={m.title} error={blocked}><button type="button" onClick={onBack}>{m.back}</button></Screen>;
   }
   if (phase === "retry") {
-    return <Screen title={COPY.pc.retryPrf} why={COPY.pc.retryWhy} error={error}><button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.pc.retryAction}</button></Screen>;
+    return <Screen title={COPY.pc.retryPrf} focusKey="retry" why={COPY.pc.retryWhy} error={error}><button type="button" class="primary" onClick={retry} disabled={busy}>{COPY.pc.retryAction}</button></Screen>;
   }
   if (phase === "ready") {
     return (

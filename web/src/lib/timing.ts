@@ -5,3 +5,5 @@ export const FOLDERS_WAIT_MS = 2 * 60_000;
 export const STEPUP_REFRESH_MS = 100_000; // server step-up challenge lives 2 minutes
 export const LOGIN_REFRESH_MS = 4 * 60_000; // server login challenge lives 5 minutes (api/src/auth/challenges.ts)
 export const SYNC_MS = 60_000; // while open and visible
+/** How long the opened master key may wait on the "make a device lock" step (the server's recovery challenge lives 5 minutes). */
+export const RECOVERY_HOLD_MS = 5 * 60_000;
