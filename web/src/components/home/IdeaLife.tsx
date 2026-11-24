@@ -54,6 +54,7 @@ export function IdeaLife({ idea, tools, server, now, routineOn, feedbackFolded, 
   const life = useMemo(() => lifeOf(idea), [idea]);
   const rowTools: RowTools = {
     ...tools,
+    version: (recordId) => idea.versions.find((v) => v.recordId === recordId),
     load: (recordId) => { // versions are newest first: the one after it in the list is the one just before it in time
       const at = idea.versions.findIndex((v) => v.recordId === recordId);
       return at < 0 ? Promise.resolve({ kind: "failed" }) : tools.load(idea.versions[at], idea.versions[at + 1] ?? null);

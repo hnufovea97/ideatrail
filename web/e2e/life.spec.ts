@@ -1,5 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { BUDGET, PIANO, deviceView, openHome, proofRepos } from "./helpers/home";
+import { readFileSync } from "node:fs";
+import { utf8 } from "@ideatrail/crypto/bytes";
+import { verifyBundle } from "../src/lib/proof/bundle";
+import type { Explorer } from "../src/lib/proof/explorers";
+import { BUDGET, PIANO, TEXT, blocks, deviceView, openHome, proofRepos } from "./helpers/home";
 
 test.use({ timezoneId: "Asia/Seoul", viewport: { width: 1280, height: 900 } });
 
@@ -120,4 +124,58 @@ test("linked: the original is opened from GitHub, checked against the signed fin
   await expect(row.locator(".dl.add")).toHaveText("+ - 부부가 같이 쓴다\n");
   await expect(row.locator(".dl.same")).toHaveCount(2);
   expect(sent.join("\n")).not.toContain("월급날"); // the opened text never goes anywhere
+});
+
+test("a version's proof journey shows each step's real state, and the proof file made here passes verifyBundle without the server (5.8)", async ({ page }) => {
+  const engine = await openHome(page);
+  const sent: string[] = [];
+  page.on("request", (r) => { if (r.method() !== "GET" && r.method() !== "OPTIONS") sent.push(`${r.url()}\n${r.postData() ?? ""}`); });
+  await page.route("https://api.github.com/**", (route) => {
+    const path = decodeURIComponent(new URL(route.request().url()).pathname.replace(/^\/repos\/[^/]+\/[^/]+\/contents\//, ""));
+    const bytes = proofRepos.get(page)?.[path];
+    return bytes ? route.fulfill({ status: 200, body: Buffer.from(bytes) }) : route.fulfill({ status: 404, json: {} });
+  });
+  await engine.putStorageLink();
+  const pulled = page.waitForResponse((r) => r.url().includes("/v1/sync"));
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await pulled;
+  await deviceView(page);
+  await page.locator(".cards .card").filter({ hasText: BUDGET }).click();
+  await page.getByRole("group", { name: "단계 4/5" }).getByRole("button").nth(0).click(); // 착상: the first version, its block already checked
+  const row = page.locator(".ver").first();
+  await row.getByRole("button", { name: "원문 보기" }).click();
+  const steps = row.locator(".journey li");
+  await expect(steps).toHaveText(["기록됨끝남", "지문 만듦끝남", "서버가 받아 확인함끝남", "GitHub 보관끝남", "블록체인 확산됨끝남"]);
+
+  const download = page.waitForEvent("download");
+  await row.getByRole("button", { name: "증명 파일 내려받기" }).click();
+  const file = await download;
+  const bundle = JSON.parse(readFileSync(await file.path(), "utf8")) as { record_id: string; nonce: string; block_height: number; ots_complete: string };
+  expect(file.suggestedFilename()).toBe(`${bundle.record_id}-증명.json`);
+  expect(bundle).toMatchObject({ v: 1, hash_alg: "sha256-nonce-v1", manifest: false });
+  expect(bundle.nonce).toMatch(/^[0-9a-f]{64}$/);
+  expect(bundle.ots_complete.length).toBeGreaterThan(0);
+
+  const known = blocks.get(page)!;
+  const explorer: Explorer = { blockAt: async (h) => ({ hash: h.toString(16).padStart(64, "0"), merkleRoot: known.get(h)!, time: 1_764_000_000 }) };
+  const original = utf8(TEXT["2026-09-03T00:12:00Z"]);
+  expect(await verifyBundle(bundle, original, { a: explorer, b: explorer })).toBe("ok");
+  expect(await verifyBundle(bundle, utf8(TEXT["2026-09-03T00:12:00Z"] + "!"))).toBe("mismatch");
+  expect(sent.join("\n")).not.toContain(bundle.nonce); // the key to the fingerprint left this page only as the user's own download
+});
+
+test("a version that is only pending on the server reads 기다리는 중, and with no original found there is no proof file to download (5.8)", async ({ page }) => {
+  const engine = await openHome(page);
+  await page.route("https://api.github.com/**", (route) => route.fulfill({ status: 404, json: {} }));
+  await engine.putStorageLink();
+  const pulled = page.waitForResponse((r) => r.url().includes("/v1/sync"));
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await pulled;
+  await deviceView(page);
+  await page.locator(".cards .card").filter({ hasText: BUDGET }).click();
+  const row = page.locator(".ver").first();
+  await row.getByRole("button", { name: "원문 보기" }).click();
+  await expect(row.locator(".journey li").nth(3)).toHaveText("GitHub 보관올라가는 중");
+  await expect(row.locator(".journey li").nth(4)).toHaveText("블록체인 확산됨기다리는 중");
+  await expect(row.getByRole("button", { name: "증명 파일 내려받기" })).toHaveCount(0); // no opened original, no file
 });

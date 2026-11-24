@@ -17,7 +17,7 @@ export interface Explorers { a: Explorer; b: Explorer }
 const MAX_B64U = Math.ceil((MAX_RECEIPT_BYTES * 4) / 3) + 4;
 
 /** Where the receipt says the fingerprint ended up: the lowest bitcoin height and that block's merkle root (display order). */
-function claimOf(commitment: Uint8Array, receipt: string): { height: number; merkleRoot: string } | null {
+export function claimOf(commitment: Uint8Array, receipt: string): { height: number; merkleRoot: string } | null {
   if (receipt.length === 0 || receipt.length > MAX_B64U) return null;
   try {
     const point = bitcoinPoints(parseTimestamp(fromB64u(receipt), commitment))[0];

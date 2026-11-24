@@ -24,9 +24,10 @@ async function open(over: { files: ReturnType<typeof file>[]; original?: boolean
 
 describe("openOriginal (5.6)", () => {
   it("one file: opened, and the fingerprint equals the signed one", async () => {
-    const { result } = await open({ files: [file("기획.md", "첫 줄\n둘째 줄\n")] });
-    expect(result).toMatchObject({ kind: "opened", same: true });
+    const { result, p } = await open({ files: [file("기획.md", "첫 줄\n둘째 줄\n")] });
+    expect(result).toMatchObject({ kind: "opened", same: true, manifest: false });
     expect(textOf(result)).toBe("첫 줄\n둘째 줄\n");
+    expect(result.kind === "opened" && result.nonce).toEqual(p.nonce); // kept in memory for the user's own proof download
   });
 
   it("many files (tar, Korean names in PAX records): opened, same, no text to compare", async () => {

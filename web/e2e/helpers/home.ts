@@ -13,16 +13,16 @@ export const BUDGET = "공정 가계부 앱";
 export const SWAP = "동네 중고 교환";
 export const PIANO = "피아노 연습 기록기";
 
-interface Spec { title: string; visibility: "private" | "public"; confirmed: boolean; records: Record<string, unknown>[] }
+interface Spec { title: string; visibility: "private" | "public"; confirmed: boolean; records: Record<string, unknown>[] } // a record may be `confirmed` on its own
 /** Text of a record's one file, so its fingerprint is real and its original can be put in the fake GitHub repo. */
-const TEXT: Record<string, string> = {
+export const TEXT: Record<string, string> = {
   "2026-09-03T00:12:00Z": "공정 가계부\n- 월급날 기준으로 달을 나눈다\n- 카드 연동\n",
   "2026-10-02T12:00:00Z": "공정 가계부\n- 월급날 기준으로 달을 나눈다\n- 부부가 같이 쓴다\n",
 };
 const file = (path: string) => [{ path, size: 10, original: true }];
 const IDEAS: Spec[] = [
   { title: BUDGET, visibility: "private", confirmed: false, records: [
-    { at: "2026-09-03T00:12:00Z", milestone: "idea", tags: ["기획", "협의"], routine: [{ slot: "problem" }], label: "개요", files: file("아이디어-메모.md") },
+    { at: "2026-09-03T00:12:00Z", milestone: "idea", tags: ["기획", "협의"], routine: [{ slot: "problem" }], label: "개요", files: file("아이디어-메모.md"), confirmed: true },
     { at: "2026-10-02T12:00:00Z", milestone: "plan_decided", milestone_certain: true, routine: [{ slot: "audience" }, { slot: "decision_reason", estimated: true }],
       decided: 2, deferred: 1, turn: "카드 연동 빼기", label: "초안", files: file("기획-초안.md") },
     { at: "2026-11-18T12:00:00Z", decided: 1, label: "개선 1", files: file("결정-카드연동.md") },
@@ -36,7 +36,7 @@ const IDEAS: Spec[] = [
 ];
 
 const meta = (title: string, r: Record<string, unknown>) => {
-  const { at, ...rest } = r;
+  const { at, confirmed: _confirmed, ...rest } = r;
   return { v: 1, title, milestone: "none", milestone_certain: false, files: [], more_files: 0, recorded_at: at, tags: [], routine: [], ...rest };
 };
 
@@ -78,10 +78,11 @@ async function rows(engine: FakeEngine, changeSeq: number, repo: Record<string, 
       if (proof) Object.assign(repo, proof.repo);
       const row = await engine.recordRow({ rootId, seq: ++seq, recordedAt: r.at as string, meta: meta(idea.title, r), changeSeq, recordId, commitment: proof?.ref.commitment });
       records.push(row);
-      if (idea.confirmed) known.set(height, toHex(fromHex(row.commitment).reverse()));
-      anchors.push({ record_id: row.record_id, status: idea.confirmed ? "confirmed" : "pending", block_height: idea.confirmed ? height : null,
-        complete_receipt: idea.confirmed ? receiptOf(row.commitment, height) : null, change_seq: changeSeq });
-      if (idea.confirmed) height++;
+      const confirmed = idea.confirmed || r.confirmed === true;
+      if (confirmed) known.set(height, toHex(fromHex(row.commitment).reverse()));
+      anchors.push({ record_id: row.record_id, status: confirmed ? "confirmed" : "pending", block_height: confirmed ? height : null,
+        complete_receipt: confirmed ? receiptOf(row.commitment, height) : null, change_seq: changeSeq });
+      if (confirmed) height++;
     }
   }
   return { roots, records, anchors };

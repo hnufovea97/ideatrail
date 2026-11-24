@@ -15,7 +15,7 @@ export type Opened =
   | { kind: "no_original" } // big or picture files: GitHub holds the fingerprint only
   | { kind: "mismatch" } // bundle.json is not this record's
   | { kind: "unreadable" } // does not open, or is not what the engine writes
-  | { kind: "opened"; same: boolean; files: readonly OriginalFile[] }; // same = fingerprint equals the signed one
+  | { kind: "opened"; same: boolean; files: readonly OriginalFile[]; nonce: Uint8Array; manifest: boolean }; // same = fingerprint equals the signed one; nonce stays in memory for the user's own proof download only
 
 /** What of a VersionView the opening needs; `commitment` is the engine-signed one. */
 export interface VersionRef { recordId: string; rootId: string; commitment: string; mainFile: string | null }
@@ -42,7 +42,7 @@ export async function openOriginal(d: OpenDeps, access: RepoAccess, v: VersionRe
       ? (untar(plain)?.map((f) => ({ path: f.path, bytes: f.content })) ?? null)
       : [{ path: v.mainFile ?? SINGLE_FALLBACK_NAME, bytes: plain }];
     if (!files || files.length === 0) return { kind: "unreadable" };
-    return { kind: "opened", same: (await fingerprintOf(nonce, files, bundle.manifest)) === v.commitment, files };
+    return { kind: "opened", same: (await fingerprintOf(nonce, files, bundle.manifest)) === v.commitment, files, nonce: nonce.slice(), manifest: bundle.manifest };
   } catch {
     return { kind: "unreadable" };
   } finally {

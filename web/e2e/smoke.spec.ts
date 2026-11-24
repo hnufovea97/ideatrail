@@ -8,8 +8,8 @@ test("pages load with a CSP meta, no violations and no foreign requests", async 
     await expect(page.locator("h1")).toBeVisible();
     const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute("content");
     expect(csp).toContain("default-src 'none'");
-    // GitHub (index/ mirror) only where the keys are open: /home (sec L5)
-    expect(csp).toContain(path === "/home" ? "connect-src 'self' http://localhost:8787 https://api.github.com;" : "connect-src 'self' http://localhost:8787;");
+    // GitHub (index/ mirror) and the two block explorers only where the keys are open: /home (sec L5)
+    expect(csp).toContain(path === "/home" ? "connect-src 'self' http://localhost:8787 https://api.github.com https://blockstream.info https://mempool.space;" : "connect-src 'self' http://localhost:8787;");
     await expectClean(page, w);
   }
 });

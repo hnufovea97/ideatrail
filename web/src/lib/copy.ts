@@ -359,6 +359,17 @@ export const COPY = {
       add: "더함", del: "뺌",
       failed: "GitHub에서 가져오지 못했어요. 연결을 확인하고 다시 해 보세요",
     },
+    journey: { // 새 문구 (5.8: 기록이 지나온 길)
+      title: "이 기록이 지나온 길",
+      steps: { recorded: "기록됨", fingerprint: "지문 만듦", signed: "서버가 받아 확인함", github: "GitHub 보관", chain: `블록체인 ${CHAIN_WORD}` },
+      state: { done: "끝남", doing: "진행 중", todo: "아직", warn: "확인 필요" },
+      notes: {
+        checking: "확인 중", unlinked: "연결 안 됨", uploading: "올라가는 중", failed: "열지 못했어요", different: "GitHub에 있는 것이 달라요",
+        changed: "원문이 달라졌어요", fingerprintOnly: "지문만 보관", waiting: "기다리는 중", mismatch: "두 곳 값이 달라요", invalid: "증명이 맞지 않아요",
+      },
+      export: "증명 파일 내려받기",
+      exportNote: "이 파일에는 원문을 확인하는 열쇠가 들어 있어요. 원문 파일과 함께 안전한 곳에 두세요. 파일은 이 기기에서 바로 만들어지고 Ideatrail 서버를 거치지 않아요",
+    },
     fingerprint: "지문 앞뒤 3자리",
     recordN: (n: number) => `기록 ${n}`, // 새 문구: 버전 이름이 없는 옛 기록
     routine: {
