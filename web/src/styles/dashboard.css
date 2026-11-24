@@ -136,3 +136,6 @@ main.dash h1, main.dash h2, main.dash h3 { color: var(--text); font-weight: 500;
 .row-actions button[aria-pressed="true"] { background: var(--primary-soft); border-color: var(--primary); color: var(--primary-strong); }
 .plain-table { border-collapse: collapse; width: 100%; }
 .plain-table th, .plain-table td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--line); }
+.check-rows { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 12px; }
+.check-rows p { margin: 0 0 6px; }
+.note-editor textarea { width: 100%; box-sizing: border-box; font: inherit; padding: 10px; border-radius: 8px; border: 1px solid var(--line, #bbb); }

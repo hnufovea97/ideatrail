@@ -103,7 +103,7 @@ export interface RegisterVerifyBody {
 export interface AccountInfo {
   user_id: string; engine_list: string | null; engine_list_version: number; confirmed_at: string | null; recovery_key_status: string;
   account_pubkey?: string | null; wrapped_account_privkey?: string | null; auto_lock_minutes?: number;
-  created_at?: string;
+  created_at?: string; recall_notes?: string | null; reminder_state?: string | null;
   envelopes?: EnvelopeMeta[]; credentials?: CredentialMeta[];
 }
 export interface EnvelopeMeta { envelope_id: string; method: "passkey" | "recovery"; created_at: string; last_used_at: string | null }
@@ -163,7 +163,7 @@ export function createApi(base: string, f: Fetch = (input, init) => fetch(input,
       sendChecked<{ resumed: true }>("POST", `/v1/engines/${id(engineId)}/resume`, { assertion }, (d) => d.resumed === true),
     removeCredential: async (credentialId: string, assertion: StepupAssertion) =>
       sendChecked<{ removed: true }>("POST", `/v1/credentials/${credentialPath(credentialId)}/remove`, { assertion }, (d) => d.removed === true),
-    savePrefs: (body: { auto_lock_minutes: 1 | 3 | 5 }) => sendChecked<{ saved: true }>("PUT", "/v1/prefs", body, (d) => d.saved === true),
+    savePrefs: (body: { auto_lock_minutes?: 1 | 3 | 5; reminder_state?: string; recall_notes?: string }) => sendChecked<{ saved: true }>("PUT", "/v1/prefs", body, (d) => d.saved === true),
     deleteAccount: (body: DeleteAccountBody) => sendChecked<{ deleted: true }>("DELETE", "/v1/account", body, (d) => d.deleted === true),
     /** `keepalive`: sent from pagehide, so the request outlives the closing page. */
     logout: (o: { keepalive?: boolean } = {}) => call<{ signed_out: true }>(f, base, "POST", "/v1/logout", {}, {}, undefined, o.keepalive),

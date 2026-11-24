@@ -154,3 +154,53 @@ test("deleting the account: the table, the device lock, then the lock screen —
   await open.click();
   await expect(page.getByText("이 기기는 아직 등록 안 됐어요", { exact: false })).toBeVisible();
 });
+
+const DAY_MS = 86_400_000;
+const lockAndOpen = async (page: Page) => {
+  await page.getByRole("button", { name: "지금 잠그기" }).click();
+  await page.getByRole("button", { name: "이 기기로 열기" }).click();
+  await expect(page.getByText(/^기록 사슬 정상/)).toBeVisible();
+};
+
+test("the day-two check card: not on signup day, once the next day, never twice; the recall note comes back", async ({ page }) => {
+  const w = await watch(page);
+  await openHomeWith(page);
+  const card = page.getByRole("heading", { name: "오래 안 쓰면 잊기 쉬운 것들이에요. 지금 한 번만 확인해 두세요" });
+  await expect(card).toHaveCount(0); // signup day
+
+  await page.clock.setFixedTime(new Date(Date.now() + 36 * 3_600_000)); // the day after signup
+  const saved = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().endsWith("/v1/prefs") && r.status() === 200);
+  await lockAndOpen(page);
+  await expect(card).toBeVisible();
+  await saved; // shown_at is saved the moment it appears
+  await expect(page.getByText("열 수 있는 기기 1대")).toBeVisible();
+  await expect(page.getByText("아직 연결 안 됐어요")).toBeVisible();
+  await expect(page.getByText("기기가 하나뿐이에요", { exact: false })).toBeVisible();
+  await expect(page.getByText(/비상 열쇠.*중요.*없음/)).toBeVisible();
+
+  const note = "비상 열쇠는 책상 서랍 두 번째 칸";
+  await page.getByRole("button", { name: "메모 남기기" }).click();
+  await expect(page.getByText("🔒 잠금을 푼 뒤에만 보여요", { exact: false })).toBeVisible();
+  await page.getByLabel("어디에 뒀는지 적어 두세요").fill(note);
+  const put = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().endsWith("/v1/prefs") && r.status() === 200);
+  await page.getByRole("button", { name: "메모 저장" }).click();
+  await put;
+  const sent = w.requests.filter((r) => r.method === "PUT" && r.url.endsWith("/v1/prefs")).map((r) => r.body).join(" ");
+  expect(sent).not.toContain("책상");
+  await page.getByRole("button", { name: "괜찮아요" }).click();
+  await expect(card).toHaveCount(0);
+
+  await page.reload();
+  await page.getByRole("button", { name: "이 기기로 열기" }).click();
+  await expect(page.getByText(/^기록 사슬 정상/)).toBeVisible();
+  await expect(card).toHaveCount(0); // once
+
+  await openSettings(page);
+  await expect(page.getByLabel("어디에 뒀는지 적어 두세요")).toHaveValue(note);
+
+  await page.getByRole("button", { name: "돌아가기" }).click();
+  await page.getByRole("button", { name: "지금 잠그기" }).click();
+  await page.clock.setFixedTime(new Date(Date.now() + 36 * 3_600_000 + 91 * DAY_MS)); // 90 days later it asks again
+  await page.getByRole("button", { name: "이 기기로 열기" }).click();
+  await expect(card).toBeVisible();
+});

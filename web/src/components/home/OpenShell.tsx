@@ -14,9 +14,13 @@ import { chainLine, type ChainStatus } from "../../lib/sync/chain";
 import { emptySync, type SyncState } from "../../lib/sync/store";
 import { SYNC_MS } from "../../lib/timing";
 import type { DashboardVault } from "../../lib/unlock";
+import { storageLinkValid } from "../../lib/github-link";
+import { shortcutNeeded } from "../../lib/home/reminder";
 import { loadSource, refOf } from "../../lib/versions/source";
 import { useGithubLink } from "../start/useGithubLink";
 import { Approvals } from "./Approvals";
+import { CheckCard } from "./CheckCard";
+import { useCheckCard } from "./useCheckCard";
 import { Home } from "./Home";
 import { Settings } from "./Settings";
 import type { SourceTools } from "./VersionDetail";
@@ -25,6 +29,15 @@ import type { SourceTools } from "./VersionDetail";
 interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onLock(): void; onVault(v: DashboardVault): void; onGone(): void }
 type View = "home" | "approvals" | "settings";
 const CHECKING: ChainStatus = { state: "checking" };
+
+/** A touch phone with the page still in the browser (not added to the home screen). */
+function onPhoneBrowser(): boolean {
+  const media = (q: string) => typeof matchMedia === "function" && matchMedia(q).matches;
+  return shortcutNeeded({
+    touch: media("(pointer: coarse)"), narrow: media("(max-width: 600px)"),
+    standalone: media("(display-mode: standalone)") || (navigator as { standalone?: boolean }).standalone === true,
+  });
+}
 
 /** The unlocked page: the chain line and the home (5.4·5.5) drawn from `loaded.ideas`. */
 export function OpenShell({ api, vault, signal, onLock, onVault, onGone }: Props) {
@@ -112,6 +125,8 @@ export function OpenShell({ api, vault, signal, onLock, onVault, onGone }: Props
     justLinked.current = true;
     refreshNow.current();
   });
+  const check = useCheckCard(api, vault, signal);
+  const githubLinked = engine !== null && [...(loaded?.sync.links.values() ?? [])].some((l) => storageLinkValid(l, engine, vault.userId));
   const tools: SourceTools = {
     load: (v, previous) => loadSource({ vault, links: sync.current.links.values(), github: (input, init) => fetch(input, init), signal }, refOf(v), previous ? refOf(previous) : null),
     connect: link, tick: linkTick,
@@ -132,6 +147,10 @@ export function OpenShell({ api, vault, signal, onLock, onVault, onGone }: Props
       {view === "approvals" ? <Approvals api={api} vault={vault} items={pending} onDecided={loadApprovals} onBack={() => setView("home")} /> : null}
       {view === "settings" && loaded ? (
         <Settings api={api} vault={vault} sync={loaded.sync} store={store} onVault={onVault} onRefresh={() => refreshNow.current()} onDeleted={onGone} onBack={() => setView("home")} />
+      ) : null}
+      {view === "home" && check.data ? (
+        <CheckCard api={api} vault={vault} data={check.data} githubLinked={githubLinked} github={link} showShortcut={onPhoneBrowser()}
+          onMakeKey={() => setView("settings")} onNotes={check.setNotes} onClose={check.close} />
       ) : null}
       {view === "home" && ideas ? <Home ideas={ideas} tools={tools} userId={vault.userId} store={store} now={new Date()} onRename={rename} /> : null}
       {view === "home" && !ideas ? <p class="small">{COPY.home.loading}</p> : null}
