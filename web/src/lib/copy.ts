@@ -12,6 +12,14 @@ export const CHECKLIST: readonly { key: keyof Checklist; label: string }[] = [
   { key: "folders", label: "기록할 폴더 고르기" },
 ];
 
+/** The one place the blockchain word lives (ADR-0018: it means "included in a block"; founder may still switch it to 새겨짐). */
+export const CHAIN_WORD = "확산됨";
+const CHAIN = { done: `블록체인 ${CHAIN_WORD}`, pending: "블록체인 진행 중" } as const;
+// ADR-0018 switch: the same words on the first screen and on the home
+const SERVER_TOGGLE = "Ideatrail 서버가 가진 데이터"; // 새 문구
+const SERVER_NOTE = "선명한 글자는 Ideatrail이 보관하는 데이터예요. 흐린 글자는 사용자의 컴퓨터와 GitHub에 있는 개인 데이터로, 사용자가 기기에서 잠금을 풀 때만 보여요. Ideatrail은 어떤 경우에도 내용을 알 수 없어요"; // 새 문구 (founder 2026-11-23)
+const DEVICE_NOTE = "지금은 이 기기에서 풀어 본 모습이에요. 다시 켜면 Ideatrail이 보관하는 데이터만 선명하게 남아요"; // 새 문구
+
 /** Stage names by preset id (founder 2026-11-24: names may become per-idea later — 개발/글쓰기/연구 or AI-suggested).
  *  Only "build" exists in M5b. Always 5 names: the five slots and the milestone enum stay fixed (spec §15 M5a, G9). */
 export const STAGE_PRESETS = {
@@ -53,11 +61,11 @@ export const COPY = {
         { when: "11.18", what: "개선 1 · 카드 연동 빼기", file: "결정-카드연동.md", fp: "a3f…9c1", chain: "pending" },
         { when: "11.10", what: "초안", file: "기획-초안.md", fp: "5d2…0b3", chain: "done" },
       ],
-      chain: { done: "블록체인 확산됨", pending: "블록체인 진행 중" },
-      toggle: "Ideatrail 서버가 가진 데이터", // 새 문구
+      chain: CHAIN,
+      toggle: SERVER_TOGGLE,
       serverFirst: true, // founder: 처음엔 서버 눈으로 보여 줌
-      deviceNote: "지금은 이 기기에서 풀어 본 모습이에요. 다시 켜면 Ideatrail이 보관하는 데이터만 선명하게 남아요", // 새 문구
-      serverNote: "선명한 글자는 Ideatrail이 보관하는 데이터예요. 흐린 글자는 사용자의 컴퓨터와 GitHub에 있는 개인 데이터로, 사용자가 기기에서 잠금을 풀 때만 보여요. Ideatrail은 어떤 경우에도 내용을 알 수 없어요", // 새 문구
+      deviceNote: DEVICE_NOTE,
+      serverNote: SERVER_NOTE,
     },
     benefitsTitle: "써 보면 좋은 점", // 새 문구
     benefits: [
@@ -255,6 +263,84 @@ export const COPY = {
       account_mismatch: "서버에 있는 계정 열쇠가 이 기기에서 푼 것과 달라 열지 않았어요. 잠시 뒤 다시 해 주세요", // 새 문구
       engine_list_rollback: "서버가 예전 기록 도우미 목록을 보여 줘서 열지 않았어요. 쓰던 다른 기기에서 열어 확인해 주세요", // 새 문구
       failed: "잠시 문제가 생겼어요. 다시 해 볼까요?",
+    },
+  },
+  // M5b 홈 (ADR-0018 시제품 모양). 새 문구는 모두 "새 문구" — 미리보기 docs/manual/홈-화면-미리보기.html과 같은 말
+  home: {
+    toggle: SERVER_TOGGLE,
+    serverNote: SERVER_NOTE,
+    deviceNote: DEVICE_NOTE,
+    tabsLabel: "보기", // 새 문구
+    tabs: { all: "전체", shared: "공유 가능", mine: "나만 보기" },
+    searchLabel: "태그나 단계로 찾기", // 새 문구
+    searchHint: "#기획 MVP 완료",
+    sortLabel: "정렬",
+    sorts: {
+      firstOld: "처음 기록한 순 (오래된 것부터)",
+      firstNew: "처음 기록한 순 (최신부터)",
+      last: "마지막 기록 순",
+      stage: "진행 단계 순",
+      opened: "최근 열어 본 순 (이 기기에만 저장)",
+    },
+    count: (n: number) => `${n}개`,
+    listLabel: "아이디어 목록", // 새 문구
+    stageOf: (no: number, name: string) => `${no}/5 ${name}`,
+    dates: (first: string, last: string) => `최초 기록 ${first} / 마지막 기록 ${last}`,
+    mine: "나만 보기", // 자물쇠 그림의 읽기 이름
+    chain: CHAIN,
+    empty: {
+      none: "아직 기록이 없어요. Claude Code에서 “기록해 줘”라고 하면 여기에 쌓여요", // 새 문구 (UX 빈 상태, 가입을 마친 사람용)
+      shared: "공유 가능으로 둔 기록이 없어요. 기록은 기본으로 나만 봐요.", // 새 문구
+      mine: "나만 보는 기록이 없어요.", // 새 문구
+      search: "찾는 기록이 없어요. 다른 태그나 단계로 찾아보세요.",
+    },
+    loading: "기기 안에서 푸는 중…",
+    pick: "아이디어를 고르면 여기에 걸어온 길이 보여요", // 새 문구
+  },
+  // M5b 아이디어의 일생 (UX ②). 개수는 점수가 아님 — "AI가 센 수"로만 (ADR-0019, CLAUDE.md 규칙 8)
+  life: {
+    back: "목록으로", // 새 문구
+    visibility: { private: "나만 보기", public: "공유 가능" },
+    versions: (n: number) => `버전 ${n}개`,
+    first: "최초 기록",
+    last: "마지막 기록",
+    nameHint: "이 제목은 이 기기에서 풀었어요",
+    how: "어떻게?",
+    howBody: "이름·단계·태그·파일 이름은 이 기기의 열쇠로 잠겨 있어서, Ideatrail 서버에는 잠긴 글자만 있어요. 이 기기에서 잠금을 풀 때만 읽을 수 있는 글자로 바뀌어요", // 새 문구
+    stagesLabel: (no: number) => `단계 ${no}/5`,
+    decided: "결정",
+    deferred: "미룸",
+    turn: "변곡점",
+    counted: "AI가 센 수", // 새 문구 (ADR-0019: AI 판단이라 틀릴 수 있음)
+    estimated: "AI 추정",
+    paused: "멈춤",
+    stalled: (days: number) => `${days}일째`,
+    notYet: "아직 이 단계에 오지 않았어요",
+    skipped: "이 단계는 기록 없이 지나갔어요", // 새 문구
+    file: "원래 위치",
+    fingerprint: "지문 앞뒤 3자리",
+    recordN: (n: number) => `기록 ${n}`, // 새 문구: 버전 이름이 없는 옛 기록
+    routine: {
+      title: (total: number, filled: number) => `루틴 점검 ${total}개 중 ${filled}개`,
+      groups: { idea: "착상", plan: "기획", run: "실행", feedback: "피드백" },
+      slots: {
+        problem: "풀려는 문제 한 줄",
+        audience: "누구를 위한 건지",
+        not_doing: "하지 않을 것 정하기",
+        decision_reason: "확정 이유 남김",
+        first_run: "첫 동작 화면",
+        feedback: "다른 사람 반응 1건",
+        changed_by_feedback: "반응 보고 바꾼 것",
+      },
+      filled: "채움",
+      empty: "아직 없음",
+      next: "다음에 채울 칸", // 새 문구 (H14: 다음 칸 하나만 또렷하게)
+      note: "근거는 모두 사용자의 AI가 기록할 때 표시했어요", // UX "내 AI" → 주어 규칙
+      hide: "점검 숨기기",
+      show: "루틴 점검 보기",
+      hiddenNote: "꺼도 점검은 조용히 쌓여요. 다시 켜면 그대로 보여요.",
+      feedbackOff: "이 아이디어엔 해당 없음",
+      feedbackOn: "피드백 칸 다시 펼치기", // 새 문구
     },
   },
 } as const;
