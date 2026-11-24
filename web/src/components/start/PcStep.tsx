@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { RegisterOptions } from "../../lib/api";
 import { COPY, errorMessage } from "../../lib/copy";
 import { browserStore } from "../../lib/engine-list";
+import { externalOpenUrl, inAppBrowser } from "../../lib/inapp";
 import type { StepProps } from "../../lib/signup/context";
 import { stepNumber } from "../../lib/signup/machine";
 import type { Vault } from "../../lib/signup/account";
@@ -137,6 +138,16 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
     return (
       <Screen step={stepNumber(state.step)} title={COPY.pc.retryPrf} why={COPY.pc.retryWhy} done={state.done} error={error}>
         <button type="button" class="primary" onClick={retryPrf} disabled={busy}>{COPY.pc.retryAction}</button>
+      </Screen>
+    );
+  }
+  const inApp = inAppBrowser(navigator.userAgent); // G2: passkeys fail inside chat-app browsers, so stop before creating one
+  if (inApp) {
+    const outside = externalOpenUrl(inApp, location.href);
+    return (
+      <Screen step={stepNumber(state.step)} title={COPY.pc.title} why={COPY.pc.why} done={state.done} error={error}>
+        <p class="small" role="note">{COPY.dash.inApp[inApp]}</p>
+        {outside ? <a class="button" href={outside}>{COPY.dash.inApp.openOutside}</a> : null}
       </Screen>
     );
   }

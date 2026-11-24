@@ -97,3 +97,14 @@ test("register options failing offers [다시] instead of a dead button", async 
   await confirmPasskey(page, "휴대폰에 예비 열쇠 만들기");
   await engine.takeHandoff();
 });
+
+test.describe("KakaoTalk in-app browser", () => {
+  test.use({ userAgent: "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36 KAKAOTALK 10.0.0" });
+  test("no passkey button, a way out instead", async ({ page }) => {
+    await openSignup(page, { prf: true });
+    await page.getByRole("button", { name: "시작하기", exact: true }).click();
+    await expect(page.getByRole("note")).toContainText("카카오톡 안에서는");
+    await expect(page.getByRole("link", { name: "휴대폰 브라우저로 열기" })).toHaveAttribute("href", /^kakaotalk:\/\/web\/openExternal\?url=/);
+    await expect(page.getByRole("button", { name: "열쇠 만들기" })).toHaveCount(0);
+  });
+});
