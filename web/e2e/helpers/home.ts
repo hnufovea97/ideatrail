@@ -48,18 +48,40 @@ async function rows(engine: FakeEngine, changeSeq: number) {
   return { roots, records, anchors };
 }
 
-/** Add the three ideas to the first sync answer; later pulls go to the real API untouched. */
+/** What the browser sent to save a root's list info (POST /v1/roots/:id/meta), kept per page for tests to read. */
+export const rootSaves = new WeakMap<Page, Record<string, unknown>[]>();
+interface SavedMeta { list_meta: string; meta_version: number }
+
+/** Put the three ideas into every sync answer (a reload starts again from cursor 0) and answer root-meta saves here,
+ *  so a saved name set comes back on the next pull. The real API still sees everything else. */
 export async function seedIdeas(page: Page, engine: FakeEngine): Promise<void> {
-  let done = false;
+  let built: Awaited<ReturnType<typeof rows>> | null = null;
+  let bump = 0;
+  const saved = new Map<string, SavedMeta>();
+  const sent: Record<string, unknown>[] = [];
+  rootSaves.set(page, sent);
   await page.route("**/v1/sync*", async (route) => {
     const res = await route.fetch();
-    if (done) return route.fulfill({ response: res });
-    done = true;
     const body = (await res.json()) as { changes: Record<string, unknown[] | undefined>; cursor: number };
-    const add = await rows(engine, Math.max(1, body.cursor));
+    built ??= await rows(engine, Math.max(1, body.cursor));
+    const add = { ...built, roots: built.roots.map((r) => {
+      const row = r as { root_id: string; change_seq: number };
+      const s = saved.get(row.root_id);
+      return s ? { ...row, list_meta: s.list_meta, meta_version: s.meta_version, change_seq: row.change_seq + 1000 + bump } : r;
+    }) };
     const changes = { ...body.changes };
     for (const k of ["roots", "records", "anchors"] as const) changes[k] = [...(changes[k] ?? []), ...add[k]];
     return route.fulfill({ response: res, json: { ...body, changes } });
+  });
+  await page.route("**/v1/roots/*/meta", async (route) => {
+    const req = route.request().postDataJSON() as { list_meta: string; meta_version: number };
+    const rootId = /\/v1\/roots\/([^/]+)\/meta/.exec(route.request().url())![1];
+    sent.push(req);
+    const have = saved.get(rootId)?.meta_version ?? 0;
+    if (req.meta_version !== have) return route.fulfill({ status: 409, json: { error: { code: "meta_version_conflict" } } });
+    saved.set(rootId, { list_meta: req.list_meta, meta_version: have + 1 });
+    bump++;
+    return route.fulfill({ json: { meta_version: have + 1 } });
   });
 }
 

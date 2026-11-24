@@ -3,6 +3,7 @@ import type { Api } from "../../lib/api";
 import { COPY } from "../../lib/copy";
 import { refresh, refreshFailure, type Loaded, type LoadDeps, type RefreshFailure } from "../../lib/dashboard/load";
 import { browserStore } from "../../lib/engine-list";
+import { saveStageNames } from "../../lib/merge/stages-save";
 import { RowCache } from "../../lib/sync/cache";
 import { chainLine, type ChainStatus } from "../../lib/sync/chain";
 import { emptySync, type SyncState } from "../../lib/sync/store";
@@ -20,14 +21,20 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
   const [failure, setFailure] = useState<RefreshFailure | null>(null);
   const sync = useRef<SyncState>(emptySync());
   const mirrorDirty = useRef(false); // a saved merge not yet in index/: every later refresh retries until "done"
+  const refreshNow = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     let live = true;
     let running = false;
     const cache = new RowCache(); // verified rows and opened metas of this open vault only
     const deps: LoadDeps = { api, github: (input, init) => fetch(input, init), marks: browserStore(), now: () => new Date(), alive: () => live && !signal.aborted, cache, signal };
+    let again = false; // a save arrived while a refresh was running: go once more when it ends
     const run = () => {
-      if (running || document.visibilityState !== "visible") return;
+      if (document.visibilityState !== "visible") return;
+      if (running) {
+        again = true;
+        return;
+      }
       running = true;
       refresh(deps, vault, sync.current, mirrorDirty.current)
         .then((l) => {
@@ -37,8 +44,15 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
           setLoaded(l);
           setFailure(null);
         }, (e: unknown) => { if (live) setFailure(refreshFailure(e)); })
-        .finally(() => { running = false; });
+        .finally(() => {
+          running = false;
+          if (again && live) {
+            again = false;
+            run();
+          }
+        });
     };
+    refreshNow.current = run;
     run();
     const t = setInterval(run, SYNC_MS);
     document.addEventListener("visibilitychange", run);
@@ -52,6 +66,13 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
 
   const chain = loaded?.chain ?? CHECKING;
   const store = useMemo(() => browserStore(), []);
+  /** The user's stage names (ADR-0020): sealed into the root meta here, then shown by the next refresh and written to index/. */
+  const rename = async (rootId: string, names: readonly string[]) => {
+    const saved = await saveStageNames(api, vault, store, sync.current, rootId, names);
+    sync.current = saved.sync;
+    mirrorDirty.current = true;
+    refreshNow.current();
+  };
   return (
     <main class="screen dash">
       <header class="dash-head">
@@ -61,7 +82,7 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
       </header>
       {chain.state === "warn" ? <p class="banner warn" role="alert">{chainLine(chain)}</p> : null}
       {loaded?.mirror === "failed" ? <p class="small">{COPY.dash.mirrorFailed}</p> : null}
-      {loaded ? <Home ideas={loaded.ideas} userId={vault.userId} store={store} now={new Date()} /> : <p class="small">{COPY.home.loading}</p>}
+      {loaded ? <Home ideas={loaded.ideas} userId={vault.userId} store={store} now={new Date()} onRename={rename} /> : <p class="small">{COPY.home.loading}</p>}
     </main>
   );
 }

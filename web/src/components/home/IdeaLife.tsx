@@ -4,15 +4,17 @@ import { shortDate } from "../../lib/home/format";
 import { lifeOf, type StageRow } from "../../lib/home/life";
 import { routineCard, stalledDays } from "../../lib/home/routine";
 import type { IdeaView } from "../../lib/model/read-model";
+import { stageNames } from "../../lib/model/stage-names";
 import type { StageNo } from "../../lib/model/stage";
 import { Locked } from "../ui/ServerToggle";
 import { LockIcon } from "./LockIcon";
 import { RoutineCard } from "./RoutineCard";
+import { StageRename } from "./StageRename";
 import { VersionRows } from "./VersionRows";
 
 interface Props {
   idea: IdeaView; server: boolean; now: Date; routineOn: boolean; feedbackFolded: boolean;
-  onBack(): void; onRoutine(on: boolean): void; onFoldFeedback(folded: boolean): void;
+  onBack(): void; onRoutine(on: boolean): void; onFoldFeedback(folded: boolean): void; onRename(rootId: string, names: readonly string[]): Promise<void>;
 }
 
 /** 결정 n · 미룸 n · 변곡점 chips with the "AI가 센 수" hint (ADR-0019: the AI counted, it may be off). */
@@ -46,10 +48,11 @@ function StagePanel({ row, server }: { row: StageRow; server: boolean }) {
 }
 
 /** Idea life (UX ②): header · dates · five stage cells (tap to open) · stage panel · routine check card. */
-export function IdeaLife({ idea, server, now, routineOn, feedbackFolded, onBack, onRoutine, onFoldFeedback }: Props) {
+export function IdeaLife({ idea, server, now, routineOn, feedbackFolded, onBack, onRoutine, onFoldFeedback, onRename }: Props) {
   const l = COPY.life;
   const life = useMemo(() => lifeOf(idea), [idea]);
   const [open, setOpen] = useState<StageNo>(idea.locked.stage);
+  const [renaming, setRenaming] = useState(false);
   const stall = routineOn ? stalledDays(idea, now) : null; // 설계 §3.1.4: off hides the stopped days too
   const row = life.stages[open - 1];
   return (
@@ -82,6 +85,9 @@ export function IdeaLife({ idea, server, now, routineOn, feedbackFolded, onBack,
           </button>
         ))}
       </div>
+      {server ? null : renaming
+        ? <StageRename names={stageNames(idea)} onSave={(names) => onRename(idea.rootId, names)} onClose={() => setRenaming(false)} />
+        : <p class="rename-row"><button type="button" class="link" onClick={() => setRenaming(true)}>{l.rename.open}</button></p>}
       <StagePanel row={row} server={server} />
       {routineOn
         ? <RoutineCard card={routineCard(idea, feedbackFolded)} server={server} onHide={() => onRoutine(false)} onFoldFeedback={onFoldFeedback} />

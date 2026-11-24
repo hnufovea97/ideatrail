@@ -105,3 +105,11 @@ main.dash h1, main.dash h2, main.dash h3 { color: var(--text); font-weight: 500;
 .slot-when { font-size: 12px; color: var(--text-sub); }
 .routine-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; border-top: 1px solid var(--line); margin-top: 10px; padding-top: 8px; }
 .routine-foot .link, .routine-off .link { font-size: 12px; }
+.rename-row .link { font-size: 12px; }
+.rename { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: var(--paper); min-width: 0; }
+.rename h3 { margin: 0; font-size: 15px; }
+.rename-fields { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.rename-fields input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; font: inherit; background: var(--card); color: var(--text); }
+.rename-fields input[aria-invalid="true"] { border-color: var(--err); }
+.rename-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+@media (max-width: 480px) { .rename-fields { grid-template-columns: 1fr; } }
