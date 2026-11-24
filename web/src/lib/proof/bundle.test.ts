@@ -45,7 +45,7 @@ describe("verifyBundle (pure: no server, no GitHub)", () => {
     const v = await versionFor(text, { anchor: "confirmed", receipt: true });
     const b = JSON.parse(JSON.stringify(exportBundle(v, nonce, false))); // as read back from the downloaded file
     expect(await verifyBundle(b, text, { a: chain(v), b: chain(v) })).toBe("ok");
-    expect(await verifyBundle(b, text)).toBe("ok"); // offline: the receipt must still lead to a bitcoin block
+    expect(await verifyBundle(b, text)).toBe("pending"); // offline: a receipt that only claims a block is never "ok"
   });
   it("one byte of the original changed → mismatch", async () => {
     const v = await versionFor(text, { anchor: "confirmed", receipt: true });

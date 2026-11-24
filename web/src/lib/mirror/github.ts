@@ -2,6 +2,7 @@
 // with the engine's GitHub access opened from kind 6. The token goes only in the Authorization header and never
 // into an error. Only to the pinned repo id, and only when it is private.
 import type { Fetch } from "../api";
+import { readCapped } from "../read-capped";
 
 export const GITHUB_API = "https://api.github.com";
 export const COMMIT_ATTEMPTS = 5; // same as the engine (spec §12)
@@ -97,26 +98,8 @@ export async function readRepoFile(f: Fetch, a: RepoAccess, path: string, signal
   }
   if (res.status === 404) return null;
   if (!res.ok) throw new GithubFailure(res.status, "github_refused");
-  if (Number(res.headers.get("content-length") ?? 0) > MAX_READ_BYTES) throw new GithubFailure(res.status, "bad_response");
   try {
-    const chunks: Uint8Array[] = [];
-    let total = 0;
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error("no body");
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.length;
-      if (total > MAX_READ_BYTES) {
-        void reader.cancel();
-        throw new Error("too big");
-      }
-      chunks.push(value);
-    }
-    const out = new Uint8Array(total);
-    let at = 0;
-    for (const c of chunks) { out.set(c, at); at += c.length; }
-    return out;
+    return await readCapped(res, MAX_READ_BYTES);
   } catch {
     throw new GithubFailure(res.status, "bad_response");
   }

@@ -2,6 +2,7 @@
 // GET of a block height, no body, no cookies, no referrer, no headers. What comes back is checked field by field and
 // capped in size; anything else is a failure (the caller reads a failure as "not checked yet", never as confirmed).
 import type { Fetch } from "../api";
+import { readCapped } from "../read-capped";
 
 export const BLOCKSTREAM = "https://blockstream.info/api"; // explorer A
 export const MEMPOOL = "https://mempool.space/api"; // explorer B
@@ -21,11 +22,13 @@ const fail = (why: string) => new ExplorerFailure(`explorer: ${why}`);
 
 async function textOf(res: Response): Promise<string> {
   if (!res.ok) throw fail(`status ${res.status}`);
-  const declared = Number(res.headers.get("content-length") ?? 0);
-  if (declared > MAX_ANSWER) throw fail("too large");
-  const text = await res.text();
-  if (text.length > MAX_ANSWER) throw fail("too large");
-  return text;
+  let bytes: Uint8Array;
+  try {
+    bytes = await readCapped(res, MAX_ANSWER);
+  } catch {
+    throw fail("too large");
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 export function httpExplorer(base: string, f: Fetch): Explorer {

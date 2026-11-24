@@ -1,3 +1,4 @@
+import { useMemo } from "preact/hooks";
 import { COPY } from "../../lib/copy";
 import type { Source } from "../../lib/versions/source";
 import { textOf } from "../../lib/versions/original";
@@ -22,19 +23,20 @@ function Lines({ lines }: { lines: readonly { op: "same" | "add" | "del"; text: 
 export function OriginalView({ source }: { source: Extract<Source, { kind: "ready" }> }) {
   const s = COPY.life.source;
   const o = source.original;
+  // decode and split once per opened original, not on every 60-second refresh redraw
+  const textLines = useMemo(() => textOf(o)?.split(/\r?\n/).map((t) => ({ op: "same" as const, text: t })) ?? null, [o]);
   if (o.kind === "no_original") return <p class="small">{s.noOriginal}</p>;
   if (o.kind === "mismatch") return <p class="error" role="alert">{s.mismatch}</p>;
   if (o.kind === "unreadable") return <p class="error" role="alert">{s.unreadable}</p>;
   if (!o.same) return <p class="error" role="alert">{s.changed}</p>;
-  const text = textOf(o);
   return (
     <div class="ver-detail">
       <p class="same" role="status">✓ {s.same}</p>
       {source.diff ? <p class="small">{s.diffTitle}</p> : null}
       {source.diff?.lines ? <Lines lines={source.diff.lines} /> : null}
       {source.diff && !source.diff.lines ? <p class="small">{s.noDiff}</p> : null}
-      {!source.diff && text !== null ? <Lines lines={text.split(/\r?\n/).map((t) => ({ op: "same", text: t }))} /> : null}
-      {text === null ? <p class="small">{s.files(o.files.length)}: {o.files.map((f) => f.path).join(", ")}</p> : null}
+      {!source.diff && textLines !== null ? <Lines lines={textLines} /> : null}
+      {textLines === null ? <p class="small">{s.files(o.files.length)}: {o.files.map((f) => f.path).join(", ")}</p> : null}
     </div>
   );
 }
