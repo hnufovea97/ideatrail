@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { toB64u } from "@ideatrail/crypto/bytes";
 import { recoveryLookupId } from "@ideatrail/crypto/envelope";
 import { parseRecoveryKey } from "@ideatrail/crypto/recovery";
-import { openHomeWith } from "./helpers/home";
+import { makeRecoveryKey, openHomeWith } from "./helpers/home";
 import { API, APP, watch } from "./helpers/guards";
 
 const FOLDER = { path: "/Users/e2e/Projects/새 폴더", name: "새 폴더", files: 7 };
@@ -99,20 +99,6 @@ test("auto-lock minutes are saved and come back after locking", async ({ page })
   await expect(page.getByRole("button", { name: "1분", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "5분", exact: true })).toHaveAttribute("aria-pressed", "false");
 });
-
-async function makeRecoveryKey(page: Page, label: "만들기" | "다시 만들기"): Promise<string> {
-  await page.getByRole("button", { name: label, exact: true }).click();
-  const display = ((await page.getByTestId("settings-recovery-key").textContent()) ?? "").trim();
-  await page.getByRole("button", { name: "다 보관했어요" }).click();
-  await page.getByLabel("앞 4자리").fill(display.slice(0, 4));
-  const save = page.getByRole("button", { name: "확인하고 저장" });
-  await expect(save).toBeEnabled();
-  const saved = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().endsWith("/v1/envelopes") && r.status() === 200);
-  await save.click();
-  await saved;
-  await expect(page.getByRole("button", { name: "다시 만들기", exact: true })).toBeVisible();
-  return display;
-}
 
 test("re-making the recovery key retires the old one", async ({ page }) => {
   await openHomeWith(page);

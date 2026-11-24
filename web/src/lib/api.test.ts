@@ -8,7 +8,7 @@ describe("api client", () => {
   it("sends JSON with credentials and returns the parsed body", async () => {
     let seen: RequestInit | undefined;
     let url = "";
-    const f: Fetch = async (u, init) => { url = String(u); seen = init; return new Response(JSON.stringify({ challenge_id: "c", user_id: "u", options: {} }), { status: 200 }); };
+    const f: Fetch = async (u, init) => { url = String(u); seen = init; return new Response(JSON.stringify({ challenge_id: "c", user_id: "u", options: { challenge: "x" } }), { status: 200 }); };
     const out = await createApi("http://api.test", f).registerOptions({ pairing_session_id: SID });
     expect(url).toBe("http://api.test/v1/webauthn/register/options");
     expect(seen?.credentials).toBe("include");

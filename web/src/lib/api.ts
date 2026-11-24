@@ -93,6 +93,7 @@ export interface StepupAssertion { challenge_id: string; response: AssertionJSON
 
 export interface PairingInfo { engine_id: string; sign_pubkey: string; kem_pubkey: string; expires_at: string; delivered: boolean }
 export interface RegisterOptions { challenge_id: string; user_id: string; options: CreationOptionsJSON }
+export interface RecoveryEnvelope { user_id: string; envelope: { envelope_id: string; wrapped_master_key: string }; recovery_challenge_id: string; challenge: string }
 export interface EnvelopeUpload { envelope_id: string; wrapped_master_key: string }
 export interface RegisterVerifyBody {
   challenge_id: string;
@@ -129,8 +130,13 @@ export function createApi(base: string, f: Fetch = (input, init) => fetch(input,
   // Methods that take an id are async so a bad id rejects (like any other ApiFailure) instead of throwing.
   return {
     pairing: async (s: string) => get<PairingInfo>(`/v1/pairing/${id(s)}`, undefined, (d) => typeof d.delivered === "boolean"),
-    registerOptions: (body: { pairing_session_id: string } | { device_add_session_id: string; join_secret: string }) =>
-      send<RegisterOptions>("POST", "/v1/webauthn/register/options", body),
+    registerOptions: async (body: { pairing_session_id: string } | { device_add_session_id: string; join_secret: string } | { recovery_challenge_id: string; proof: string }) =>
+      sendChecked<RegisterOptions>("POST", "/v1/webauthn/register/options", "recovery_challenge_id" in body ? { ...body, recovery_challenge_id: id(body.recovery_challenge_id) } : body,
+        (d) => typeof d.challenge_id === "string" && typeof d.user_id === "string" && isObject(d.options) && typeof d.options.challenge === "string"),
+    /** Recovery step 1 (spec §11): the sealed envelope for a lookup id, plus a 5-minute challenge to sign. 404 `recovery_not_found` = no such key. */
+    recoveryEnvelope: (body: { lookup_id: string }) => sendChecked<RecoveryEnvelope>("POST", "/v1/recovery/envelope", body,
+      (d) => typeof d.user_id === "string" && ID.test(d.user_id) && typeof d.recovery_challenge_id === "string" && ID.test(d.recovery_challenge_id) && typeof d.challenge === "string"
+        && isObject(d.envelope) && typeof d.envelope.envelope_id === "string" && ID.test(d.envelope.envelope_id) && typeof d.envelope.wrapped_master_key === "string"),
     registerVerify: (body: RegisterVerifyBody) => send<{ user_id: string }>("POST", "/v1/webauthn/register/verify", body),
     confirm: () => send<{ confirmed: true }>("POST", "/v1/account/confirm", {}),
     account: () => get<AccountInfo>("/v1/account", undefined, (d) => isCount(d.engine_list_version)),

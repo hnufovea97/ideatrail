@@ -7,6 +7,7 @@ import { externalOpenUrl, inAppBrowser } from "../../lib/inapp";
 import { LOGIN_REFRESH_MS } from "../../lib/timing";
 import { askPasskey, failureCode, isFresh, openVault, prepareLogin, settleOpened, unlockReason, type DashboardVault, type PreparedLogin } from "../../lib/unlock";
 import { Screen } from "../ui/Screen";
+import { RecoveryOpen } from "./RecoveryOpen";
 
 interface Props { api: Api; notice: string | null; onOpen(v: DashboardVault): void }
 /** Where the shown error came from: a later successful load clears only its own ("load"), never an open() failure. */
@@ -18,6 +19,8 @@ export function LockScreen({ api, notice, onOpen }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Shown | null>(null);
   const alive = useRef(true);
+  const [recovering, setRecovering] = useState(false);
+  const [made, setMade] = useState(false); // a new device lock was just made by 비상 열쇠로 열기
 
   const load = () => prepareLogin(api).then(
     (p) => {
@@ -69,13 +72,15 @@ export function LockScreen({ api, notice, onOpen }: Props) {
       );
   };
 
+  if (recovering) return <RecoveryOpen api={api} onBack={() => setRecovering(false)} onDone={() => { setMade(true); setRecovering(false); }} />;
   const inApp = typeof navigator === "undefined" ? null : inAppBrowser(navigator.userAgent);
   const outside = inApp ? externalOpenUrl(inApp, location.href) : null;
   return (
-    <Screen title={COPY.dash.lockTitle} why={COPY.dash.lockLead} error={error?.text ?? null} status={busy ? COPY.dash.opening : notice}>
+    <Screen title={COPY.dash.lockTitle} why={COPY.dash.lockLead} error={error?.text ?? null} status={busy ? COPY.dash.opening : made ? COPY.recoveryOpen.done : notice}>
       <button type="button" class="primary" onClick={open} disabled={!prepared || busy}>{COPY.dash.open}</button>
       <p class="small">{COPY.dash.openHint}</p>
       {inApp ? <p class="small" role="note">{COPY.dash.inApp[inApp]}</p> : null}
+      <button type="button" class="link" onClick={() => { setMade(false); setRecovering(true); }}>{COPY.recoveryOpen.link}</button>
       {outside ? <a class="button" href={outside}>{COPY.dash.inApp.openOutside}</a> : null}
     </Screen>
   );

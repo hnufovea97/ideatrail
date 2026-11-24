@@ -156,3 +156,18 @@ export async function openHomeWith(page: Page): Promise<{ engine: FakeEngine; au
 export async function deviceView(page: Page): Promise<void> {
   await page.getByLabel("Ideatrail 서버가 가진 데이터").uncheck();
 }
+
+/** In 설정: make (or re-make) the recovery key, confirm the first four, save with the device lock; returns the key shown. */
+export async function makeRecoveryKey(page: Page, label: "만들기" | "다시 만들기"): Promise<string> {
+  await page.getByRole("button", { name: label, exact: true }).click();
+  const display = ((await page.getByTestId("settings-recovery-key").textContent()) ?? "").trim();
+  await page.getByRole("button", { name: "다 보관했어요" }).click();
+  await page.getByLabel("앞 4자리").fill(display.slice(0, 4));
+  const save = page.getByRole("button", { name: "확인하고 저장" });
+  await expect(save).toBeEnabled();
+  const saved = page.waitForResponse((r) => r.request().method() === "PUT" && r.url().endsWith("/v1/envelopes") && r.status() === 200);
+  await save.click();
+  await saved;
+  await expect(page.getByRole("button", { name: "다시 만들기", exact: true })).toBeVisible();
+  return display;
+}
