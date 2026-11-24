@@ -5,10 +5,10 @@ import { MAX_NOTE_CHARS, sealNotes } from "../../lib/home/reminder";
 import type { DashboardVault } from "../../lib/unlock";
 
 /** `initial` is null when a saved note cannot be opened: say so, and let a new note replace it. */
-interface Props { api: Api; vault: DashboardVault; initial: string | null; idPrefix: string; onSaved(text: string): void }
+interface Props { api: Api; vault: DashboardVault; signal?: AbortSignal; initial: string | null; idPrefix: string; onSaved(text: string): void }
 
 /** 기억 메모 (D8): one note of up to 500 characters, sealed here before it is sent; the server never sees the words. */
-export function NoteEditor({ api, vault, initial, idPrefix, onSaved }: Props) {
+export function NoteEditor({ api, vault, signal, initial, idPrefix, onSaved }: Props) {
   const m = COPY.note;
   const [text, setText] = useState(initial ?? "");
   const [state, setState] = useState<"idle" | "saved" | "failed">("idle");
@@ -17,7 +17,7 @@ export function NoteEditor({ api, vault, initial, idPrefix, onSaved }: Props) {
   const id = `${idPrefix}-note`;
 
   const save = () => {
-    if (busy || length > MAX_NOTE_CHARS) return;
+    if (busy || length > MAX_NOTE_CHARS || signal?.aborted) return;
     setBusy(true);
     setState("idle");
     let sealed: string;
@@ -28,7 +28,7 @@ export function NoteEditor({ api, vault, initial, idPrefix, onSaved }: Props) {
       setState("failed");
       return;
     }
-    void api.savePrefs({ recall_notes: sealed }).then(() => { setState("saved"); onSaved(text); }, () => setState("failed")).finally(() => setBusy(false));
+    void api.savePrefs({ recall_notes: sealed }).then(() => { if (!signal?.aborted) { setState("saved"); onSaved(text); } }, () => { if (!signal?.aborted) setState("failed"); }).finally(() => setBusy(false));
   };
 
   return (

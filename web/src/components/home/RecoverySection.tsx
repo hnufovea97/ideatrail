@@ -3,16 +3,17 @@ import type { Api } from "../../lib/api";
 import { COPY, errorMessage } from "../../lib/copy";
 import { shortDate } from "../../lib/home/format";
 import { firstFourMatches, makeRecovery, type RecoveryPlan } from "../../lib/recovery";
+import { guard, isLockedError } from "../../lib/live-key";
 import type { DashboardVault } from "../../lib/unlock";
 import { groups } from "../start/RecoveryStep";
 import { CopyButton } from "../ui/CopyButton";
 import { useStepup } from "../ui/useStepup";
 
 type Phase = "idle" | "show" | "check";
-interface Props { api: Api; vault: DashboardVault; madeAt: string | null; onSaved(): void }
+interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; madeAt: string | null; onSaved(): void }
 
 /** 비상 열쇠: make or re-make. The key is shown once, checked in the browser (first four only), then saved with step-up. */
-export function RecoverySection({ api, vault, madeAt, onSaved }: Props) {
+export function RecoverySection({ api, vault, signal, madeAt, onSaved }: Props) {
   const m = COPY.manage.recovery;
   const r = COPY.recovery;
   const [phase, setPhase] = useState<Phase>("idle");
@@ -29,13 +30,23 @@ export function RecoverySection({ api, vault, madeAt, onSaved }: Props) {
     if (!asked) return;
     setBusy(true);
     setError(null);
-    void asked.then((assertion) => api.putRecovery({ ...plan.body, assertion })).then(() => {
+    void asked.then((assertion) => { guard(signal); return api.putRecovery({ ...plan.body, assertion }); }).then(() => {
+      if (signal.aborted) return;
       setPlan(null); // the key is not kept once saved
       setTyped("");
       setPhase("idle");
       setBusy(false);
       onSaved();
-    }, (e: unknown) => { setError(errorMessage(e)); setBusy(false); });
+    }, (e: unknown) => { if (isLockedError(e, signal)) return; setError(errorMessage(e)); setBusy(false); });
+  };
+
+  const make = () => {
+    try {
+      setPlan(makeRecovery(vault));
+      setPhase("show");
+    } catch (e) {
+      if (!isLockedError(e, signal)) setError(errorMessage(e));
+    }
   };
 
   return (
@@ -45,7 +56,7 @@ export function RecoverySection({ api, vault, madeAt, onSaved }: Props) {
       {phase === "idle" ? (
         <>
           {madeAt ? <p class="small">{m.remakeNote}</p> : null}
-          <button type="button" onClick={() => { setPlan(makeRecovery(vault)); setPhase("show"); }}>{madeAt ? m.remake : m.make}</button>
+          <button type="button" onClick={make}>{madeAt ? m.remake : m.make}</button>
         </>
       ) : null}
       {phase === "show" && plan ? (

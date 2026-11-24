@@ -1,13 +1,13 @@
 import { useState } from "preact/hooks";
 import type { Api } from "../../lib/api";
 import { COPY, manageError } from "../../lib/copy";
-import type { DashboardVault } from "../../lib/unlock";
+import type { DashboardVault, VaultPatch } from "../../lib/unlock";
 
 const CHOICES = [1, 3, 5] as const;
-interface Props { api: Api; vault: DashboardVault; onVault(v: DashboardVault): void }
+interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onVault(patch: VaultPatch): void }
 
 /** 자동 잠금: saved on the server, and the open vault takes it at once (the timer restarts with the new vault). */
-export function AutoLockSection({ api, vault, onVault }: Props) {
+export function AutoLockSection({ api, vault, signal, onVault }: Props) {
   const m = COPY.manage.autoLock;
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -15,9 +15,10 @@ export function AutoLockSection({ api, vault, onVault }: Props) {
     setError(null);
     setSaved(false);
     void api.savePrefs({ auto_lock_minutes: minutes }).then(() => {
+      if (signal.aborted) return;
       setSaved(true);
-      onVault({ ...vault, autoLockMinutes: minutes });
-    }, (e: unknown) => setError(manageError(e)));
+      onVault({ autoLockMinutes: minutes });
+    }, (e: unknown) => { if (!signal.aborted) setError(manageError(e)); });
   };
   return (
     <section aria-labelledby="autolock-title">

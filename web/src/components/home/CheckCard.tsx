@@ -10,12 +10,12 @@ import { NoteEditor } from "./NoteEditor";
 export interface GithubTool { phase: "idle" | "waiting"; error: string | null; start(): Promise<void> }
 export interface CheckData { acct: AccountInfo; notes: string | null }
 interface Props {
-  api: Api; vault: DashboardVault; data: CheckData; githubLinked: boolean; github: GithubTool; showShortcut: boolean;
+  api: Api; vault: DashboardVault; signal: AbortSignal; data: CheckData; githubLinked: boolean; github: GithubTool; showShortcut: boolean;
   onMakeKey(): void; onNotes(text: string): void; onClose(): void;
 }
 
 /** 챙길 것 카드 (UX ⑥-3): the status of each thing is read from the account, never typed. [괜찮아요] only closes it. */
-export function CheckCard({ api, vault, data, githubLinked, github, showShortcut, onMakeKey, onNotes, onClose }: Props) {
+export function CheckCard({ api, vault, signal, data, githubLinked, github, showShortcut, onMakeKey, onNotes, onClose }: Props) {
   const c = COPY.check;
   const rows: CheckRows = checkRows(data.acct, githubLinked);
   const [noting, setNoting] = useState(false);
@@ -46,7 +46,7 @@ export function CheckCard({ api, vault, data, githubLinked, github, showShortcut
           </li>
         ) : null}
       </ul>
-      {noting ? <NoteEditor api={api} vault={vault} initial={data.notes} idPrefix="check" onSaved={onNotes} /> : null}
+      {noting ? <NoteEditor api={api} vault={vault} signal={signal} initial={data.notes} idPrefix="check" onSaved={onNotes} /> : null}
       <div class="row-actions">
         {noting ? null : <button type="button" onClick={() => setNoting(true)}>{COPY.note.open}</button>}
         <button type="button" class="primary" onClick={onClose}>{c.ok}</button>

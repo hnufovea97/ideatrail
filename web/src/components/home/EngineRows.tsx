@@ -1,16 +1,16 @@
 import { useState } from "preact/hooks";
 import type { Api } from "../../lib/api";
 import { COPY, manageError } from "../../lib/copy";
-import { browserStore, rememberVersion } from "../../lib/engine-list";
-import { githubTokenFor, isLive, liveEngines, revokeList, sealRevoked } from "../../lib/engines";
+import { browserStore } from "../../lib/engine-list";
+import { isLive, liveEngines, planDisconnect } from "../../lib/engines";
 import { shortDate } from "../../lib/home/format";
-import { verifyRows } from "../../lib/sync/verify";
-import { memoryStore } from "../../lib/engine-list";
+import { guard, isLockedError } from "../../lib/live-key";
+import { disconnectEngine } from "../../lib/manage-actions";
 import type { SyncState } from "../../lib/sync/store";
-import type { DashboardVault } from "../../lib/unlock";
+import type { DashboardVault, VaultPatch } from "../../lib/unlock";
 import { useStepup } from "../ui/useStepup";
 
-interface Props { api: Api; vault: DashboardVault; sync: SyncState; onVault(v: DashboardVault): void; onChanged(): void }
+interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; sync: SyncState; onVault(patch: VaultPatch): void; onChanged(): void }
 
 function lastRecord(sync: SyncState, engineId: string): { at: string; n: number } | null {
   const mine = [...sync.records.values()].filter((r) => r.engine_id === engineId);
@@ -18,7 +18,7 @@ function lastRecord(sync: SyncState, engineId: string): { at: string; n: number 
   return { at: mine.reduce((m, r) => (r.recorded_at > m ? r.recorded_at : m), ""), n: mine.length };
 }
 
-function Row({ api, vault, sync, engineId, onVault, onChanged }: Props & { engineId: string }) {
+function Row({ api, vault, signal, sync, engineId, onVault, onChanged }: Props & { engineId: string }) {
   const m = COPY.manage.engines;
   const entry = vault.engineList.engines.find((e) => e.engine_id === engineId)!;
   const live = isLive(entry);
@@ -35,30 +35,29 @@ function Row({ api, vault, sync, engineId, onVault, onChanged }: Props & { engin
   const run = (job: Promise<unknown>) => {
     setBusy(true);
     setError(null);
-    void job.then(() => { setBusy(false); onChanged(); }, (e: unknown) => { setBusy(false); setError(manageError(e)); });
+    void job.then(() => { if (signal.aborted) return; setBusy(false); onChanged(); },
+      (e: unknown) => { if (isLockedError(e, signal)) return; setBusy(false); setError(manageError(e)); });
   };
 
   function pause() {
     if (!busy) run(api.pauseEngine(engineId));
   }
   function resumeNow() {
+    if (busy) return;
     const asked = resume.take();
-    if (!asked || busy) return;
-    run(asked.then((a) => api.resumeEngine(engineId, a)));
+    if (!asked) return;
+    run(asked.then((a) => { guard(signal); return api.resumeEngine(engineId, a); }));
   }
   function disconnect() {
     if (busy) return;
     if (!sync.complete) return setError(m.notLoaded); // the cutoff needs every row of this engine
-    const asked = revoke.take(); // the device lock comes first; the list is only built after it
+    if (!planDisconnect(vault.userId, vault.engineList, sync, browserStore(), engineId, new Date()).ok) return setError(m.unverified); // before the device lock is asked
+    const asked = revoke.take(); // the device lock comes first; the list is built again from what is loaded after it
     if (!asked) return;
-    run(asked.then(async (assertion) => {
-      const accepted = verifyRows(vault.userId, vault.engineList, sync, memoryStore());
-      const token = await githubTokenFor(vault, vault.engineList, sync.links.values(), engineId); // sent once, never kept
-      const next = revokeList(vault.engineList, engineId, accepted, vault.userId, new Date());
-      await api.revokeEngine(engineId, { engine_list: sealRevoked(vault.mk, vault.userId, next), engine_list_version: next.version, ...(token ? { github_token: token } : {}), assertion });
-      rememberVersion(browserStore(), vault.userId, next.version);
+    run(disconnectEngine({ api, vault, sync, marks: browserStore(), signal, engineId, asked }).then((next) => {
+      if (signal.aborted) return;
       setConfirming(false);
-      onVault({ ...vault, engineList: next });
+      onVault({ engineList: next });
     }));
   }
 

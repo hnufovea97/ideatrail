@@ -3,12 +3,13 @@ import type { Api, CredentialMeta } from "../../lib/api";
 import { COPY, manageError } from "../../lib/copy";
 import { canRemoveDevice, storagePlace } from "../../lib/devices";
 import { shortDate } from "../../lib/home/format";
+import { guard, isLockedError } from "../../lib/live-key";
 import type { DashboardVault } from "../../lib/unlock";
 import { useStepup } from "../ui/useStepup";
 
-interface Props { api: Api; vault: DashboardVault; credentials: readonly CredentialMeta[]; onChanged(): void }
+interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; credentials: readonly CredentialMeta[]; onChanged(): void }
 
-function Row({ api, vault, c, removable, onChanged }: { api: Api; vault: DashboardVault; c: CredentialMeta; removable: boolean; onChanged(): void }) {
+function Row({ api, vault, signal, c, removable, onChanged }: { api: Api; vault: DashboardVault; signal: AbortSignal; c: CredentialMeta; removable: boolean; onChanged(): void }) {
   const m = COPY.manage.devices;
   const here = vault.credentialId !== undefined && vault.credentialId === c.credential_id;
   const [confirming, setConfirming] = useState(false);
@@ -17,12 +18,13 @@ function Row({ api, vault, c, removable, onChanged }: { api: Api; vault: Dashboa
   const step = useStepup(api, "POST", confirming ? `/v1/credentials/${c.credential_id}/remove` : null);
 
   const remove = () => {
+    if (busy) return;
     const asked = step.take();
-    if (!asked || busy) return;
+    if (!asked) return;
     setBusy(true);
     setError(null);
-    void asked.then((a) => api.removeCredential(c.credential_id, a)).then(() => { setConfirming(false); setBusy(false); onChanged(); },
-      (e: unknown) => { setError(manageError(e)); setBusy(false); });
+    void asked.then((a) => { guard(signal); return api.removeCredential(c.credential_id, a); }).then(() => { if (signal.aborted) return; setConfirming(false); setBusy(false); onChanged(); },
+      (e: unknown) => { if (isLockedError(e, signal)) return; setError(manageError(e)); setBusy(false); });
   };
   return (
     <li class="panel">
@@ -45,11 +47,11 @@ function Row({ api, vault, c, removable, onChanged }: { api: Api; vault: Dashboa
 }
 
 /** 기기 목록: where each device lock is stored. Removing is offered only while another one is left. */
-export function DeviceSection({ api, vault, credentials, onChanged }: Props) {
+export function DeviceSection({ api, vault, signal, credentials, onChanged }: Props) {
   return (
     <section aria-labelledby="devices-title">
       <h2 id="devices-title">{COPY.manage.devices.title}</h2>
-      <ul class="plain">{credentials.map((c) => <Row key={c.credential_id} api={api} vault={vault} c={c} removable={canRemoveDevice(credentials.length)} onChanged={onChanged} />)}</ul>
+      <ul class="plain">{credentials.map((c) => <Row key={c.credential_id} api={api} vault={vault} signal={signal} c={c} removable={canRemoveDevice(credentials.length)} onChanged={onChanged} />)}</ul>
     </section>
   );
 }

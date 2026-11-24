@@ -4,7 +4,7 @@ import { createApi } from "../../lib/api";
 import { bindActivity, startAutoLock } from "../../lib/autolock";
 import { bindPrivacyBlur } from "../../lib/blur";
 import { COPY } from "../../lib/copy";
-import { wipeVault, type DashboardVault } from "../../lib/unlock";
+import { wipeVault, type DashboardVault, type VaultPatch } from "../../lib/unlock";
 import { LockIcon } from "./LockIcon";
 import { LockScreen } from "./LockScreen";
 import { OpenShell } from "./OpenShell";
@@ -34,6 +34,11 @@ export default function DashboardApp() {
     setNotice(COPY.manage.account.notice);
   }, []);
 
+  /** Patches the CURRENT vault, never a stale copy, and never one the lock has already closed (a locked vault stays locked). */
+  const updateVault = useCallback((forUserId: string, patch: VaultPatch) => {
+    setVault((cur) => (cur && !opened.current.signal.aborted && cur.userId === forUserId ? { ...cur, ...patch } : cur));
+  }, []);
+
   useEffect(() => {
     if (!vault) return;
     const auto = startAutoLock(vault.autoLockMinutes, () => lock(vault, true));
@@ -51,7 +56,7 @@ export default function DashboardApp() {
     <>
       <div class="blur-cover" aria-hidden="true"><LockIcon /><span class="sr-only">{COPY.dash.cover}</span></div>
       {vault
-        ? <OpenShell api={api} vault={vault} signal={opened.current.signal} onLock={() => lock(vault, false)} onVault={setVault} onGone={() => gone(vault)} />
+        ? <OpenShell api={api} vault={vault} signal={opened.current.signal} onLock={() => lock(vault, false)} onVault={(patch) => updateVault(vault.userId, patch)} onGone={() => gone(vault)} />
         : <LockScreen api={api} notice={notice} onOpen={(v) => { opened.current = new AbortController(); setNotice(null); setVault(v); }} />}
     </>
   );

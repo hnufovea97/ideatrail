@@ -18,6 +18,9 @@ const MIN_LOCK_MINUTES = 1;
 /** `credentialId`: the device lock used to open (server credential_id), so settings can mark "이 기기". */
 export interface DashboardVault extends Vault { engineList: EngineList; autoLockMinutes: number; credentialId?: string }
 
+/** What the open vault may change while it stays open (never the keys). */
+export type VaultPatch = Partial<Pick<DashboardVault, "autoLockMinutes" | "engineList">>;
+
 export type UnlockReason = "passkey_cancel" | "prf_missing" | "not_registered" | "retry" | "offline" | "account_mismatch" | "engine_list_rollback" | "browser_unsupported" | "failed";
 
 export class UnlockFailure extends Error {

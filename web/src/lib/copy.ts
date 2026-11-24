@@ -308,6 +308,7 @@ export const COPY = {
       confirmYes: "끊기", // 새 문구
       cancel: "그만두기", // 새 문구
       notLoaded: "기록을 아직 다 불러오지 못했어요. 잠시 뒤 다시 눌러 주세요", // 새 문구
+      unverified: "이 기록 도우미의 기록이 아직 다 맞춰지지 않았어요. 잠시 뒤 다시 해 주세요", // 새 문구
     },
     autoLock: {
       title: "자동 잠금", // 새 문구
@@ -545,6 +546,7 @@ export function errorMessage(e: unknown): string {
 
 /** Like errorMessage, plus the sentences the dashboard's management screens have for their own server codes. */
 export function manageError(e: unknown): string {
+  if (e instanceof Error && e.name === "DisconnectRefused") return COPY.manage.engines.unverified;
   if (e instanceof ApiFailure) {
     const known: Record<string, string> = {
       last_device: COPY.manage.errors.last_device,

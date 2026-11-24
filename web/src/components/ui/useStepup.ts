@@ -38,7 +38,7 @@ export function useStepup(api: Api, method: StepupMethod, path: string | null) {
     if (!prepared) return null;
     const asked = confirmWithPasskey(prepared); // first call in the click: no await before it
     setPrepared(null);
-    const renew = () => load();
+    const renew = () => { if (alive.current) load(); };
     asked.then(renew, renew);
     return asked;
   };

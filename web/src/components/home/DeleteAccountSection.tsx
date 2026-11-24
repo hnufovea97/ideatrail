@@ -2,15 +2,16 @@ import { useState } from "preact/hooks";
 import type { Api } from "../../lib/api";
 import { COPY, manageError } from "../../lib/copy";
 import { githubTokenFor, liveEngines } from "../../lib/engines";
+import { guard, isLockedError } from "../../lib/live-key";
 import type { SyncState } from "../../lib/sync/store";
 import type { DashboardVault } from "../../lib/unlock";
 import { useStepup } from "../ui/useStepup";
 
 const MAX_TOKENS = 10;
-interface Props { api: Api; vault: DashboardVault; sync: SyncState; onDeleted(): void }
+interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; sync: SyncState; onDeleted(): void }
 
 /** 계정 지우기: what goes and what stays, then the device lock. Each live engine's GitHub access is cancelled (best effort). */
-export function DeleteAccountSection({ api, vault, sync, onDeleted }: Props) {
+export function DeleteAccountSection({ api, vault, signal, sync, onDeleted }: Props) {
   const m = COPY.manage.account;
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -18,15 +19,20 @@ export function DeleteAccountSection({ api, vault, sync, onDeleted }: Props) {
   const step = useStepup(api, "DELETE", confirming ? "/v1/account" : null);
 
   const erase = () => {
+    if (busy) return;
     const asked = step.take();
-    if (!asked || busy) return;
+    if (!asked) return;
     setBusy(true);
     setError(null);
     void asked.then(async (assertion) => {
-      const found = await Promise.all(liveEngines(vault.engineList).map((e) => githubTokenFor(vault, vault.engineList, sync.links.values(), e.engine_id).catch(() => null)));
+      guard(signal);
+      // a locked (wiped) key aborts the whole thing; any other failure to find a token only means "no token for that engine"
+      const found = await Promise.all(liveEngines(vault.engineList).map((e) => githubTokenFor(vault, vault.engineList, sync.links.values(), e.engine_id)
+        .catch((err: unknown) => { if (isLockedError(err, signal)) throw err; return null; })));
+      guard(signal);
       const tokens = [...new Set(found.filter((t): t is string => t !== null))].slice(0, MAX_TOKENS);
       await api.deleteAccount({ ...(tokens.length ? { github_tokens: tokens } : {}), assertion });
-    }).then(onDeleted, (e: unknown) => { setError(manageError(e)); setBusy(false); });
+    }).then(() => { if (!signal.aborted) onDeleted(); }, (e: unknown) => { if (isLockedError(e, signal)) return; setError(manageError(e)); setBusy(false); });
   };
   return (
     <section aria-labelledby="delete-title">

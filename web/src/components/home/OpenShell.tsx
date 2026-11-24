@@ -13,7 +13,7 @@ import { RowCache } from "../../lib/sync/cache";
 import { chainLine, type ChainStatus } from "../../lib/sync/chain";
 import { emptySync, type SyncState } from "../../lib/sync/store";
 import { SYNC_MS } from "../../lib/timing";
-import type { DashboardVault } from "../../lib/unlock";
+import type { DashboardVault, VaultPatch } from "../../lib/unlock";
 import { storageLinkValid } from "../../lib/github-link";
 import { shortcutNeeded } from "../../lib/home/reminder";
 import { loadSource, refOf } from "../../lib/versions/source";
@@ -26,7 +26,7 @@ import { Settings } from "./Settings";
 import type { SourceTools } from "./VersionDetail";
 
 /** `signal` is aborted by the lock before it wipes the keys: a refresh in flight then writes nothing. */
-interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onLock(): void; onVault(v: DashboardVault): void; onGone(): void }
+interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onLock(): void; onVault(patch: VaultPatch): void; onGone(): void }
 type View = "home" | "approvals" | "settings";
 const CHECKING: ChainStatus = { state: "checking" };
 
@@ -52,11 +52,30 @@ export function OpenShell({ api, vault, signal, onLock, onVault, onGone }: Props
   const [confirmTick, setConfirmTick] = useState(0);
   const [view, setView] = useState<View>("home");
   const [pending, setPending] = useState<readonly OpenApproval[]>([]);
+  const store = useMemo(() => browserStore(), []);
+  const vaultRef = useRef(vault); // the effects below depend on who is signed in, not on each patched copy of the vault
+  vaultRef.current = vault;
+  const heading = useRef<HTMLHeadingElement>(null);
+  const shown = useRef(view);
+  useEffect(() => {
+    if (shown.current !== view && view === "home") heading.current?.focus(); // back from a view: the page title, as a new screen would
+    shown.current = view;
+  }, [view]);
+
+  /** Changes the open vault (engine list, auto-lock minutes) without turning the page over. A locked vault takes nothing. */
+  const patchVault = useCallback((patch: VaultPatch) => {
+    if (signal.aborted) return;
+    vaultRef.current = { ...vaultRef.current, ...patch }; // the next refresh in this tick already sees it
+    onVault(patch);
+  }, [signal, onVault]);
 
   /** The waiting requests: only those a live engine signed and this account can open (5.9a). A failed load keeps the last list. */
   const loadApprovals = useCallback(() => {
-    void api.approvals().then((r) => openApprovals(r.approvals, vault.engineList, vault)).then((items) => { if (!signal.aborted) setPending(items); }, () => undefined);
-  }, [api, vault, signal]);
+    const v = vaultRef.current;
+    void api.approvals()
+      .then((r) => (signal.aborted ? null : openApprovals(r.approvals, v.engineList, v, store)))
+      .then((items) => { if (items && !signal.aborted) setPending(items); }, () => undefined);
+  }, [api, signal, store]);
 
   useEffect(() => {
     let live = true;
@@ -73,7 +92,7 @@ export function OpenShell({ api, vault, signal, onLock, onVault, onGone }: Props
         return;
       }
       running = true;
-      refresh(deps, vault, sync.current, mirrorDirty.current)
+      refresh(deps, vaultRef.current, sync.current, mirrorDirty.current)
         .then((l) => {
           if (!live) return;
           sync.current = l.sync;
@@ -107,12 +126,11 @@ export function OpenShell({ api, vault, signal, onLock, onVault, onGone }: Props
       clearInterval(t);
       document.removeEventListener("visibilitychange", run);
     };
-  }, [api, vault, signal, loadApprovals]);
+  }, [api, vault.userId, signal, loadApprovals]);
 
   const chain = loaded?.chain ?? CHECKING;
   // 확산됨 only where this browser checked the block at both explorers; the server's "confirmed" alone reads 확인 중
   const ideas = useMemo(() => (loaded ? withConfirmations(loaded.ideas, confirmations.current?.results ?? new Map()) : null), [loaded, confirmTick]);
-  const store = useMemo(() => browserStore(), []);
   /** The user's stage names (ADR-0020): sealed into the root meta here, then shown by the next refresh and written to index/. */
   const rename = async (rootId: string, names: readonly string[]) => {
     const saved = await saveStageNames(api, vault, store, sync.current, rootId, names);
@@ -134,9 +152,9 @@ export function OpenShell({ api, vault, signal, onLock, onVault, onGone }: Props
   return (
     <main class="screen dash">
       <header class="dash-head">
-        <h1 tabIndex={-1}>{COPY.dash.lockTitle}</h1>
+        <h1 ref={heading} tabIndex={-1}>{COPY.dash.lockTitle}</h1>
         <p class="small chain-line" role="status">{failure ? COPY.dash.errors[failure] : chain.state === "warn" ? "" : chainLine(chain)}</p>
-        <button type="button" class="lock-now" onClick={() => setView("settings")}>{COPY.manage.settingsOpen}</button>
+        <button type="button" class="lock-now" disabled={!loaded} onClick={() => setView("settings")}>{COPY.manage.settingsOpen}</button>
         <button type="button" class="lock-now" onClick={onLock}>{COPY.dash.lockNow}</button>
       </header>
       {chain.state === "warn" ? <p class="banner warn" role="alert">{chainLine(chain)}</p> : null}
@@ -144,12 +162,13 @@ export function OpenShell({ api, vault, signal, onLock, onVault, onGone }: Props
         <p class="banner" role="status">{COPY.manage.banner(pending.length)} <button type="button" class="link" onClick={() => { setView("approvals"); loadApprovals(); }}>{COPY.manage.bannerAction}</button></p>
       ) : null}
       {loaded?.mirror === "failed" ? <p class="small">{COPY.dash.mirrorFailed}</p> : null}
-      {view === "approvals" ? <Approvals api={api} vault={vault} items={pending} onDecided={loadApprovals} onBack={() => setView("home")} /> : null}
+      {view === "approvals" ? <Approvals api={api} vault={vault} signal={signal} items={pending} onDecided={loadApprovals} onBack={() => setView("home")} /> : null}
+      {view === "settings" && !loaded ? <p class="small">{COPY.home.loading}</p> : null}
       {view === "settings" && loaded ? (
-        <Settings api={api} vault={vault} sync={loaded.sync} store={store} onVault={onVault} onRefresh={() => refreshNow.current()} onDeleted={onGone} onBack={() => setView("home")} />
+        <Settings api={api} vault={vault} signal={signal} sync={loaded.sync} store={store} onVault={patchVault} onRefresh={() => refreshNow.current()} onDeleted={onGone} onBack={() => setView("home")} />
       ) : null}
       {view === "home" && check.data ? (
-        <CheckCard api={api} vault={vault} data={check.data} githubLinked={githubLinked} github={link} showShortcut={onPhoneBrowser()}
+        <CheckCard api={api} vault={vault} signal={signal} data={check.data} githubLinked={githubLinked} github={link} showShortcut={onPhoneBrowser()}
           onMakeKey={() => setView("settings")} onNotes={check.setNotes} onClose={check.close} />
       ) : null}
       {view === "home" && ideas ? <Home ideas={ideas} tools={tools} userId={vault.userId} store={store} now={new Date()} onRename={rename} /> : null}
