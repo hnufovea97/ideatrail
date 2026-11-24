@@ -6,6 +6,7 @@ import { newKemKeyPair, randomKey, signPublicKey } from "@ideatrail/crypto/keypa
 import { bytesEqual, pairMac } from "@ideatrail/crypto/mac";
 import { KIND, open, openAuth, seal } from "@ideatrail/crypto/seal";
 import { messageFor, sign } from "@ideatrail/crypto/sign";
+import { makeProof, type Proof, type ProofFile } from "../../src/lib/testing/fake-proofs";
 import { API, APP } from "./guards";
 
 /** One record as GET /v1/sync returns it (api/src/routes/sync.ts records columns). */
@@ -123,13 +124,18 @@ export class FakeEngine {
     return out;
   }
 
+  /** What this engine would put in the repo for a record: proofs/<id>/bundle.json and original.it1 (spec §12). */
+  proof(o: { rootId: string; recordId: string; files: readonly ProofFile[] }): Promise<Proof> {
+    return makeProof(this.ak(), this.userId, o);
+  }
+
   /** A record row signed and sealed like engine/internal/record (kind 1 list meta, §8 record signature over D1's hashes).
    *  E2E only: tests add it to the sync answer, so no Bitcoin calendar is needed (the API checks receipts on upload). */
-  async recordRow(o: { rootId: string; seq: number; recordedAt: string; meta: Record<string, unknown>; changeSeq: number }): Promise<SyncRecord> {
-    const recordId = newId();
+  async recordRow(o: { rootId: string; seq: number; recordedAt: string; meta: Record<string, unknown>; changeSeq: number; recordId?: string; commitment?: string }): Promise<SyncRecord> {
+    const recordId = o.recordId ?? newId();
     const sealed = await seal(KIND.record_meta, this.ak(), { userId: this.userId, rootId: o.rootId, recordId, version: "0" }, utf8(JSON.stringify(o.meta)));
     const hex = () => toHex(randomKey());
-    const commitment = hex(), body_hash = hex(), nonce_hash = hex();
+    const commitment = o.commitment ?? hex(), body_hash = hex(), nonce_hash = hex();
     const engine_sig = sign(this.seed, messageFor({ type: "record_hashed", userId: this.userId, rootId: o.rootId, recordId, parents: [], commitmentHex: commitment,
       metaSealed: sealed, bodyHashHex: body_hash, nonceHashHex: nonce_hash, logSeq: BigInt(o.seq), recordedAt: o.recordedAt }));
     return { record_id: recordId, root_id: o.rootId, parent_ids: "-", commitment, recorded_at: o.recordedAt, engine_id: this.engineId, log_seq: String(o.seq),

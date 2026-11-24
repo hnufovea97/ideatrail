@@ -12,6 +12,11 @@ export const SWAP = "동네 중고 교환";
 export const PIANO = "피아노 연습 기록기";
 
 interface Spec { title: string; visibility: "private" | "public"; confirmed: boolean; records: Record<string, unknown>[] }
+/** Text of a record's one file, so its fingerprint is real and its original can be put in the fake GitHub repo. */
+const TEXT: Record<string, string> = {
+  "2026-09-03T00:12:00Z": "공정 가계부\n- 월급날 기준으로 달을 나눈다\n- 카드 연동\n",
+  "2026-10-02T12:00:00Z": "공정 가계부\n- 월급날 기준으로 달을 나눈다\n- 부부가 같이 쓴다\n",
+};
 const file = (path: string) => [{ path, size: 10, original: true }];
 const IDEAS: Spec[] = [
   { title: BUDGET, visibility: "private", confirmed: false, records: [
@@ -33,14 +38,21 @@ const meta = (title: string, r: Record<string, unknown>) => {
   return { v: 1, title, milestone: "none", milestone_certain: false, files: [], more_files: 0, recorded_at: at, tags: [], routine: [], ...rest };
 };
 
-async function rows(engine: FakeEngine, changeSeq: number) {
+/** The fake GitHub repo of a page (repo path → bytes) holding the original of every record in TEXT. */
+export const proofRepos = new WeakMap<Page, Record<string, Uint8Array>>();
+
+async function rows(engine: FakeEngine, changeSeq: number, repo: Record<string, Uint8Array>) {
   const roots: unknown[] = [], records: unknown[] = [], anchors: unknown[] = [];
   let seq = 0;
   for (const idea of IDEAS) {
     const rootId = newId();
     roots.push({ root_id: rootId, visibility: idea.visibility, meta_version: 0, list_meta: null, created_at: idea.records[0].at, deleted_at: null, change_seq: changeSeq });
     for (const r of idea.records) {
-      const row = await engine.recordRow({ rootId, seq: ++seq, recordedAt: r.at as string, meta: meta(idea.title, r), changeSeq });
+      const text = idea.title === BUDGET ? TEXT[r.at as string] : undefined;
+      const recordId = newId();
+      const proof = text === undefined ? null : await engine.proof({ rootId, recordId, files: [{ path: (r.files as { path: string }[])[0].path, bytes: new TextEncoder().encode(text) }] });
+      if (proof) Object.assign(repo, proof.repo);
+      const row = await engine.recordRow({ rootId, seq: ++seq, recordedAt: r.at as string, meta: meta(idea.title, r), changeSeq, recordId, commitment: proof?.ref.commitment });
       records.push(row);
       anchors.push({ record_id: row.record_id, status: idea.confirmed ? "confirmed" : "pending", block_height: idea.confirmed ? 870_000 : null, change_seq: changeSeq });
     }
@@ -56,6 +68,8 @@ interface SavedMeta { list_meta: string; meta_version: number }
  *  so a saved name set comes back on the next pull. The real API still sees everything else. */
 export async function seedIdeas(page: Page, engine: FakeEngine): Promise<void> {
   let built: Awaited<ReturnType<typeof rows>> | null = null;
+  const repo: Record<string, Uint8Array> = {};
+  proofRepos.set(page, repo);
   let bump = 0;
   const saved = new Map<string, SavedMeta>();
   const sent: Record<string, unknown>[] = [];
@@ -63,7 +77,7 @@ export async function seedIdeas(page: Page, engine: FakeEngine): Promise<void> {
   await page.route("**/v1/sync*", async (route) => {
     const res = await route.fetch();
     const body = (await res.json()) as { changes: Record<string, unknown[] | undefined>; cursor: number };
-    built ??= await rows(engine, Math.max(1, body.cursor));
+    built ??= await rows(engine, Math.max(1, body.cursor), repo);
     const add = { ...built, roots: built.roots.map((r) => {
       const row = r as { root_id: string; change_seq: number };
       const s = saved.get(row.root_id);

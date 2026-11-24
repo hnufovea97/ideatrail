@@ -11,7 +11,7 @@ import { LockIcon } from "./LockIcon";
 import { RoutineCard } from "./RoutineCard";
 import { StageRename } from "./StageRename";
 import { VersionRows } from "./VersionRows";
-import type { SourceTools } from "./VersionDetail";
+import type { RowTools, SourceTools } from "./VersionDetail";
 
 interface Props {
   idea: IdeaView; tools: SourceTools; server: boolean; now: Date; routineOn: boolean; feedbackFolded: boolean;
@@ -32,7 +32,7 @@ function Counts({ decided, deferred, turn, server }: { decided: number | null; d
   );
 }
 
-function StagePanel({ row, server, tools }: { row: StageRow; server: boolean; tools: SourceTools }) {
+function StagePanel({ row, server, tools }: { row: StageRow; server: boolean; tools: RowTools }) {
   const l = COPY.life;
   if (!row.reached) return <div class="panel"><p class="small">{l.notYet}</p></div>;
   return (
@@ -52,6 +52,13 @@ function StagePanel({ row, server, tools }: { row: StageRow; server: boolean; to
 export function IdeaLife({ idea, tools, server, now, routineOn, feedbackFolded, onBack, onRoutine, onFoldFeedback, onRename }: Props) {
   const l = COPY.life;
   const life = useMemo(() => lifeOf(idea), [idea]);
+  const rowTools: RowTools = {
+    ...tools,
+    load: (recordId) => { // versions are newest first: the one after it in the list is the one just before it in time
+      const at = idea.versions.findIndex((v) => v.recordId === recordId);
+      return at < 0 ? Promise.resolve({ kind: "failed" }) : tools.load(idea.versions[at], idea.versions[at + 1] ?? null);
+    },
+  };
   const [open, setOpen] = useState<StageNo>(idea.locked.stage);
   const [renaming, setRenaming] = useState(false);
   const stall = routineOn ? stalledDays(idea, now) : null; // 설계 §3.1.4: off hides the stopped days too
@@ -89,7 +96,7 @@ export function IdeaLife({ idea, tools, server, now, routineOn, feedbackFolded, 
       {server ? null : renaming
         ? <StageRename names={stageNames(idea)} onSave={(names) => onRename(idea.rootId, names)} onClose={() => setRenaming(false)} />
         : <p class="rename-row"><button type="button" class="link" onClick={() => setRenaming(true)}>{l.rename.open}</button></p>}
-      <StagePanel row={row} server={server} tools={tools} />
+      <StagePanel row={row} server={server} tools={rowTools} />
       {routineOn
         ? <RoutineCard card={routineCard(idea, feedbackFolded)} server={server} onHide={() => onRoutine(false)} onFoldFeedback={onFoldFeedback} />
         : <p class="routine-off small">{l.routine.hiddenNote} <button type="button" class="link" onClick={() => onRoutine(true)}>{l.routine.show}</button></p>}

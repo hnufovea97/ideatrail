@@ -116,3 +116,8 @@ main.dash h1, main.dash h2, main.dash h3 { color: var(--text); font-weight: 500;
 .rename-fields input[aria-invalid="true"] { border-color: var(--err); }
 .rename-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
 @media (max-width: 480px) { .rename-fields { grid-template-columns: 1fr; } }
+.same { color: var(--ok); font-weight: 600; margin: 0; }
+.orig { margin: 0; max-width: 100%; max-height: 22em; overflow: auto; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.dl { display: block; }
+.dl.add { background: var(--ok-bg); }
+.dl.del { background: var(--err-bg); }

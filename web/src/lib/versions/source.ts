@@ -1,50 +1,58 @@
-// What the version screen can show of a version's original (5.13): no GitHub link, not uploaded yet, found, or failed.
-// Reads only proofs/<record_id>/bundle.json here; opening the original is original.ts.
+// What the version screen can show of a version's original (5.13, 5.6): no GitHub link, not uploaded yet, found
+// (opened, checked against the signed fingerprint, compared with the version before it), or failed.
 import type { Fetch } from "../api";
-import { GithubFailure, readRepoFile } from "../mirror/github";
+import type { VersionView } from "../model/read-model";
+import { GithubFailure, readRepoFile, type RepoAccess } from "../mirror/github";
 import { openRepoAccess } from "../mirror/storage";
 import type { LinkRow } from "../sync/rows";
 import type { DashboardVault } from "../unlock";
+import { bundlePath, parseBundle } from "./bundle";
+import { lineDiff, type DiffLine } from "./diff";
+import { openOriginal, textOf, type Opened, type OpenDeps, type VersionRef } from "./original";
 
-/** The two fields of the GitHub bundle.json (spec §12) this screen needs; the rest is for /verify. */
-export interface GithubBundle { commitment: string; nonceSealed: string }
+/** `diff`: null when the version has no earlier text to compare with, or when either side is not one intact UTF-8 file (D2). */
+export interface Ready { original: Opened; diff: { lines: readonly DiffLine[] | null } | null } // lines null = too long to compare
 export type Source =
   | { kind: "unlinked" }
   | { kind: "not_yet" }
-  | { kind: "ready"; bundle: GithubBundle }
+  | { kind: "ready"; original: Opened; diff: Ready["diff"] }
   | { kind: "failed" };
 
 export interface SourceDeps { vault: Pick<DashboardVault, "userId" | "akPriv" | "engineList">; links: Iterable<LinkRow>; github: Fetch; signal?: AbortSignal }
 
 const RECORD_ID = /^[0-9a-hjkmnp-tv-z]{26}$/;
-const HEX64 = /^[0-9a-f]{64}$/;
-const B64U = /^[A-Za-z0-9_-]+$/;
 
-export const bundlePath = (recordId: string) => `proofs/${recordId}/bundle.json`;
-export const originalPath = (recordId: string) => `proofs/${recordId}/original.it1`;
+export const refOf = (v: VersionView): VersionRef => ({ recordId: v.recordId, rootId: v.rootId, commitment: v.server.commitment, mainFile: v.locked.mainFile });
 
-export function parseBundle(bytes: Uint8Array): GithubBundle | null {
-  try {
-    const raw = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as { commitment?: unknown; nonce_sealed?: unknown } | null;
-    if (typeof raw?.commitment !== "string" || !HEX64.test(raw.commitment)) return null;
-    if (typeof raw.nonce_sealed !== "string" || !B64U.test(raw.nonce_sealed)) return null;
-    return { commitment: raw.commitment, nonceSealed: raw.nonce_sealed };
-  } catch {
-    return null;
-  }
-}
-
-export async function loadSource(d: SourceDeps, recordId: string): Promise<Source> {
-  if (!RECORD_ID.test(recordId)) return { kind: "failed" };
+/** `previous`: the version just before this one, if any (its original is read only for the comparison). */
+export async function loadSource(d: SourceDeps, v: VersionRef, previous: VersionRef | null = null): Promise<Source> {
+  if (!RECORD_ID.test(v.recordId) || (previous && !RECORD_ID.test(previous.recordId))) return { kind: "failed" };
   const access = await openRepoAccess(d.vault, d.vault.engineList, d.links);
   if (!access) return { kind: "unlinked" };
+  const deps: OpenDeps = { vault: d.vault, github: d.github, signal: d.signal };
   try {
-    const bytes = await readRepoFile(d.github, access, bundlePath(recordId), d.signal);
+    const bytes = await readRepoFile(d.github, access, bundlePath(v.recordId), d.signal);
     if (!bytes) return { kind: "not_yet" };
     const bundle = parseBundle(bytes);
-    return bundle ? { kind: "ready", bundle } : { kind: "failed" };
+    if (!bundle) return { kind: "failed" };
+    const original = await openOriginal(deps, access, v, bundle);
+    const now = textOf(original);
+    if (now === null || !previous) return { kind: "ready", original, diff: null };
+    const before = await previousText(d, deps, access, previous);
+    return { kind: "ready", original, diff: before === null ? null : { lines: lineDiff(before, now) } };
   } catch (e) {
     if (e instanceof GithubFailure) return { kind: "failed" };
     throw e;
+  }
+}
+
+/** The earlier version's text; any trouble just means "no comparison", never a failure of this version. */
+async function previousText(d: SourceDeps, deps: OpenDeps, access: RepoAccess, p: VersionRef): Promise<string | null> {
+  try {
+    const bytes = await readRepoFile(d.github, access, bundlePath(p.recordId), d.signal);
+    const bundle = bytes ? parseBundle(bytes) : null;
+    return bundle ? textOf(await openOriginal(deps, access, p, bundle)) : null;
+  } catch {
+    return null;
   }
 }

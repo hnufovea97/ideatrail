@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { BUDGET, PIANO, deviceView, openHome } from "./helpers/home";
+import { BUDGET, PIANO, deviceView, openHome, proofRepos } from "./helpers/home";
 
 test.use({ timezoneId: "Asia/Seoul", viewport: { width: 1280, height: 900 } });
 
@@ -94,4 +94,30 @@ test("[GitHub에 보관함 만들기] on a version asks the engine, and once lin
   await expect(row.getByText("아직 GitHub에 올라가는 중이에요. 잠시 뒤에 다시 열어 보세요")).toBeVisible();
   expect(asked.length).toBeGreaterThan(0);
   expect(asked.every((u) => u.includes("/contents/proofs/"))).toBe(true);
+});
+
+test("linked: the original is opened from GitHub, checked against the signed fingerprint, and compared line by line with the version before (5.6)", async ({ page }) => {
+  const engine = await openHome(page);
+  const sent: string[] = [];
+  page.on("request", (r) => { if (r.method() !== "GET" && r.method() !== "OPTIONS") sent.push(r.postData() ?? ""); });
+  await page.route("https://api.github.com/**", (route) => {
+    const path = decodeURIComponent(new URL(route.request().url()).pathname.replace(/^\/repos\/[^/]+\/[^/]+\/contents\//, ""));
+    const bytes = proofRepos.get(page)?.[path];
+    return bytes ? route.fulfill({ status: 200, body: Buffer.from(bytes) }) : route.fulfill({ status: 404, json: {} });
+  });
+  await engine.putStorageLink();
+  const pulled = page.waitForResponse((r) => r.url().includes("/v1/sync"));
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange"))); // do not wait for the timer: pull the new link now
+  await pulled;
+  await deviceView(page);
+  await page.locator(".cards .card").filter({ hasText: BUDGET }).click();
+  await page.getByRole("group", { name: "단계 4/5" }).getByRole("button").nth(2).click(); // 기획 확정: the 초안 version
+  const row = page.locator(".ver").first();
+  await row.getByRole("button", { name: "원문 보기" }).click();
+  await expect(row.getByText("✓ 그날 그대로예요")).toBeVisible();
+  await expect(row.getByText("바로 앞 버전과 달라진 줄")).toBeVisible();
+  await expect(row.locator(".dl.del")).toHaveText("− - 카드 연동\n");
+  await expect(row.locator(".dl.add")).toHaveText("+ - 부부가 같이 쓴다\n");
+  await expect(row.locator(".dl.same")).toHaveCount(2);
+  expect(sent.join("\n")).not.toContain("월급날"); // the opened text never goes anywhere
 });

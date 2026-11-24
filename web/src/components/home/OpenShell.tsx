@@ -10,7 +10,7 @@ import { chainLine, type ChainStatus } from "../../lib/sync/chain";
 import { emptySync, type SyncState } from "../../lib/sync/store";
 import { SYNC_MS } from "../../lib/timing";
 import type { DashboardVault } from "../../lib/unlock";
-import { loadSource } from "../../lib/versions/source";
+import { loadSource, refOf } from "../../lib/versions/source";
 import { useGithubLink } from "../start/useGithubLink";
 import { Home } from "./Home";
 import type { SourceTools } from "./VersionDetail";
@@ -89,7 +89,7 @@ export function OpenShell({ api, vault, signal, onLock }: Props) {
     refreshNow.current();
   });
   const tools: SourceTools = {
-    load: (recordId) => loadSource({ vault, links: sync.current.links.values(), github: (input, init) => fetch(input, init), signal }, recordId),
+    load: (v, previous) => loadSource({ vault, links: sync.current.links.values(), github: (input, init) => fetch(input, init), signal }, refOf(v), previous ? refOf(previous) : null),
     connect: link, tick: linkTick,
   };
   return (
