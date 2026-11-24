@@ -13,11 +13,19 @@ export function bindPrivacyBlur(win: EventTarget, doc: BlurDoc): () => void {
   win.addEventListener("blur", on);
   win.addEventListener("pagehide", on);
   win.addEventListener("focus", off);
+  win.addEventListener("pointerdown", off); // Android sends no focus after the fingerprint sheet: a touch means the user is here
   doc.addEventListener("visibilitychange", visibility);
   return () => {
     win.removeEventListener("blur", on);
     win.removeEventListener("pagehide", on);
     win.removeEventListener("focus", off);
+    win.removeEventListener("pointerdown", off);
     doc.removeEventListener("visibilitychange", visibility);
   };
+}
+
+
+/** After the passkey sheet closes: the page is in front again, so drop the cover the sheet's blur put up. */
+export function clearPrivacyBlur(doc: Pick<BlurDoc, "visibilityState" | "documentElement">): void {
+  if (doc.visibilityState === "visible") doc.documentElement.classList.remove(BLUR_CLASS);
 }

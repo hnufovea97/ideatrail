@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLUR_CLASS, bindPrivacyBlur } from "./blur";
+import { BLUR_CLASS, bindPrivacyBlur, clearPrivacyBlur } from "./blur";
 
 function fakeDoc() {
   const classes = new Set<string>();
@@ -39,5 +39,26 @@ describe("privacy blur on app switch (5.1)", () => {
     bindPrivacyBlur(win, doc)();
     win.dispatchEvent(new Event("blur"));
     expect(classes.size).toBe(0);
+  });
+});
+
+describe("the cover does not stay after the phone lock sheet (G2 2026-11-24)", () => {
+  it("a touch on the visible page clears it", () => {
+    const win = new EventTarget();
+    const { doc, classes } = fakeDoc();
+    bindPrivacyBlur(win, doc);
+    win.dispatchEvent(new Event("blur")); // Android: the fingerprint sheet blurs the window and no focus comes back
+    win.dispatchEvent(new Event("pointerdown"));
+    expect(classes.has(BLUR_CLASS)).toBe(false);
+  });
+  it("clearPrivacyBlur clears only while the page is visible", () => {
+    const { doc, classes } = fakeDoc();
+    classes.add(BLUR_CLASS);
+    doc.visibilityState = "hidden";
+    clearPrivacyBlur(doc);
+    expect(classes.has(BLUR_CLASS)).toBe(true);
+    doc.visibilityState = "visible";
+    clearPrivacyBlur(doc);
+    expect(classes.has(BLUR_CLASS)).toBe(false);
   });
 });

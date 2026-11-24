@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Api } from "../../lib/api";
 import { COPY } from "../../lib/copy";
+import { clearPrivacyBlur } from "../../lib/blur";
 import { browserStore } from "../../lib/engine-list";
 import { externalOpenUrl, inAppBrowser } from "../../lib/inapp";
 import { LOGIN_REFRESH_MS } from "../../lib/timing";
@@ -52,6 +53,7 @@ export function LockScreen({ api, notice, onOpen }: Props) {
     setBusy(true);
     setError(null);
     setPrepared(null); // a login challenge is single-use
+    void asked.then(() => clearPrivacyBlur(document), () => clearPrivacyBlur(document)); // G2: no focus event after the sheet on Android
     void asked
       .then((got) => openVault(api, prepared, got, browserStore()))
       .then(
