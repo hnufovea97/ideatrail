@@ -67,7 +67,7 @@ input[type="text"] { font: inherit; padding: 10px; border-radius: 8px; border: 1
 .server-toggle .cbx { position: relative; display: inline-grid; place-items: center; flex: none; }
 .server-toggle input { margin: 0; }
 .server-toggle .mark { position: absolute; left: -11px; top: -11px; width: 40px; height: 40px; pointer-events: none; overflow: visible; }
-.server-toggle .mark path { fill: none; stroke: var(--warn); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.server-toggle .mark path { fill: none; stroke: var(--mark, var(--warn)); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 0; }
 @media (prefers-reduced-motion: no-preference) { .server-toggle .mark path { animation: mark-draw 3.2s ease-in-out infinite; } }
 @keyframes mark-draw { 0% { stroke-dashoffset: 1; opacity: 1; } 45% { stroke-dashoffset: 0; opacity: 1; } 80% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
 .server-note.on { color: var(--warn); }

@@ -1,15 +1,6 @@
 import { useState } from "preact/hooks";
-import type { ComponentChildren } from "preact";
 import { COPY } from "../../lib/copy";
-
-/** Text that exists on the Ideatrail server only locked: blurred and hidden from screen readers in server view. */
-function Locked({ server, children }: { server: boolean; children: ComponentChildren }) {
-  return (
-    <span data-testid="locked" class={server ? "locked blur" : "locked"} aria-hidden={server ? "true" : undefined}>
-      {children}
-    </span>
-  );
-}
+import { Locked, ServerToggle } from "../ui/ServerToggle";
 
 /** First-screen example of the confirmed home (ADR-0018), with the "what the server sees" switch. */
 export function IntroHome() {
@@ -18,17 +9,7 @@ export function IntroHome() {
   return (
     <section class="mini-home" aria-labelledby="home-title">
       <h2 id="home-title">{h.title}</h2>
-      <label class="server-toggle">
-        <span class="cbx">
-          <input type="checkbox" checked={server} onChange={(e) => setServer(e.currentTarget.checked)} />
-          {server ? (
-            <svg class="mark" viewBox="0 0 40 40" aria-hidden="true" focusable="false">
-              <path pathLength={1} d="M9 23 C 6 11, 19 4, 29 8 C 37 12, 38 26, 31 33 C 23 39, 9 37, 6 27 C 4 19, 11 11, 21 9" />
-            </svg>
-          ) : null}
-        </span>
-        <span>{h.toggle}</span>
-      </label>
+      <ServerToggle checked={server} label={h.toggle} onChange={setServer} />
       <p class={server ? "server-note on" : "server-note"} aria-live="polite">{server ? h.serverNote : h.deviceNote}</p>
       <div class="mini-card">
         <p class="mini-name"><Locked server={server}>{h.name}</Locked> <span class="lock" role="img" aria-label="잠김">🔒</span></p>
