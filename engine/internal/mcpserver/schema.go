@@ -18,6 +18,11 @@ var recordSchema = map[string]any{
 			"properties": map[string]any{"slot": map[string]any{"type": "string", "enum": []string{"problem", "audience", "not_doing", "decision_reason", "first_run", "feedback", "changed_by_feedback"}}, "estimated": map[string]any{"type": "boolean"}},
 			"required":   []string{"slot"}}, "description": "Only slots newly evidenced by these files"},
 		"tags": map[string]any{"type": "array", "items": map[string]any{"type": "string", "maxLength": 20}, "maxItems": 5, "description": "Only on the first record of a new idea"},
+		// ADR-0019: optional, sealed with the list meta. Plain words only (no quotes or line breaks).
+		"decided":  map[string]any{"type": "integer", "minimum": 0, "maximum": 999, "description": "How many things were decided in this record"},
+		"deferred": map[string]any{"type": "integer", "minimum": 0, "maximum": 999, "description": "How many were put off for later"},
+		"turn":     map[string]any{"type": "string", "maxLength": 40, "description": "One line if the direction changed; else omit"},
+		"label":    map[string]any{"type": "string", "maxLength": 20, "description": "Version name, e.g. 개요, 초안, 개선 1"},
 	},
 	"required":             []string{"paths", "note"},
 	"additionalProperties": false,

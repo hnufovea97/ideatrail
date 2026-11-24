@@ -156,6 +156,16 @@ type recordIn struct {
 	MilestoneCertain bool             `json:"milestone_certain,omitempty"`
 	Routine          []record.Routine `json:"routine,omitempty"`
 	Tags             []string         `json:"tags,omitempty"`
+	Decided          *int             `json:"decided,omitempty"`
+	Deferred         *int             `json:"deferred,omitempty"`
+	Turn             string           `json:"turn,omitempty"`
+	Label            string           `json:"label,omitempty"`
+}
+
+// input maps the tool arguments onto the pipeline input; the pipeline checks every value again.
+func (in recordIn) input(paths []string) record.Input {
+	return record.Input{Paths: paths, Note: in.Note, Milestone: in.Milestone, MilestoneCertain: in.MilestoneCertain,
+		Routine: in.Routine, Tags: in.Tags, Decided: in.Decided, Deferred: in.Deferred, Turn: in.Turn, Label: in.Label}
 }
 
 func (e *Engine) recordTool(ctx context.Context, in recordIn) string {
@@ -169,8 +179,7 @@ func (e *Engine) recordTool(ctx context.Context, in recordIn) string {
 		}
 		paths = append(paths, p)
 	}
-	r, err := record.Record(ctx, e.Record, record.Input{Paths: paths, Note: in.Note, Milestone: in.Milestone,
-		MilestoneCertain: in.MilestoneCertain, Routine: in.Routine, Tags: in.Tags})
+	r, err := record.Record(ctx, e.Record, in.input(paths))
 	e.background()
 	if err != nil {
 		return recordError(err)
