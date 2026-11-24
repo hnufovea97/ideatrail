@@ -44,7 +44,7 @@ var (
 )
 
 func (in Input) validate() error {
-	if len([]rune(in.Note)) > maxNote || !milestones[in.Milestone] || len(in.Tags) > maxTags || len(in.Routine) > maxRoutines {
+	if len([]rune(in.Note)) > maxNote || !milestones[in.Milestone] || len(in.Tags) > maxTags || len(in.Routine) > maxRoutines || !in.aiFieldsOK() {
 		return ErrBadInput
 	}
 	for _, t := range in.Tags {
@@ -88,7 +88,11 @@ type Input struct {
 	MilestoneCertain bool
 	Routine          []Routine
 	Tags             []string
-	Import           bool // signup first import: uses the server's import allowance, not the hourly cap
+	Decided          *int   // ADR-0019: things decided in this record (0-999), nil = not given
+	Deferred         *int   // things put off (0-999), nil = not given
+	Turn             string // one line (<=40) when the direction changed, "" = none
+	Label            string // version name (<=20), e.g. "개선 1", "" = none
+	Import           bool   // signup first import: uses the server's import allowance, not the hourly cap
 }
 
 // Result is safe to show: ids, a status code and the idea title — no paths or secrets.
@@ -283,7 +287,7 @@ func metaJSON(title string, in Input, col *Collected, recordedAt string) ([]byte
 		m := map[string]any{"v": 1, "title": title, "milestone": orNone(in.Milestone), "milestone_certain": in.MilestoneCertain,
 			"files": shown, "more_files": len(files) - len(shown), "recorded_at": recordedAt,
 			"tags": orEmpty(in.Tags), "routine": routineOrEmpty(in.Routine)} // list view needs these without GitHub (spec §15 M5a)
-		b, err := json.Marshal(m)
+		b, err := json.Marshal(withAIFields(m, in))
 		if err != nil || len(b) <= maxMetaPlain || limit == 0 {
 			if len(b) > maxMetaPlain {
 				return nil, errors.New("record metadata too large")
