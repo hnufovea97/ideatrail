@@ -15,5 +15,6 @@ export default defineConfig({
       },
     })),
   ],
-  test: { setupFiles: ["./test/apply-migrations.ts"] },
+  // The first test in a file also boots the Worker; a slow CI runner once took 5s+ (2026-11-24).
+  test: { setupFiles: ["./test/apply-migrations.ts"], testTimeout: 15_000 },
 });
