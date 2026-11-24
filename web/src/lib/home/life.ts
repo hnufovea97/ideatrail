@@ -3,7 +3,7 @@
 import { COPY } from "../copy";
 import type { IdeaView, StageView, VersionView } from "../model/read-model";
 import type { StageNo } from "../model/stage";
-import { stageName } from "../model/stage-names";
+import { stageNameOf } from "../model/stage-names";
 import { dayRange, monthDay } from "./format";
 
 export type ChainState = "done" | "pending";
@@ -26,7 +26,7 @@ function versionRow(v: VersionView, ordinal: number, timeZone?: string): Version
 
 function stageRow(idea: IdeaView, s: StageView, rows: ReadonlyMap<string, VersionRow>, timeZone?: string): StageRow {
   return {
-    no: s.no, name: stageName(s.no, idea.locked.stagePreset), reached: s.reached, current: s.no === idea.locked.stage, estimated: s.estimated,
+    no: s.no, name: stageNameOf(idea, s.no), reached: s.reached, current: s.no === idea.locked.stage, estimated: s.estimated,
     date: s.firstAt ? monthDay(s.firstAt, timeZone) : null,
     range: s.firstAt && s.lastAt ? dayRange(s.firstAt, s.lastAt, timeZone) : null,
     decided: s.decided, deferred: s.deferred, turn: s.turn,

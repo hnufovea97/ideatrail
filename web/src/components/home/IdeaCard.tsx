@@ -2,7 +2,7 @@ import { COPY } from "../../lib/copy";
 import { shortDate } from "../../lib/home/format";
 import { ideaChain } from "../../lib/home/list";
 import type { IdeaView } from "../../lib/model/read-model";
-import { stageName } from "../../lib/model/stage-names";
+import { stageNameOf } from "../../lib/model/stage-names";
 import { STAGE_NUMBERS } from "../../lib/model/stage";
 import { Locked } from "../ui/ServerToggle";
 import { LockIcon } from "./LockIcon";
@@ -20,7 +20,7 @@ export function IdeaCard({ idea, server, selected, onPick }: Props) {
         <Locked server={server}>{locked.title}</Locked>
         {srv.visibility === "private" ? <span class="lock" role="img" aria-label={h.mine}><LockIcon /></span> : null}
       </span>
-      <span class="card-stage small"><Locked server={server}>{h.stageOf(locked.stage, stageName(locked.stage, locked.stagePreset))}</Locked></span>
+      <span class="card-stage small"><Locked server={server}>{h.stageOf(locked.stage, stageNameOf(idea, locked.stage))}</Locked></span>
       <Locked server={server}>
         <span class="bar" aria-hidden="true">{STAGE_NUMBERS.map((no) => <i key={no} class={no <= locked.stage ? "on" : ""} />)}</span>
       </Locked>

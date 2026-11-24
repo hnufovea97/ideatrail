@@ -3,6 +3,7 @@
 // Cells compare by (signed created_at, engine_id, log_seq): a total order, so any arrival order gives the same result.
 import type { DeltaRow } from "../sync/rows";
 import type { DeltaBody } from "./delta";
+import { AI_STAGES_CELL } from "./stages";
 
 export interface Cell { value: unknown; at: string; engine: string; seq: string }
 export type Ranges = readonly (readonly [string, string])[];
@@ -22,6 +23,7 @@ export function later(a: Stamp, b: Stamp): boolean {
 export function cellsOf(d: DeltaBody): [string, unknown][] {
   if (d.op === "routine") return d.value.map((r) => [`routine.${r.slot}`, r.cleared ? null : { estimated: r.estimated }]);
   if (d.op === "milestone" && d.recordId) return [[`r.${d.recordId}.milestone`, d.value]];
+  if (d.op === "stages") return [[AI_STAGES_CELL, d.value]]; // never the user's `stages` cell (ADR-0020)
   return [[d.op, d.value]];
 }
 
@@ -53,7 +55,8 @@ export function applyDeltas(meta: RootMetaV1, items: readonly Opened[], version:
     const stamp: Stamp = { at: row.created_at, engine: row.engine_id, seq: row.log_seq };
     for (const [key, value] of cellsOf(body)) {
       const old = cells[key];
-      if (!old || later(stamp, old)) cells[key] = { value, ...stamp };
+      // the AI names the stages once: the earliest fragment stays (still a total order); every other cell is last-writer-wins
+      if (!old || (key === AI_STAGES_CELL ? later(old, stamp) : later(stamp, old))) cells[key] = { value, ...stamp };
     }
     merged[row.engine_id] = addSeq(merged[row.engine_id], row.log_seq);
   }

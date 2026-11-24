@@ -41,4 +41,9 @@ describe("idea life", () => {
     const old = lifeOf(idea({ stages: [stage(1, { reached: true })] }), SEOUL);
     expect([old.decided, old.deferred]).toEqual([null, null]);
   });
+
+  it("uses the idea's own stage names (ADR-0020) and the preset when it has none", () => {
+    const own = idea({ stage: 3, stages: subject.locked.stages as never, stageNames: ["착상", "개요", "초고", "퇴고", "발행"] });
+    expect(lifeOf(own, SEOUL).stages.map((s) => s.name)).toEqual(["착상", "개요", "초고", "퇴고", "발행"]);
+  });
 });

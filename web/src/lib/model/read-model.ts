@@ -9,6 +9,7 @@ import type { Verified } from "../sync/verify";
 import { cleanLabel } from "../text";
 import { isMilestone, openRecordMeta, parseTags, ROUTINE_SLOTS, type FileEntry, type Milestone, type RecordMeta, type RoutineMark, type RoutineSlot } from "./meta";
 import { stagesOf, type StageNo, type StagePoint, type StageSpan } from "./stage";
+import { stageNamesOf } from "../merge/stages";
 import { DEFAULT_STAGE_PRESET, type StagePreset } from "./stage-names";
 
 /** "server_confirmed" is the server's word only; 5.7 checks two explorers before anything says 확정/확산됨. */
@@ -28,7 +29,7 @@ export interface RoutineView { slot: RoutineSlot; filled: boolean; estimated: bo
 export interface IdeaView {
   rootId: string;
   server: { visibility: "private" | "public"; firstAt: string; lastAt: string; versionCount: number };
-  locked: { title: string; tags: readonly string[]; stagePreset: StagePreset; stage: StageNo; paused: boolean; stages: readonly StageView[]; routine: readonly RoutineView[] };
+  locked: { title: string; tags: readonly string[]; stagePreset: StagePreset; stageNames: readonly string[] | null; stage: StageNo; paused: boolean; stages: readonly StageView[]; routine: readonly RoutineView[] };
   versions: readonly VersionView[]; // newest first
 }
 export interface Built { ideas: readonly IdeaView[]; metas: ReadonlyMap<string, RecordMeta>; issues: readonly ChainIssue[] }
@@ -107,7 +108,7 @@ function ideaOf(rootId: string, root: RootRow | undefined, found: readonly Item[
     locked: {
       title: (typeof cellTitle === "string" ? cleanLabel(cellTitle, MAX_TITLE) : "") || latest.meta.title,
       tags: parseTags(meta.cells.tags?.value) ?? items.find((x) => x.meta.tags.length > 0)?.meta.tags ?? [],
-      stagePreset: DEFAULT_STAGE_PRESET, // per-idea presets later (founder 2026-11-24); always "build" in M5b
+      stagePreset: DEFAULT_STAGE_PRESET, stageNames: stageNamesOf(meta), // ADR-0020: the user's names, else the AI's, else the preset
       stage: stages.current, paused: stages.paused, stages: stageViews(stages.spans, metaOf), routine: routineOf(items, meta),
     },
     versions: [...items].reverse().map(({ row, meta: m }) => versionOf(row, m, anchors.get(row.record_id))),

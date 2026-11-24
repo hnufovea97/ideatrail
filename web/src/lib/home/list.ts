@@ -1,6 +1,6 @@
 // Home list (ADR-0018, UX ① 정렬): tabs, #tag + stage search and the five sorts — all on this device, after unlock.
 import type { IdeaView } from "../model/read-model";
-import { stageName } from "../model/stage-names";
+import { stageNameOf } from "../model/stage-names";
 
 export const TABS = ["all", "shared", "mine"] as const;
 export type Tab = (typeof TABS)[number];
@@ -23,7 +23,7 @@ export function inTab(idea: IdeaView, tab: Tab): boolean {
 export function matchesQuery(idea: IdeaView, query: string): boolean {
   const words = query.trim().split(/\s+/).filter((w) => w.length > 0);
   const tags = idea.locked.tags.map((t) => t.toLowerCase());
-  const text = squash(idea.locked.title + stageName(idea.locked.stage, idea.locked.stagePreset));
+  const text = squash(idea.locked.title + stageNameOf(idea, idea.locked.stage));
   return words.every((w) => (w.startsWith("#") && w.length > 1 ? tags.some((t) => t.startsWith(w.slice(1).toLowerCase())) : text.includes(squash(w))));
 }
 

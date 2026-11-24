@@ -43,4 +43,10 @@ describe("home list", () => {
     expect(ideaChain(idea({ versions: [version({ anchor: "server_confirmed" }), version({ anchor: "server_confirmed" })] }))).toBe("done");
     expect(ideaChain(idea({ versions: [version({ anchor: "pending" }), version({ anchor: "server_confirmed" })] }))).toBe("pending");
   });
+
+  it("searches the idea's own stage name, not the preset's (ADR-0020)", () => {
+    const essay = idea({ title: "에세이", stage: 4, stageNames: ["착상", "개요", "초고", "퇴고", "발행"] });
+    expect(matchesQuery(essay, "퇴고")).toBe(true);
+    expect(matchesQuery(essay, "개발 중")).toBe(false);
+  });
 });

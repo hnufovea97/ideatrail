@@ -5,13 +5,15 @@ import { KIND, open } from "@ideatrail/crypto/seal";
 import { isMilestone, isSlot, parseTags, type Milestone, type RoutineSlot } from "../model/meta";
 import type { DeltaRow } from "../sync/rows";
 import { cleanLabel } from "../text";
+import { parseStageNames } from "./stages";
 
 export interface RoutineChange { slot: RoutineSlot; estimated: boolean; cleared: boolean }
 export type DeltaBody =
   | { op: "title"; recordId: string | null; value: string }
   | { op: "tags"; recordId: string | null; value: string[] }
   | { op: "routine"; recordId: string | null; value: RoutineChange[] }
-  | { op: "milestone"; recordId: string | null; value: { milestone: Milestone; certain: boolean } };
+  | { op: "milestone"; recordId: string | null; value: { milestone: Milestone; certain: boolean } }
+  | { op: "stages"; recordId: string | null; value: string[] }; // ADR-0020: five stage names, AI once
 
 export const UNKNOWN_OP = "unknown_op" as const;
 const ID = /^[0-9a-hjkmnp-tv-z]{26}$/;
@@ -44,6 +46,10 @@ export function parseDelta(raw: unknown): DeltaBody | typeof UNKNOWN_OP | null {
     case "milestone": {
       const v = raw.value;
       return isObj(v) && isMilestone(v.milestone) ? { op: "milestone", recordId, value: { milestone: v.milestone, certain: v.certain === true } } : null;
+    }
+    case "stages": {
+      const value = parseStageNames(raw.value);
+      return value ? { op: "stages", recordId, value: [...value] } : UNKNOWN_OP; // a wrong set is left open, never shown
     }
     default:
       return UNKNOWN_OP;
