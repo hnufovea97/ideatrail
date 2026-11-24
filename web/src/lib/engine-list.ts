@@ -1,6 +1,7 @@
 import { fromB64u, toB64u, utf8 } from "@ideatrail/crypto/bytes";
 import { relock, unlock } from "@ideatrail/crypto/relock";
 import { subkey } from "@ideatrail/crypto/subkey";
+import { assertLive } from "./live-key";
 
 /**
  * Spec §15 M5a: a disconnected engine stays listed so its earlier rows still verify. At disconnect the list freezes
@@ -19,6 +20,7 @@ const aad = (userId: string, version: number) => ({ userId, version: String(vers
 /** Spec §15 M4: relock(subkey(MK,"engine_list"), "engine_list", {user_id, version:"N"}, JSON). */
 /** The engine-list subkey for one use, zeroed afterwards on every path. */
 function withListKey<T>(mk: Uint8Array, use: (k: Uint8Array) => T): T {
+  assertLive(mk); // a vault wiped by the lock must not seal or open anything
   const k = subkey(mk, "engine_list");
   try {
     return use(k);

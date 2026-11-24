@@ -12,6 +12,11 @@ describe("recovery key (spec §3, §11)", () => {
   it("shows 52 characters in 13 groups of 4", () => {
     expect(makeRecovery(vault()).display).toMatch(/^(?:[0-9A-Z]{4}-){12}[0-9A-Z]{4}$/);
   });
+  it("makes nothing from a vault the lock has wiped", () => {
+    const v = vault();
+    v.mk.fill(0);
+    expect(() => makeRecovery(v)).toThrow("zero_key");
+  });
   it("the key as typed back opens the recovery envelope", () => {
     const v = vault();
     const p = makeRecovery(v);

@@ -3,10 +3,11 @@
 import { fromB64u } from "@ideatrail/crypto/bytes";
 import { KIND, open } from "@ideatrail/crypto/seal";
 import type { ApprovalRow } from "./api";
-import type { EngineList } from "./engine-list";
+import type { EngineList, VersionStore } from "./engine-list";
 import { isLive } from "./engines";
 import { signedByEngine, toFolder } from "./folders";
 import type { Vault } from "./signup/account";
+import { apprMark, rememberMax } from "./sync/marks";
 
 export type ApprovalKind = "import" | "add_folder" | "forget_original" | "disconnect";
 const KINDS: readonly string[] = ["import", "add_folder", "forget_original", "disconnect"];
@@ -27,13 +28,20 @@ async function openSummary(v: Vault, row: ApprovalRow): Promise<ApprovalFolder[]
   return raw.folders.slice(0, MAX_FOLDERS).flatMap(toFolder).map(({ path, name, files }) => ({ path, name, files }));
 }
 
-/** Rows that fail any check are left out, never half-shown. Oldest first, as the server sends them. */
-export async function openApprovals(rows: readonly ApprovalRow[], list: EngineList, v: Vault): Promise<OpenApproval[]> {
+const DIGITS = /^[0-9]{1,20}$/;
+
+/**
+ * Rows that fail any check are left out, never half-shown. Oldest first, as the server sends them.
+ * `marks` keeps the highest appr_seq this browser has seen per engine (spec §8; only ever raised, only from rows a live engine
+ * signed). Holes are normal here: an answered or expired request leaves the list, so no row is ever dropped for its number.
+ */
+export async function openApprovals(rows: readonly ApprovalRow[], list: EngineList, v: Vault, marks?: VersionStore): Promise<OpenApproval[]> {
   const out: OpenApproval[] = [];
   for (const r of rows) {
     const engine = list.engines.find((e) => e.engine_id === r.engine_id);
     if (!engine || !isLive(engine) || !isKind(r.kind)) continue; // signup_select belongs to the signup screen
     if (!signedByEngine(r, fromB64u(engine.sign_pubkey), v.userId)) continue;
+    if (marks && DIGITS.test(r.appr_seq)) rememberMax(marks, apprMark(v.userId, engine.engine_id), BigInt(r.appr_seq));
     try {
       out.push({ approvalId: r.approval_id, engineId: engine.engine_id, engineName: engine.name, kind: r.kind, folders: await openSummary(v, r), expiresAt: r.expires_at });
     } catch {

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { newId } from "@ideatrail/crypto/ids";
 import { openEngineList } from "./engine-list";
-import { githubTokenFor, revokeList, sealRevoked } from "./engines";
+import { githubTokenFor, planDisconnect, revokeList, sealRevoked } from "./engines";
 import { deltaRow, fakeWorld, linkRow, recordRow, syncOf, worldEngine } from "./testing/fake-world";
+import { randomKey } from "@ideatrail/crypto/keypair";
 import { memoryStore } from "./engine-list";
 import { verifyRows } from "./sync/verify";
 
@@ -57,5 +58,67 @@ describe("githubTokenFor", () => {
     expect(await githubTokenFor(w.vault, w.list, [link], w.engine.id)).toBe("fake-token-for-tests");
     expect(await githubTokenFor(w.vault, w.list, [], w.engine.id)).toBeNull();
     expect(await githubTokenFor(w.vault, w.list, [link], newId())).toBeNull();
+  });
+});
+
+describe("planDisconnect (digest = what a later refresh accepts)", () => {
+  const plan = (w: ReturnType<typeof fakeWorld>, sync: ReturnType<typeof syncOf>, marks = memoryStore()) =>
+    planDisconnect(w.userId, w.list, sync, marks, w.engine.id, NOW);
+
+  it("freezes a clean engine, and a refresh against the new list reports no mismatch", async () => {
+    const w = fakeWorld();
+    const root = newId();
+    const records = [await recordRow(w, { rootId: root, seq: 1 }), await recordRow(w, { rootId: root, seq: 2 })];
+    const sync = syncOf({ records });
+    const p = plan(w, sync);
+    expect(p.ok).toBe(true);
+    if (!p.ok) return;
+    const v = verifyRows(w.userId, p.next, sync, memoryStore(), { now: NOW });
+    expect(v.issues).toEqual([]);
+    expect(v.records).toHaveLength(2);
+  });
+
+  it("refuses a row signed in the future (the later refresh would drop it and mismatch)", async () => {
+    const w = fakeWorld();
+    const root = newId();
+    const sync = syncOf({ records: [await recordRow(w, { rootId: root, seq: 1 }), await recordRow(w, { rootId: root, seq: 2, recordedAt: "2099-01-01T00:00:00Z" })] });
+    expect(plan(w, sync).ok).toBe(false);
+  });
+
+  it("refuses two rows with one log_seq", async () => {
+    const w = fakeWorld();
+    const root = newId();
+    const sync = syncOf({ records: [await recordRow(w, { rootId: root, seq: 1 }), await recordRow(w, { rootId: root, seq: 1 })] });
+    expect(plan(w, sync).ok).toBe(false);
+  });
+
+  it("refuses a hole in the log_seqs, a bad signature and an unfinished pull", async () => {
+    const w = fakeWorld();
+    const root = newId();
+    expect(plan(w, syncOf({ records: [await recordRow(w, { rootId: root, seq: 2 })] })).ok).toBe(false);
+    const forged = await deltaRow(w, { rootId: root, seq: 1, body: { op: "tags", value: [] }, signer: randomKey() });
+    expect(plan(w, syncOf({ deltas: [forged] })).ok).toBe(false);
+    expect(plan(w, syncOf({ records: [await recordRow(w, { rootId: root, seq: 1 })] }, false)).ok).toBe(false);
+  });
+
+  it("refuses when the highest seq is below what this browser has seen, and writes no mark", async () => {
+    const w = fakeWorld();
+    const marks = memoryStore();
+    marks.set(`it.seq.${w.userId}.${w.engine.id}`, "5");
+    const sync = syncOf({ records: [await recordRow(w, { rootId: newId(), seq: 1 })] });
+    expect(plan(w, sync, marks).ok).toBe(false);
+    expect(marks.get(`it.seq.${w.userId}.${w.engine.id}`)).toBe("5");
+    const fresh = memoryStore();
+    expect(plan(w, syncOf({ records: [await recordRow(w, { rootId: newId(), seq: 1 })] }), fresh).ok).toBe(true);
+    expect(fresh.get(`it.seq.${w.userId}.${w.engine.id}`)).toBeNull(); // read-only
+  });
+
+  it("another engine's problem does not block this one", async () => {
+    const w = fakeWorld();
+    const other = worldEngine("Other");
+    const list = { ...w.list, engines: [...w.list.engines, other.entry] };
+    const root = newId();
+    const sync = syncOf({ records: [await recordRow(w, { rootId: root, seq: 1 }), await recordRow(w, { rootId: root, seq: 3, engine: other })] });
+    expect(planDisconnect(w.userId, list, sync, memoryStore(), w.engine.id, NOW).ok).toBe(true);
   });
 });

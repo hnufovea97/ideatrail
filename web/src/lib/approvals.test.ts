@@ -6,6 +6,8 @@ import { KIND, seal } from "@ideatrail/crypto/seal";
 import { messageFor, sign } from "@ideatrail/crypto/sign";
 import type { ApprovalRow } from "./api";
 import { openApprovals } from "./approvals";
+import { memoryStore } from "./engine-list";
+import { seenMax, apprMark } from "./sync/marks";
 import { fakeWorld, worldEngine, type World } from "./testing/fake-world";
 
 const FOLDERS = [{ path: "/Users/e2e/Projects/가계부", name: "가계부 앱", files: 12 }];
@@ -56,5 +58,26 @@ describe("openApprovals (5.9a)", () => {
     const w = fakeWorld();
     const out = await openApprovals([await row(w, { kind: "disconnect", plain: { v: 1, folders: [] } })], w.list, w.vault);
     expect(out[0]).toMatchObject({ kind: "disconnect", folders: [] });
+  });
+
+  it("keeps the highest appr_seq per engine: it only goes up, and no row is dropped for its number", async () => {
+    const w = fakeWorld();
+    const marks = memoryStore();
+    const key = apprMark(w.userId, w.engine.id);
+    const high = await row(w, { seq: 7n });
+    const low = await row(w, { seq: 2n }); // a hole below the mark is normal: answered requests leave the list
+    expect(await openApprovals([high], w.list, w.vault, marks)).toHaveLength(1);
+    expect(seenMax(marks, key)).toBe(7n);
+    expect(await openApprovals([low], w.list, w.vault, marks)).toHaveLength(1);
+    expect(seenMax(marks, key)).toBe(7n);
+    expect(await openApprovals([await row(w, { seq: 9n })], w.list, w.vault, marks)).toHaveLength(1);
+    expect(seenMax(marks, key)).toBe(9n);
+  });
+
+  it("a number from an unsigned or foreign row never raises the mark", async () => {
+    const w = fakeWorld();
+    const marks = memoryStore();
+    await openApprovals([await row(w, { seq: 50n, seed: randomKey() })], w.list, w.vault, marks);
+    expect(seenMax(marks, apprMark(w.userId, w.engine.id))).toBe(0n);
   });
 });

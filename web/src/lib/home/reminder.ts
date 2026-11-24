@@ -2,10 +2,11 @@
 // The shown-at time and the recall note are relocked under their own subkeys (spec §3, AAD {user_id}); the server holds only the
 // sealed bytes. Every temporary subkey is zeroed after use. A damaged blob never throws to the screen.
 import { fromB64u, toB64u, utf8 } from "@ideatrail/crypto/bytes";
-import { assertLiveKey, relock, unlock, type Purpose } from "@ideatrail/crypto/relock";
+import { relock, unlock, type Purpose } from "@ideatrail/crypto/relock";
 import { subkey } from "@ideatrail/crypto/subkey";
 import type { AccountInfo } from "../api";
 import { storagePlace } from "../devices";
+import { assertLive } from "../live-key";
 
 export interface ReminderState { v: 1; shown_at: string }
 
@@ -25,7 +26,7 @@ export function dueCheck(state: ReminderState | null, createdAt: string, now: Da
 }
 
 function withKey<T>(mk: Uint8Array, purpose: Purpose, use: (k: Uint8Array) => T): T {
-  assertLiveKey(mk); // a vault wiped by the lock must not seal or open anything (the subkey of zeros is not zeros)
+  assertLive(mk); // a vault wiped by the lock must not seal or open anything (the subkey of zeros is not zeros)
   const k = subkey(mk, purpose);
   try {
     return use(k);
