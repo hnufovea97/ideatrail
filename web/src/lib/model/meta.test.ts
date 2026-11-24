@@ -29,6 +29,11 @@ describe("record list meta (kind 1)", () => {
     expect(m!.label).toBe("개선 1 · 카드 연동 빼기를 한 줄로 아주 길게".slice(0, 20)); // F1 ①: version name, 20 chars
     expect(m!.routine).toEqual([{ slot: "problem", estimated: false }]);
   });
+  it("reads the engine's ADR-0019 fields: zero is a count, absent is null", () => {
+    expect(parseRecordMeta(META({ decided: 0, deferred: 3, turn: "카드 연동 빼기", label: "개선 1" }))).toMatchObject({ decided: 0, deferred: 3, turn: "카드 연동 빼기", label: "개선 1" });
+    expect(parseRecordMeta(META())).toMatchObject({ decided: null, deferred: null, turn: null, label: null });
+    expect(parseRecordMeta(META({ decided: 2.5, turn: "", label: 7 }))).toMatchObject({ decided: null, turn: null, label: null });
+  });
   it("missing new fields read as empty (records from before M5a)", () => {
     const old: Record<string, unknown> = { ...META() };
     delete old.tags;

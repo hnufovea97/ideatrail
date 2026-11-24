@@ -19,7 +19,7 @@ describe("read model (ADR-0018 shape)", () => {
     expect(issues).toEqual([]);
     const idea = ideas[0];
     expect(idea.server).toEqual({ visibility: "public", firstAt: "2026-11-03T00:00:00Z", lastAt: "2026-11-10T00:00:00Z", versionCount: 2 });
-    expect(idea.locked).toMatchObject({ title: "가계부 앱", tags: ["기획"], stage: 3, paused: false });
+    expect(idea.locked).toMatchObject({ title: "가계부 앱", tags: ["기획"], stagePreset: "build", stage: 3, paused: false });
     expect(idea.locked.stages[2]).toMatchObject({ no: 3, reached: true, estimated: false, decided: 2, deferred: 1, turn: "카드 연동 빼기", recordIds: [r2.record_id] });
     expect(idea.locked.stages[1]).toMatchObject({ reached: true, firstAt: null, decided: null, turn: null });
     expect(idea.locked.routine.find((r) => r.slot === "problem")).toEqual({ slot: "problem", filled: true, estimated: true, recordId: r1.record_id, at: "2026-11-03T00:00:00Z" });

@@ -12,6 +12,13 @@ export const CHECKLIST: readonly { key: keyof Checklist; label: string }[] = [
   { key: "folders", label: "기록할 폴더 고르기" },
 ];
 
+/** Stage names by preset id (founder 2026-11-24: names may become per-idea later — 개발/글쓰기/연구 or AI-suggested).
+ *  Only "build" exists in M5b. Always 5 names: the five slots and the milestone enum stay fixed (spec §15 M5a, G9). */
+export const STAGE_PRESETS = {
+  build: ["착상", "기획 중", "기획 확정", "개발 중", "MVP 완료"],
+} as const satisfies Record<string, readonly [string, string, string, string, string]>;
+const STAGES = STAGE_PRESETS.build;
+
 // Plain-language words (G1 founder feedback): the device unlock is the 열쇠, the phone the 예비 열쇠, the private
 // GitHub repo the 증명 보관함, the recovery key the 비상 열쇠, the engine the 기록 도우미. copy.test.ts bans the
 // technical names on screen.
@@ -36,7 +43,7 @@ export const COPY = {
       first: "26.11.03",
       last: "26.11.18",
       labels: { first: "최초 기록", last: "마지막 기록", decided: "결정", deferred: "미룸", turn: "변곡점", file: "원래 위치" },
-      stages: ["착상", "기획 중", "기획 확정", "개발 중", "MVP 완료"],
+      stages: STAGES,
       current: 2,
       stageRange: "11.10 – 11.18",
       decided: 2,
