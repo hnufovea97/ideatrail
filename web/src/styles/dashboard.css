@@ -8,6 +8,15 @@
   --mark: #D93025; /* ADR-0018 hand-drawn circle */
   --fg: var(--text); --muted: var(--text-sub); --accent: var(--primary); --accent-fg: #FFFFFF; --warn: var(--err);
 }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #85B7EB; --primary-strong: #B5D4F4; --primary-soft: #0C447C;
+    --bg: #1F1F1E; --card: #2C2C2A; --paper: #2C2C2A; --line: #444441;
+    --text: #F1EFE8; --text-body: #D3D1C7; --text-sub: #B4B2A9; --text-off: #5F5E5A;
+    --ok: #C0DD97; --ok-bg: #27500A; --wait: #FAC775; --wait-bg: #633806; --err: #F7C1C1; --err-bg: #501313;
+    --mark: #FF7A6E; --accent-fg: #1F1F1E;
+  }
+}
 main.dash { max-width: 1200px; font-variant-numeric: tabular-nums; color: var(--text-body); }
 main.dash h1, main.dash h2, main.dash h3 { color: var(--text); font-weight: 500; }
 .dash-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
