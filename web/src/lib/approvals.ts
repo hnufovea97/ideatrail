@@ -34,7 +34,7 @@ function toUpdate(raw: unknown): UpdateInfo {
   if (!u || typeof u !== "object" || typeof u.from !== "string" || typeof u.to !== "string" || !VERSION.test(u.from) || !VERSION.test(u.to)) throw new Error("summary_invalid");
   if (!Array.isArray(u.changes) || u.changes.length > MAX_CHANGES) throw new Error("summary_invalid");
   const changes = u.changes.map((c: unknown) => {
-    if (typeof c !== "string" || c.length < 1 || c.length > MAX_CHANGE_CHARS || CONTROL.test(c)) throw new Error("summary_invalid");
+    if (typeof c !== "string" || c.length < 1 || [...c].length > MAX_CHANGE_CHARS || CONTROL.test(c)) throw new Error("summary_invalid");
     return c;
   });
   return { from: u.from, to: u.to, changes };

@@ -44,6 +44,9 @@ type Deps struct {
 	Keys     *keys.Keys
 	StateDir string
 	Now      func() time.Time
+	// OnlyUpdate: handle nothing but the dashboard's answer to an update request; every other
+	// message stays in the inbox untouched (not read as seen, not deleted) for a later round.
+	OnlyUpdate bool
 }
 
 func (d Deps) now() time.Time {
@@ -130,9 +133,7 @@ func RequestUpdate(ctx context.Context, d Deps, from, to string, changes []strin
 	if st.UserID == "" || st.AccountPub == "" {
 		return "", ErrNotPaired
 	}
-	if openApprovals(st, d.now()) >= MaxOpen {
-		return "", ErrTooMany
-	}
+	// no MaxOpen check: the engine stays locked until this request is answered
 	if changes == nil {
 		changes = []string{}
 	}
@@ -163,7 +164,7 @@ func submit(ctx context.Context, d Deps, st *state.State, a state.Approval, seal
 	var body []byte
 	err = state.With(d.StateDir, func(s *state.State) error {
 		prune(s, d.now())
-		if openApprovals(s, d.now()) >= MaxOpen { // re-check under the lock
+		if kind != "update" && openApprovals(s, d.now()) >= MaxOpen { // re-check under the lock; an update request is never refused here
 			return ErrTooMany
 		}
 		seq, err := s.ApprSeq.Next()
@@ -366,6 +367,9 @@ func handle(d Deps, pub kem.PublicKey, m message) (Event, bool, bool) {
 	var ev Event
 	ok := false
 	err = state.With(d.StateDir, func(s *state.State) error {
+		if d.OnlyUpdate && !isUpdateAnswer(s, p, boundTo, d.now()) {
+			return errKeep
+		}
 		if !s.RememberMsgID(m.MsgID) {
 			return errReplay
 		}
@@ -433,6 +437,9 @@ func handle(d Deps, pub kem.PublicKey, m message) (Event, bool, bool) {
 	if errors.Is(err, errReplay) {
 		return Event{}, false, false
 	}
+	if errors.Is(err, errKeep) {
+		return Event{}, false, true
+	}
 	if err != nil {
 		return Event{}, false, true
 	}
@@ -455,7 +462,19 @@ func answerUpdate(s *state.State, a state.Approval, approved bool) (Event, bool)
 	return Event{Kind: "update_rejected"}, true
 }
 
-var errReplay = errors.New("replayed message")
+var (
+	errReplay = errors.New("replayed message")
+	errKeep   = errors.New("message kept for later")
+)
+
+// isUpdateAnswer: an approval_result bound to one of this engine's own open update requests.
+func isUpdateAnswer(s *state.State, p payload, boundTo string, now time.Time) bool {
+	a, ok := s.Approvals[p.ApprovalID]
+	return p.Type == "approval_result" && ok && a.Kind == "update" && !a.Done && p.ApprovalID == boundTo && !expired(a, now)
+}
+
+// Expired reports whether an approval request is older than the approval lifetime.
+func Expired(a state.Approval, now time.Time) bool { return expired(a, now) }
 
 func expired(a state.Approval, now time.Time) bool {
 	t, err := time.Parse(time.RFC3339, a.CreatedAt)

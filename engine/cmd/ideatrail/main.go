@@ -34,6 +34,7 @@ const (
 	msgNotReady    = "ideatrail: 정식으로 배포된 기록 도우미가 아니라서 실행할 수 없어요. 플러그인을 다시 설치해 주세요."
 	msgTampered    = "ideatrail: 기록 도우미 파일이 바뀐 것 같아 멈췄어요. 플러그인을 다시 설치해 주세요."
 	msgKeyChanged  = "ideatrail: 새 버전의 서명 열쇠가 처음 설치한 것과 달라서 멈췄어요. 플러그인을 다시 설치해 주세요."
+	msgStateBroken = "ideatrail: 기록 도우미의 상태 파일을 읽지 못해서 멈췄어요. 도움말을 확인해 주세요."
 	msgSynced      = "ideatrail: 기록 도우미의 보관 폴더가 동기화 폴더(iCloud·Dropbox·Syncthing 등) 안에 있어서 멈췄어요."
 	msgStartFailed = "ideatrail: 기록 도우미를 시작하지 못했어요. Claude Code를 다시 켜 주세요."
 	githubAPI      = "https://api.github.com"
@@ -88,15 +89,22 @@ func verifySelf(stderr io.Writer) (int, bool) {
 	if paths, err := config.Locate(); err == nil {
 		stateDir = paths.Engine
 	}
-	switch err := releaseCheck(config.ReleasePub, exe, runtime.GOOS, releaseArch(), config.Version, stateDir); {
-	case errors.Is(err, update.ErrKeyChanged):
-		fmt.Fprintln(stderr, msgKeyChanged)
-		return 1, false
-	case err != nil:
-		fmt.Fprintln(stderr, msgTampered)
+	if err := releaseCheck(config.ReleasePub, exe, runtime.GOOS, releaseArch(), config.Version, stateDir); err != nil {
+		fmt.Fprintln(stderr, releaseMessage(err))
 		return 1, false
 	}
 	return 0, true
+}
+
+// releaseMessage is the fixed sentence for a refused release check.
+func releaseMessage(err error) string {
+	switch {
+	case errors.Is(err, update.ErrKeyChanged):
+		return msgKeyChanged
+	case errors.Is(err, errStateUnreadable):
+		return msgStateBroken
+	}
+	return msgTampered
 }
 
 // releaseCheck refuses a binary whose embedded key differs from the key pinned at first install,
@@ -106,7 +114,7 @@ func releaseCheck(embeddedKey, exe, goos, goarch, version, stateDir string) erro
 		if _, err := os.Stat(stateDir); err == nil {
 			pinned, err := update.Pinned(stateDir)
 			if err != nil {
-				return selfcheck.ErrBadSignature
+				return errStateUnreadable
 			}
 			if pinned != "" && pinned != embeddedKey {
 				return update.ErrKeyChanged

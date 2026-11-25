@@ -6,11 +6,13 @@ package update
 import (
 	_ "embed"
 	"errors"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 
+	"ideatrail/engine/internal/config"
 	"ideatrail/engine/internal/state"
 )
 
@@ -20,6 +22,15 @@ const (
 	// MsgDowngrade is the single line shown when the version went backwards.
 	MsgDowngrade = "이전 버전으로 바뀌었어요."
 )
+
+// ErrBadVersion: a release binary whose version is not a plain major.minor.patch number.
+var ErrBadVersion = errors.New("version is not a release number")
+
+var releaseVersion = regexp.MustCompile(`^\d{1,4}\.\d{1,4}\.\d{1,4}$`)
+
+// IsReleaseVersion reports whether v is a plain major.minor.patch number (the line the dashboard
+// and the engine agree on).
+func IsReleaseVersion(v string) bool { return releaseVersion.MatchString(v) }
 
 // ErrKeyChanged: the embedded release key differs from the one pinned at first install.
 var ErrKeyChanged = errors.New("release key differs from the pinned key")
@@ -96,13 +107,22 @@ func Pinned(stateDir string) (string, error) {
 // a user who has not signed up are accepted; a changed version for a signed-up user waits.
 func Check(stateDir, version string) (Status, error) {
 	var out Status
+	if !IsReleaseVersion(version) {
+		if config.Dev() {
+			return out, nil // a development build never asks for approval
+		}
+		return out, ErrBadVersion
+	}
 	err := state.With(stateDir, func(s *state.State) error {
 		out = Status{}
 		switch {
 		case s.ApprovedVersion == "" || s.UserID == "":
 			s.ApprovedVersion, s.UpdatePending = version, nil
 		case s.ApprovedVersion == version:
-			s.UpdatePending = nil
+			// only the request for this very version is settled; a newer waiting one stays
+			if s.UpdatePending != nil && s.UpdatePending.Version == version {
+				s.UpdatePending = nil
+			}
 		default:
 			if s.UpdatePending == nil || s.UpdatePending.Version != version {
 				s.UpdatePending = &state.UpdatePending{Version: version}
@@ -185,7 +205,10 @@ func cleanLine(s string) string {
 
 func parseVersion(v string) ([3]int, bool) {
 	var out [3]int
-	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	v = strings.TrimSpace(v)
+	if !IsReleaseVersion(v) {
+		return out, false
+	}
 	parts := strings.Split(v, ".")
 	if len(parts) != 3 {
 		return out, false

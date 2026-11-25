@@ -33,6 +33,7 @@ type gate struct {
 func newGate(t *testing.T) *gate {
 	t.Helper()
 	g := &gate{env: newEnv(t, true)}
+	g.e.Version = "0.2.0"
 	sk, pk, _ := ic.GenerateKEMKey(rand.Reader)
 	g.acct = sk
 	raw, _ := pk.MarshalBinary()
@@ -177,5 +178,66 @@ func TestNotSignedUpIsNeverBlocked(t *testing.T) {
 	e.e.StartUpdateGate(context.Background())
 	if out, _ := e.call(t, "status", map[string]any{}); out == update.WaitingLine("0.2.0") {
 		t.Fatalf("%q", out)
+	}
+}
+
+func TestOlderBinaryCannotUnlockANewerPendingVersion(t *testing.T) {
+	g := newGate(t)                                                // 0.1.0 approved, 0.2.0 pending, this process is 0.2.0
+	if _, err := update.Check(g.e.StateDir, "0.1.0"); err != nil { // the AI starts the cached older binary
+		t.Fatal(err)
+	}
+	if update.Pending(g.e.StateDir) == nil {
+		t.Fatal("the older binary cleared the request for 0.2.0")
+	}
+	if out, _ := g.call(t, "status", map[string]any{}); out != update.WaitingLine("0.2.0") {
+		t.Fatalf("0.2.0 unlocked by an older binary: %q", out)
+	}
+	g.answer(t, "approved")
+	_, _ = g.call(t, "status", map[string]any{})
+	g.settle(t, func() bool { s, _ := state.Read(g.e.StateDir); return s.ApprovedVersion == "0.2.0" })
+	if out, _ := g.call(t, "status", map[string]any{}); out == update.WaitingLine("0.2.0") {
+		t.Fatalf("still blocked after approval: %q", out)
+	}
+}
+
+func TestBlockedEngineHandlesOnlyTheUpdateAnswer(t *testing.T) {
+	g := newGate(t)
+	connect, _ := json.Marshal(map[string]any{"v": 1, "type": "connect_github", "issued_at": ic.FormatTime(time.Now())})
+	connectID, _ := ic.NewID(rand.Reader)
+	sealedConnect, err := ic.SealAuth(ic.KindEngineInbox, g.e.Keys.KEMPub, g.acct, ic.AAD{UserID: gateUser, RootID: "", RecordID: connectID}, connect)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _ := state.Read(g.e.StateDir)
+	id := s.UpdatePending.ApprovalID
+	pt, _ := json.Marshal(map[string]any{"v": 1, "type": "approval_result", "approval_id": id, "decision": "approved", "issued_at": ic.FormatTime(time.Now())})
+	updID, _ := ic.NewID(rand.Reader)
+	sealedUpd, _ := ic.SealAuth(ic.KindEngineInbox, g.e.Keys.KEMPub, g.acct, ic.AAD{UserID: gateUser, RootID: id, RecordID: updID}, pt)
+	var deleted []string
+	g.srv.Handle("DELETE", "/v1/inbox/:id", func(w http.ResponseWriter, r *http.Request, _ []byte, _ string) {
+		g.mu.Lock()
+		deleted = append(deleted, r.URL.Path)
+		g.mu.Unlock()
+		testsrv.JSON(w, 200, map[string]any{})
+	})
+	g.mu.Lock()
+	g.inbox = []map[string]string{{"msg_id": connectID, "sealed": ic.B64(sealedConnect)}, {"msg_id": updID, "sealed": ic.B64(sealedUpd)}}
+	g.mu.Unlock()
+
+	if n := g.e.inboxRound(context.Background()); n != 1 {
+		t.Fatalf("events %d", n)
+	}
+	g.mu.Lock()
+	got := append([]string(nil), deleted...)
+	g.mu.Unlock()
+	if len(got) != 1 || got[0] != "/v1/inbox/"+updID {
+		t.Fatalf("deleted %v (the GitHub message must stay)", got)
+	}
+	if st, _ := state.Read(g.e.StateDir); st.ApprovedVersion != "0.2.0" {
+		t.Fatalf("update not applied: %+v", st)
+	}
+	// unblocked now: the kept message is handled
+	if n := g.e.inboxRound(context.Background()); n != 1 {
+		t.Fatalf("the kept message was not handled later: %d", n)
 	}
 }

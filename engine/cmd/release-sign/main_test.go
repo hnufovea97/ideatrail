@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -119,3 +122,44 @@ func TestUsageErrorsAreFixedAndShort(t *testing.T) {
 }
 
 func runtimeUnix() bool { return runtime.GOOS != "windows" }
+
+func TestSignRefusesAKeyFileOthersCanRead(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("file modes do not apply")
+	}
+	_, key, art := fixture(t)
+	if err := os.Chmod(key, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, _, e := call("sign", "-key", key, "-version", "0.1.0", art+"=darwin/universal")
+	if code == 0 || strings.TrimSpace(e) != msgKeyBad {
+		t.Fatalf("%d %q", code, e)
+	}
+	if _, err := os.Stat(art + ".sig"); err == nil {
+		t.Fatal("signed with a readable key")
+	}
+}
+
+func TestSignRefusesAFullKeyWhosePublicHalfDoesNotMatchTheSeed(t *testing.T) {
+	_, key, art := fixture(t)
+	raw, _ := os.ReadFile(key)
+	seed, _ := base64.RawURLEncoding.DecodeString(strings.TrimSpace(string(raw)))
+	full := append([]byte(nil), ed25519.NewKeyFromSeed(seed)...)
+	_, other, _ := ed25519.GenerateKey(rand.Reader)
+	copy(full[32:], other[32:]) // a public half that is not this seed's
+	bad := filepath.Join(t.TempDir(), "bad.key")
+	if err := os.WriteFile(bad, []byte(base64.RawURLEncoding.EncodeToString(full)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, _, e := call("sign", "-key", bad, "-version", "0.1.0", art+"=darwin/universal")
+	if code == 0 || strings.TrimSpace(e) != msgKeyBad {
+		t.Fatalf("%d %q", code, e)
+	}
+	good := filepath.Join(t.TempDir(), "good.key")
+	if err := os.WriteFile(good, []byte(base64.RawURLEncoding.EncodeToString(ed25519.NewKeyFromSeed(seed))+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, e := call("sign", "-key", good, "-version", "0.1.0", art+"=darwin/universal"); code != 0 {
+		t.Fatalf("a consistent full key was refused: %q", e)
+	}
+}

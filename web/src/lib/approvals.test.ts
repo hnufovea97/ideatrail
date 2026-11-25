@@ -90,6 +90,14 @@ describe("openApprovals (5.9a)", () => {
     expect(await openApprovals([await row(w, upd(edge))], w.list, w.vault)).toHaveLength(1);
   });
 
+  it("counts a change line in code points like the engine: 200 emoji pass, 201 are dropped", async () => {
+    const w = fakeWorld();
+    const ok = { ...UPDATE, changes: ["😀".repeat(200)] };
+    const tooLong = { ...UPDATE, changes: ["😀".repeat(201)] };
+    expect(await openApprovals([await row(w, upd(ok))], w.list, w.vault)).toHaveLength(1);
+    expect(await openApprovals([await row(w, upd(tooLong))], w.list, w.vault)).toEqual([]);
+  });
+
   it("keeps the highest appr_seq per engine: it only goes up, and no row is dropped for its number", async () => {
     const w = fakeWorld();
     const marks = memoryStore();

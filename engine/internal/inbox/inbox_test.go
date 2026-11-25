@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -505,5 +506,52 @@ func TestRequestUpdateNeedsPairing(t *testing.T) {
 	_ = state.With(e.d.StateDir, func(s *state.State) error { s.UserID = ""; return nil })
 	if _, err := RequestUpdate(context.Background(), e.d, "0.1.0", "0.2.0", nil); !errors.Is(err, ErrNotPaired) {
 		t.Fatalf("%v", err)
+	}
+}
+
+func TestRequestUpdateIgnoresTheOpenRequestLimit(t *testing.T) {
+	e := newEnv(t)
+	for i := 0; i < MaxOpen; i++ {
+		d := filepath.Join(filepath.Dir(e.folder), "idea"+string(rune('a'+i)))
+		_ = os.MkdirAll(d, 0o700)
+		if _, err := RequestImport(context.Background(), e.d, "import", []string{d}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pendingUpdate(t, e, "0.2.0")
+	if _, err := RequestUpdate(context.Background(), e.d, "0.1.0", "0.2.0", nil); err != nil {
+		t.Fatalf("a full request list kept the update request away: %v", err)
+	}
+}
+
+func TestOnlyUpdateModeHandlesUpdateAnswersAndLeavesTheRestUntouched(t *testing.T) {
+	e := newEnv(t)
+	imp, _ := RequestImport(context.Background(), e.d, "import", []string{e.folder})
+	pendingUpdate(t, e, "0.2.0")
+	upd, _ := RequestUpdate(context.Background(), e.d, "0.1.0", "0.2.0", nil)
+	gh := e.send(t, "", map[string]any{"type": "connect_github"}, e.akPriv)
+	folderAnswer := e.send(t, imp, map[string]any{"type": "approval_result", "approval_id": imp, "decision": "approved"}, e.akPriv)
+	updAnswer := e.send(t, upd, map[string]any{"type": "approval_result", "approval_id": upd, "decision": "approved"}, e.akPriv)
+
+	d := e.d
+	d.OnlyUpdate = true
+	ev, err := Process(context.Background(), d)
+	if err != nil || len(ev) != 1 || ev[0].Kind != "update_approved" {
+		t.Fatalf("%+v %v", ev, err)
+	}
+	if len(folders(t, e)) != 0 {
+		t.Fatal("a folder was registered while only the update may be answered")
+	}
+	deleted := strings.Join(e.deleted, " ")
+	if !strings.Contains(deleted, updAnswer) || strings.Contains(deleted, gh) || strings.Contains(deleted, folderAnswer) {
+		t.Fatalf("deleted: %s", deleted)
+	}
+	// later (no longer blocked) the kept messages are still there and handled
+	ev, err = Process(context.Background(), e.d)
+	if err != nil || len(ev) != 2 {
+		t.Fatalf("%+v %v", ev, err)
+	}
+	if len(folders(t, e)) != 1 {
+		t.Fatal("kept folder answer was lost")
 	}
 }

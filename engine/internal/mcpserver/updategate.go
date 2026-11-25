@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"ideatrail/engine/internal/config"
 	"ideatrail/engine/internal/inbox"
 	"ideatrail/engine/internal/record"
 	"ideatrail/engine/internal/state"
@@ -15,10 +16,31 @@ import (
 // fixed line and do nothing else. The state is read on every call, so the answer that arrives
 // through the inbox unlocks the tools without a restart.
 
-// updateBlock returns the waiting line when a new version is not approved yet.
+// updateBlock returns the waiting line unless the user approved exactly the version this process
+// runs. The approved version is read on every call, so an older binary that started later (and
+// cleared nothing) can never unlock a newer one, and the dashboard's answer unlocks without a restart.
 func (e *Engine) updateBlock() (string, bool) {
-	line := update.BlockLine(update.Pending(e.StateDir))
-	return line, line != ""
+	if config.Dev() {
+		return "", false
+	}
+	st, err := state.Read(e.StateDir)
+	if err != nil {
+		return update.WaitingLine(e.Version), true // unreadable state: fail closed
+	}
+	if st.UserID == "" || st.ApprovedVersion == "" || st.ApprovedVersion == e.Version {
+		return "", false
+	}
+	if st.UpdatePending == nil || st.UpdatePending.Version != e.Version {
+		// not approved and no request for this version in state: make it again
+		_, _ = update.Check(e.StateDir, e.Version)
+		if st, err = state.Read(e.StateDir); err != nil {
+			return update.WaitingLine(e.Version), true
+		}
+	}
+	if st.UpdatePending != nil && st.UpdatePending.Version == e.Version {
+		return update.BlockLine(st.UpdatePending), true
+	}
+	return update.WaitingLine(e.Version), true
 }
 
 // blockedTool answers the waiting line and keeps the inbox round going so the approval can arrive.
@@ -86,9 +108,5 @@ func (e *Engine) ensureUpdateRequest(ctx context.Context, restart bool) {
 // openApproval reports whether the request is still waiting for an answer.
 func openApproval(st *state.State, id string) bool {
 	a, ok := st.Approvals[id]
-	if !ok || a.Done {
-		return false
-	}
-	t, err := time.Parse(time.RFC3339, a.CreatedAt)
-	return err == nil && time.Since(t) <= 7*24*time.Hour
+	return ok && !a.Done && !inbox.Expired(a, time.Now())
 }

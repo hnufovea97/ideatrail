@@ -11,17 +11,17 @@ on:
 permissions:
   contents: read
 jobs:
-  build:
+  test:
     runs-on: macos-latest
     permissions:
-      contents: write        # 초안 릴리스 만들기
-      id-token: write        # 빌드 증명 서명(Sigstore)
-      attestations: write
+      contents: read         # 시험 단계에는 쓰기 권한이 없다
+    outputs:
+      version: ${{ steps.v.outputs.version }}
     env:
       RELEASE_PUB: ${{ vars.RELEASE_PUB }}   # 공개키(비밀 아님). 저장소 변수로 founder가 넣는다
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with: { go-version-file: engine/go.mod }
       - name: 버전 정하기
         id: v
@@ -35,20 +35,33 @@ jobs:
           echo "version=$v" >> "$GITHUB_OUTPUT"
       - name: 엔진 시험
         run: cd engine && go test ./...
+  build:
+    needs: test
+    runs-on: macos-latest
+    permissions:
+      contents: write        # 초안 릴리스 만들기
+      id-token: write        # 빌드 증명 서명(Sigstore)
+      attestations: write
+    env:
+      RELEASE_PUB: ${{ vars.RELEASE_PUB }}
+      V: ${{ needs.test.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with: { go-version-file: engine/go.mod }
       - name: 빌드 (Mac universal, 임시 서명)
-        env: { V: "${{ steps.v.outputs.version }}" }
         run: make build VERSION="$V" RELEASE_PUB="$RELEASE_PUB"
       - name: 릴리스 파일 모으기
         run: |
           mkdir -p out
           cp plugin/engine/darwin/ideatrail out/ideatrail-darwin
           (cd out && shasum -a 256 ideatrail-darwin > SHA256SUMS)
-      - uses: actions/attest-build-provenance@v2
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: out/ideatrail-darwin
       - name: 초안 릴리스
-        env: { GH_TOKEN: "${{ github.token }}", V: "${{ steps.v.outputs.version }}" }
+        env: { GH_TOKEN: "${{ github.token }}" }
         run: |
           gh release create "v$V" out/ideatrail-darwin out/SHA256SUMS \
-            --draft --title "ideatrail $V" \
+            --draft --target "$GITHUB_SHA" --title "ideatrail $V" \
             --notes "서명 전 초안이에요. founder가 release-sign으로 서명한 .sig를 붙인 뒤 게시해요."

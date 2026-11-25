@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/sha256"
@@ -14,6 +15,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"ideatrail/engine/internal/selfcheck"
@@ -164,6 +166,15 @@ func parseTargets(args []string) ([]target, bool) {
 
 // readKey accepts the base64url seed keygen writes (or a full 64-byte key).
 func readKey(path string) (ed25519.PrivateKey, error) {
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil {
+			return nil, err
+		}
+		if info.Mode().Perm()&0o077 != 0 {
+			return nil, errors.New("key file is readable by others")
+		}
+	}
 	text, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -176,7 +187,11 @@ func readKey(path string) (ed25519.PrivateKey, error) {
 	case ed25519.SeedSize:
 		return ed25519.NewKeyFromSeed(raw), nil
 	case ed25519.PrivateKeySize:
-		return ed25519.PrivateKey(raw), nil
+		full := ed25519.PrivateKey(raw)
+		if !bytes.Equal(full.Public().(ed25519.PublicKey), ed25519.NewKeyFromSeed(full.Seed()).Public().(ed25519.PublicKey)) {
+			return nil, errors.New("key halves do not match")
+		}
+		return full, nil
 	}
 	return nil, errors.New("bad key")
 }

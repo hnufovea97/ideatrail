@@ -82,11 +82,48 @@ func TestCheckVersionChangeWhileSignedUpIsPending(t *testing.T) {
 	if s.UpdatePending.ApprovalID != "appr" {
 		t.Fatal("pending record replaced for the same version")
 	}
-	// rolling back to the approved version clears it
+	// an older approved binary does not clear the request for the newer one
 	st, _ = Check(d, "0.1.0")
 	s, _ = state.Read(d)
-	if st.Pending || s.UpdatePending != nil {
+	if st.Pending || s.UpdatePending == nil || s.UpdatePending.Version != "0.2.0" {
 		t.Fatalf("%+v %+v", st, s)
+	}
+}
+
+func TestCheckOlderApprovedVersionKeepsAPendingNewerOne(t *testing.T) {
+	d := dir(t)
+	signedUp(t, d)
+	_, _ = Check(d, "0.8.0")
+	_, _ = Check(d, "0.9.0")
+	if st, _ := Check(d, "0.8.0"); st.Pending {
+		t.Fatalf("%+v", st)
+	}
+	s, _ := state.Read(d)
+	if s.UpdatePending == nil || s.UpdatePending.Version != "0.9.0" || s.ApprovedVersion != "0.8.0" {
+		t.Fatalf("pending cleared by an older binary: %+v", s)
+	}
+}
+
+func TestCheckRefusesAVersionThatIsNotAReleaseNumber(t *testing.T) {
+	for _, v := range []string{"dev", "v0.1.0", "0.1", "0.1.0-rc1", "00000.1.0", "1.2.3.4", ""} {
+		d := dir(t)
+		signedUp(t, d)
+		_, _ = Check(d, "0.1.0")
+		if _, err := Check(d, v); !errors.Is(err, ErrBadVersion) {
+			t.Fatalf("%q: %v", v, err)
+		}
+		if s, _ := state.Read(d); s.UpdatePending != nil || s.ApprovedVersion != "0.1.0" {
+			t.Fatalf("%q changed state: %+v", v, s)
+		}
+	}
+}
+
+func TestParseVersionRejectsAVPrefix(t *testing.T) {
+	if _, ok := parseVersion("v0.1.0"); ok {
+		t.Fatal("accepted v prefix")
+	}
+	if _, ok := parseVersion("0.1.0"); !ok {
+		t.Fatal("rejected plain version")
 	}
 }
 

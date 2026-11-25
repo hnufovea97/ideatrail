@@ -141,3 +141,22 @@ func TestReleaseCheckWithoutStateFolderStillVerifies(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestUnreadableStateIsNotReportedAsTampering(t *testing.T) {
+	pub, priv := newKey(t)
+	exe := signedExe(t, priv, "0.1.0")
+	d := t.TempDir()
+	if err := os.WriteFile(filepath.Join(d, "state.json"), []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := releaseCheck(pub, exe, "linux", "amd64", "0.1.0", d)
+	if !errors.Is(err, errStateUnreadable) {
+		t.Fatalf("%v", err)
+	}
+	if got := releaseMessage(err); got != msgStateBroken || got == msgTampered {
+		t.Fatalf("%q", got)
+	}
+	if releaseMessage(selfcheck.ErrBadSignature) != msgTampered || releaseMessage(update.ErrKeyChanged) != msgKeyChanged {
+		t.Fatal("other messages changed")
+	}
+}

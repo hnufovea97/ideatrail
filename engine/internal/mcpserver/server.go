@@ -315,6 +315,12 @@ func (e *Engine) background() {
 
 // Tick is one round of background work (exported for tests and the session-start path).
 func (e *Engine) Tick(ctx context.Context) {
+	if _, blocked := e.updateBlock(); blocked {
+		// waiting for the update approval: no recording, uploads or GitHub work
+		e.ensureUpdateRequest(ctx, false)
+		e.inboxRound(ctx)
+		return
+	}
 	e.inboxRound(ctx)
 	e.resumeImport()
 	record.Flush(ctx, e.Record)
@@ -325,8 +331,10 @@ func (e *Engine) Tick(ctx context.Context) {
 
 // inboxRound sends pending approval requests and acts on the inbox; it returns the event count.
 func (e *Engine) inboxRound(ctx context.Context) int {
-	inbox.SendPending(ctx, e.Inbox)
-	events, err := inbox.Process(ctx, e.Inbox)
+	d := e.Inbox
+	_, d.OnlyUpdate = e.updateBlock() // until the new version is approved only that answer is handled
+	inbox.SendPending(ctx, d)
+	events, err := inbox.Process(ctx, d)
 	if err != nil {
 		return 0
 	}
