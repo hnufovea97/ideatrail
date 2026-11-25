@@ -81,7 +81,7 @@ export function LockScreen({ api, notice, onOpen }: Props) {
       <p class="small">{COPY.dash.openHint}</p>
       {inApp ? <p class="small" role="note">{COPY.dash.inApp[inApp]}</p> : null}
       <button type="button" class="link" onClick={() => { setMade(false); setRecovering(true); }}>{COPY.recoveryOpen.link}</button>
-      {outside ? <a class="button" href={outside}>{COPY.dash.inApp.openOutside}</a> : null}
+      {outside ? <a class="button" href={outside}>{inApp === "whale" ? COPY.dash.inApp.openChrome : COPY.dash.inApp.openOutside}</a> : null}
     </Screen>
   );
 }

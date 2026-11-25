@@ -20,4 +20,10 @@ describe("inAppBrowser (G2: passkeys fail inside chat-app browsers)", () => {
     expect(externalOpenUrl("kakao", "https://x.dev/home/?a=1")).toBe("kakaotalk://web/openExternal?url=https%3A%2F%2Fx.dev%2Fhome%2F%3Fa%3D1");
     expect(externalOpenUrl("other", "https://x.dev/home/")).toBeNull();
   });
+  it("finds Whale on Android (G2 2026-11-25: no device lock there) and sends it to Chrome", () => {
+    const whale = `${CHROME} Whale/4.30.302.12`;
+    expect(inAppBrowser(whale)).toBe("whale");
+    expect(externalOpenUrl("whale", "https://x.dev/home/?a=1")).toBe("intent://x.dev/home/?a=1#Intent;scheme=https;package=com.android.chrome;end");
+    expect(inAppBrowser("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Whale/4.30 Safari/537.36")).toBeNull(); // not tested on Windows
+  });
 });

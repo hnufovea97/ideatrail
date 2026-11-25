@@ -147,7 +147,7 @@ export function PcStep({ api, ctx, setCtx, state, dispatch }: StepProps) {
     return (
       <Screen step={stepNumber(state.step)} title={COPY.pc.title} why={COPY.pc.why} done={state.done} error={error}>
         <p class="small" role="note">{COPY.dash.inApp[inApp]}</p>
-        {outside ? <a class="button" href={outside}>{COPY.dash.inApp.openOutside}</a> : null}
+        {outside ? <a class="button" href={outside}>{inApp === "whale" ? COPY.dash.inApp.openChrome : COPY.dash.inApp.openOutside}</a> : null}
       </Screen>
     );
   }
