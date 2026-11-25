@@ -27,7 +27,7 @@ describe("screen copy", () => {
   });
   it("tells, before each action, what will pop up, and after it, what was just made", () => {
     for (const k of ["pc", "phone", "github", "recovery", "folders"] as const) expect(COPY.did[k]).toMatch(/^✓ /);
-    expect(COPY.pc.ahead).toContain("Touch ID");
+    expect(COPY.pc.ahead).toContain("지문·얼굴"); // 2026-11-25 founder: 기기 이름 대신 누구에게나 맞는 말 (D2 바뀜)
     expect(didLine({ ...initialState, justDid: "pc" })).toBe("✓ 이 컴퓨터에 열쇠를 만들었어요. 사용자의 기록은 이 열쇠로만 열려요");
     expect(didLine(initialState)).toBeNull();
     expect(COPY.intro.time).toContain("5분");
