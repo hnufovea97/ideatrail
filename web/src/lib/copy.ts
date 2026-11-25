@@ -218,7 +218,7 @@ export const COPY = {
     link_expired: "이 링크는 시간이 지났어요. Claude Code에 \"설치 링크 다시 줘\"라고 말해 주세요",
     link_used: "이 링크는 이미 쓰였어요. Claude Code에서 설치 링크를 다시 받아 주세요", // 새 문구
     no_prf: "이 브라우저에서는 열쇠를 만들 수 없어요. Chrome이나 Safari로 열어 주세요",
-    prf_missing: "이 브라우저에선 열쇠로 내용을 열 수 없어요. Chrome이나 Safari 최신 버전으로 열어 주세요. 시험을 마친 브라우저: Chrome(갤럭시·Mac), Safari(Mac), Edge(Windows)",
+    prf_missing: "이 브라우저에선 열쇠로 내용을 열 수 없어요. Chrome이나 Safari 최신 버전으로 열어 주세요. 시험을 마친 브라우저: Chrome(갤럭시·Mac), 삼성 인터넷(갤럭시), Safari(Mac), Edge(Windows)",
     offline: "인터넷이 끊겼어요. 연결되면 다시 불러올게요",
     not_registered: "이 기기는 아직 등록 안 됐어요. 쓰던 기기에서 '기기 추가'를 눌러 주세요",
     failed: "잠시 문제가 생겼어요. Claude Code에서 설치 링크를 다시 받아 주세요", // 새 문구
@@ -256,17 +256,17 @@ export const COPY = {
     },
     errors: {
       passkey_cancel: "기기 잠금 확인이 안 됐어요. 다시 해 볼까요?",
-      prf_missing: "이 브라우저에선 열쇠로 내용을 열 수 없어요. Chrome이나 Safari 최신 버전으로 열어 주세요. 시험을 마친 브라우저: Chrome(갤럭시·Mac), Safari(Mac), Edge(Windows)",
+      prf_missing: "이 브라우저에선 열쇠로 내용을 열 수 없어요. Chrome이나 Safari 최신 버전으로 열어 주세요. 시험을 마친 브라우저: Chrome(갤럭시·Mac), 삼성 인터넷(갤럭시), Safari(Mac), Edge(Windows)",
       not_registered: "이 기기는 아직 등록 안 됐어요. 쓰던 기기에서 '기기 추가'를 눌러 주세요",
       retry: "잠깐 시간이 지났어요. 잠시 뒤 [이 기기로 열기]를 다시 눌러 주세요", // 새 문구 (확인 기한 지남·시도가 많음)
       offline: "인터넷이 끊겼어요. 연결되면 다시 불러올게요",
       account_mismatch: "서버에 있는 계정 열쇠가 이 기기에서 푼 것과 달라 열지 않았어요. 잠시 뒤 다시 해 주세요", // 새 문구
       engine_list_rollback: "서버가 예전 기록 도우미 목록을 보여 줘서 열지 않았어요. 쓰던 다른 기기에서 열어 확인해 주세요", // 새 문구
-      browser_unsupported: "이 브라우저에선 기기 잠금을 쓸 수 없어요. Chrome이나 Safari에서 열어 주세요. 시험을 마친 브라우저: Chrome(갤럭시·Mac), Safari(Mac), Edge(Windows)", // 새 문구 (G2)
+      browser_unsupported: "이 브라우저에선 기기 잠금을 쓸 수 없어요. Chrome이나 Safari에서 열어 주세요. 시험을 마친 브라우저: Chrome(갤럭시·Mac), 삼성 인터넷(갤럭시), Safari(Mac), Edge(Windows)", // 새 문구 (G2)
       failed: "잠시 문제가 생겼어요. 다시 해 볼까요?",
     },
     inApp: { // 새 문구 (G2: 카카오톡 안 브라우저에서 기기 잠금 실패)
-      whale: "웨일은 기기 잠금을 지원하지 않아서 쓸 수 없어요. 아래 버튼으로 Chrome에서 열어 주세요. 시험을 마친 브라우저: Chrome(갤럭시·Mac), Safari(Mac), Edge(Windows)", // 새 문구 (G2 2026-11-25)
+      whale: "웨일은 기기 잠금을 지원하지 않아서 쓸 수 없어요. 아래 버튼으로 Chrome에서 열어 주세요. 시험을 마친 브라우저: Chrome(갤럭시·Mac), 삼성 인터넷(갤럭시), Safari(Mac), Edge(Windows)", // 새 문구 (G2 2026-11-25)
       kakao: "카카오톡 안에서는 기기 잠금을 쓸 수 없어요. 아래 버튼으로 휴대폰 브라우저에서 열어 주세요",
       other: "앱 안의 브라우저에서는 기기 잠금을 쓸 수 없어요. 오른쪽 위 메뉴에서 '다른 브라우저로 열기'를 눌러 주세요",
       openOutside: "휴대폰 브라우저로 열기",
