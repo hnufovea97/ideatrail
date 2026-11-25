@@ -33,6 +33,18 @@ git -C "$t/out" ls-files | grep -q tools.json && fail "tools.json은 배포에 �
 # 조립된 엔진이 스스로 서명을 확인하고 돌아가는지 (Mac에서만 실행 가능)
 if [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = "$(go env GOARCH | sed 's/amd64/x86_64/')" ]; then
 	"$t/out/ideatrail/engine/darwin/ideatrail" version >/dev/null || fail "version 실패"
+	# Claude Code가 하듯 launch/ideatrail로 MCP를 띄워 도구 목록을 받는다 (빈 홈 폴더 = 새 Mac)
+	mkdir -p "$t/home"
+	resp=$( {
+		printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"t","version":"0"}}}'
+		printf '%s\n' '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+		printf '%s\n' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+		sleep 2
+	} | HOME="$t/home" CLAUDE_PLUGIN_ROOT="$t/out/ideatrail" "$t/out/ideatrail/launch/ideatrail" mcp 2>"$t/mcp.err" || true)
+	for name in record status request_import set_record_words; do
+		echo "$resp" | grep -q "\"name\":\"$name\"" || { cat "$t/mcp.err" >&2; fail "MCP 도구 $name 없음"; }
+	done
+	grep -q "release_key" "$t/home/Library/Application Support/ideatrail/state.json" || fail "첫 실행이 릴리스 키를 고정하지 않음"
 fi
 
 # 2. 다른 열쇠로 서명한 엔진 → 거절, 폴더 안 생김
