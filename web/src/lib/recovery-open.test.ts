@@ -3,6 +3,8 @@ import e from "../../../spec/vectors/envelope.json";
 import { fromB64u, fromHex, toB64u } from "@ideatrail/crypto/bytes";
 import { newId } from "@ideatrail/crypto/ids";
 import { prfWrapKey, unwrapMasterKey } from "@ideatrail/crypto/envelope";
+import { COPY } from "./copy";
+import { lockCreateError } from "./recovery-open";
 import { ApiFailure, type Api, type RegisterOptions, type RegisterVerifyBody } from "./api";
 import { fakeCredential } from "./testing/fake-credential";
 
@@ -116,5 +118,18 @@ describe("finishRecovery", () => {
     const prf = new Uint8Array(32).fill(7);
     await expect(finishRecovery(api, state, { credential: fakeCredential({ kind: "create", prf }), rawId: new Uint8Array(16).fill(1), prf }, prf.slice())).rejects.toBeInstanceOf(ApiFailure);
     expect(state.mk.every((b) => b === 0)).toBe(true);
+  });
+});
+
+describe("lockCreateError (G2 2026-11-25: Windows Chrome chose the phone that already holds a lock)", () => {
+  it("says the chosen device already has a lock for InvalidStateError", () => {
+    expect(lockCreateError(new DOMException("x", "InvalidStateError"))).toBe(COPY.errors.already_here);
+  });
+  it("keeps the cancel wording for a cancelled prompt", () => {
+    expect(lockCreateError(new DOMException("x", "NotAllowedError"))).toBe(COPY.errors.passkey_cancel);
+  });
+  it("adds the error name, never the message, to anything else", () => {
+    expect(lockCreateError(new DOMException("secret detail", "UnknownError"))).toBe(`${COPY.errors.generic} (${COPY.dash.errorCode} UnknownError)`);
+    expect(lockCreateError("weird")).toBe(`${COPY.errors.generic} (${COPY.dash.errorCode} unknown)`);
   });
 });

@@ -3,7 +3,7 @@ import type { Api } from "../../lib/api";
 import { prfSupport, type CapabilityEnv } from "../../lib/capability";
 import { COPY } from "../../lib/copy";
 import { inAppBrowser } from "../../lib/inapp";
-import { abandonRecovery, finishRecovery, recoveryReason, startRecovery, type RecoveryState } from "../../lib/recovery-open";
+import { abandonRecovery, finishRecovery, lockCreateError, recoveryReason, startRecovery, type RecoveryState } from "../../lib/recovery-open";
 import { verifyFailure } from "../../lib/signup/pc-flow";
 import { RECOVERY_HOLD_MS } from "../../lib/timing";
 import { createPasskey, forgetCredential, readPrf, type Created } from "../../lib/webauthn";
@@ -98,7 +98,7 @@ export function RecoveryOpen({ api, onBack, onDone }: Props) {
         setPending(c);
         setPhase("retry");
       })
-      .catch((e: unknown) => { if (alive.current) setError(e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "AbortError") ? COPY.errors.passkey_cancel : COPY.errors.generic); })
+      .catch((e: unknown) => { if (alive.current) setError(lockCreateError(e)); })
       .finally(() => { if (alive.current) setBusy(false); });
   };
 
@@ -111,7 +111,7 @@ export function RecoveryOpen({ api, onBack, onDone }: Props) {
         await forgetCredential(rpId(), pending.rawId);
         restart(COPY.stop.prf_missing);
       })
-      .catch(() => { if (alive.current) setError(COPY.errors.generic); })
+      .catch((e: unknown) => { if (alive.current) setError(lockCreateError(e)); })
       .finally(() => { if (alive.current) setBusy(false); });
   };
 

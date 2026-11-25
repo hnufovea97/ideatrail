@@ -7,6 +7,8 @@ import { recoveryProofMessage } from "@ideatrail/crypto/message";
 import { parseRecoveryKey } from "@ideatrail/crypto/recovery";
 import { sign } from "@ideatrail/crypto/sign";
 import { ApiFailure, type Api, type RegisterOptions } from "./api";
+import { COPY } from "./copy";
+import { failureCode } from "./unlock";
 import { makeEnvelope } from "./signup/account";
 import { registrationJSON, type Created } from "./webauthn";
 
@@ -80,4 +82,12 @@ export async function finishRecovery(api: Api, s: RecoveryState, created: Create
     abandonRecovery(s);
     prf.fill(0);
   }
+}
+
+/** Screen text for a failed new device lock. InvalidStateError = the chosen authenticator already holds a lock for this
+ * account (excludeCredentials) — G2 2026-11-25, Windows Chrome offered the phone. Anything else shows its name only. */
+export function lockCreateError(e: unknown): string {
+  if (e instanceof DOMException && e.name === "InvalidStateError") return COPY.errors.already_here;
+  if (e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "AbortError")) return COPY.errors.passkey_cancel;
+  return `${COPY.errors.generic} (${COPY.dash.errorCode} ${failureCode(e)})`;
 }
