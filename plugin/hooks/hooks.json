@@ -1,0 +1,7 @@
+{
+  "hooks": {
+    "SessionStart": [{ "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/launch/ideatrail\" hook session-start" }] }],
+    "Stop": [{ "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/launch/ideatrail\" hook stop" }] }],
+    "PreToolUse": [{ "matcher": "Read|Edit|Write|Bash|Grep|Glob", "hooks": [{ "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}/launch/ideatrail\" hook guard" }] }]
+  }
+}

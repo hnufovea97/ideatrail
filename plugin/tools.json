@@ -1,0 +1,171 @@
+[
+  {
+    "name": "record",
+    "description": "Record a meaningful change to an idea (plan decided, feature done, feedback applied), or a moment the user asks to keep (\"기록해 줘\" or in their own words). If it lives only in the conversation, first save it as a short Markdown note in the project folder (what was chosen, why, what was ruled out), then record that file. Not for typo fixes. The engine fingerprints, seals and anchors the files; you only describe.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "decided": {
+          "description": "How many things were decided in this record",
+          "maximum": 999,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "deferred": {
+          "description": "How many were put off for later",
+          "maximum": 999,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "label": {
+          "description": "Version name, e.g. 개요, 초안, 개선 1",
+          "maxLength": 20,
+          "type": "string"
+        },
+        "milestone": {
+          "default": "none",
+          "enum": [
+            "none",
+            "idea",
+            "plan_decided",
+            "mvp_done",
+            "feature_done",
+            "paused"
+          ],
+          "type": "string"
+        },
+        "milestone_certain": {
+          "default": false,
+          "description": "true only if the user said it or a checklist/tag shows it",
+          "type": "boolean"
+        },
+        "note": {
+          "description": "2-3 sentences: what changed and why",
+          "maxLength": 400,
+          "type": "string"
+        },
+        "paths": {
+          "description": "Files inside a registered project folder",
+          "items": {
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "type": "array"
+        },
+        "routine": {
+          "description": "Only slots newly evidenced by these files",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "estimated": {
+                "type": "boolean"
+              },
+              "slot": {
+                "enum": [
+                  "problem",
+                  "audience",
+                  "not_doing",
+                  "decision_reason",
+                  "first_run",
+                  "feedback",
+                  "changed_by_feedback"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "slot"
+            ],
+            "type": "object"
+          },
+          "maxItems": 7,
+          "type": "array"
+        },
+        "stages": {
+          "description": "First record of an idea only: 5 short stage names fitting the work (e.g. writing: 착상·개요·초고·퇴고·발행).",
+          "items": {
+            "maxLength": 12,
+            "type": "string"
+          },
+          "maxItems": 5,
+          "minItems": 5,
+          "type": "array"
+        },
+        "tags": {
+          "description": "Only on the first record of a new idea",
+          "items": {
+            "maxLength": 20,
+            "type": "string"
+          },
+          "maxItems": 5,
+          "type": "array"
+        },
+        "turn": {
+          "description": "One line if the direction changed; else omit",
+          "maxLength": 40,
+          "type": "string"
+        }
+      },
+      "required": [
+        "paths",
+        "note"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "request_import",
+    "description": "Ask to import existing notes from folders. Only shows a list; the user approves on the dashboard.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "folders": {
+          "items": {
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "maxItems": 5,
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "folders"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "set_record_words",
+    "description": "Save the user's own words that mean \"record this\" (for example \"박제해\"), used from the next conversation on. Only when the user asks to set or change them. An empty list restores the default. \"기록해 줘\" always works.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "words": {
+          "items": {
+            "maxLength": 20,
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 5,
+          "type": "array"
+        }
+      },
+      "required": [
+        "words"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "name": "status",
+    "description": "Show this project's idea: stage, empty routine slots, last record. Call before recording if unsure whether it is a new idea.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    }
+  }
+]

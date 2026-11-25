@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ideatrail": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/launch/ideatrail",
+      "args": ["mcp"]
+    }
+  }
+}

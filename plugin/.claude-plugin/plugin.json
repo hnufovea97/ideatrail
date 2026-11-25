@@ -1,0 +1,8 @@
+{
+  "name": "ideatrail",
+  "version": "0.1.0",
+  "description": "AI와 작업하는 동안 기획·문서의 변화를 저절로 기록하고 날짜를 증명해 둬요. 내용은 내 기기에서만 잠기고 풀려요.",
+  "author": { "name": "ideatrail" },
+  "license": "MIT",
+  "keywords": ["proof", "timestamp", "ideas", "planning"]
+}

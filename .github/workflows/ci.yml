@@ -26,3 +26,5 @@ jobs:
       - run: cd engine && go test ./... && go test -tags devbuild ./internal/config ./internal/home
       - run: pnpm -r typecheck
       - run: pnpm -r test
+      - run: node --test scripts/
+      - run: node scripts/measure-tokens.mjs
