@@ -7,9 +7,9 @@ import { guard, isLockedError } from "../../lib/live-key";
 import type { DashboardVault } from "../../lib/unlock";
 import { useStepup } from "../ui/useStepup";
 
-interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; credentials: readonly CredentialMeta[]; onChanged(): void }
+interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; credentials: readonly CredentialMeta[]; onChanged(): void; onRemovedHere(): void }
 
-function Row({ api, vault, signal, c, removable, onChanged }: { api: Api; vault: DashboardVault; signal: AbortSignal; c: CredentialMeta; removable: boolean; onChanged(): void }) {
+function Row({ api, vault, signal, c, removable, onChanged, onRemovedHere }: { api: Api; vault: DashboardVault; signal: AbortSignal; c: CredentialMeta; removable: boolean; onChanged(): void; onRemovedHere(): void }) {
   const m = COPY.manage.devices;
   const here = vault.credentialId !== undefined && vault.credentialId === c.credential_id;
   const [confirming, setConfirming] = useState(false);
@@ -23,7 +23,7 @@ function Row({ api, vault, signal, c, removable, onChanged }: { api: Api; vault:
     if (!asked) return;
     setBusy(true);
     setError(null);
-    void asked.then((a) => { guard(signal); return api.removeCredential(c.credential_id, a); }).then(() => { if (signal.aborted) return; setConfirming(false); setBusy(false); onChanged(); },
+    void asked.then((a) => { guard(signal); return api.removeCredential(c.credential_id, a); }).then(() => { if (signal.aborted) return; if (here) return onRemovedHere(); setConfirming(false); setBusy(false); onChanged(); },
       (e: unknown) => { if (isLockedError(e, signal)) return; setError(manageError(e)); setBusy(false); });
   };
   return (
@@ -47,11 +47,11 @@ function Row({ api, vault, signal, c, removable, onChanged }: { api: Api; vault:
 }
 
 /** 기기 목록: where each device lock is stored. Removing is offered only while another one is left. */
-export function DeviceSection({ api, vault, signal, credentials, onChanged }: Props) {
+export function DeviceSection({ api, vault, signal, credentials, onChanged, onRemovedHere }: Props) {
   return (
     <section aria-labelledby="devices-title">
       <h2 id="devices-title">{COPY.manage.devices.title}</h2>
-      <ul class="plain">{credentials.map((c) => <Row key={c.credential_id} api={api} vault={vault} signal={signal} c={c} removable={canRemoveDevice(credentials.length)} onChanged={onChanged} />)}</ul>
+      <ul class="plain">{credentials.map((c) => <Row key={c.credential_id} api={api} vault={vault} signal={signal} c={c} removable={canRemoveDevice(credentials.length)} onChanged={onChanged} onRemovedHere={onRemovedHere} />)}</ul>
     </section>
   );
 }

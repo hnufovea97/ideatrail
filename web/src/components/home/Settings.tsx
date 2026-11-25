@@ -16,7 +16,7 @@ import { RoutineSection } from "./RoutineSection";
 
 interface Props {
   api: Api; vault: DashboardVault; signal: AbortSignal; sync: SyncState; store: VersionStore;
-  onVault(patch: VaultPatch): void; onRefresh(): void; onDeleted(): void; onBack(): void;
+  onVault(patch: VaultPatch): void; onRefresh(): void; onDeleted(notice?: string): void; onBack(): void;
 }
 
 /** 설정 (5.9b): one main action per section. Account details are read again from the server after each change. */
@@ -43,9 +43,9 @@ export function Settings(p: Props) {
       <RoutineSection store={p.store} userId={p.vault.userId} />
       {acct ? <RecoverySection api={p.api} vault={p.vault} signal={p.signal} madeAt={recoveryAt} onSaved={load} /> : null}
       {acct ? <NoteSection api={p.api} vault={p.vault} signal={p.signal} blob={acct.recall_notes ?? null} /> : null}
-      {acct ? <DeviceSection api={p.api} vault={p.vault} signal={p.signal} credentials={acct.credentials ?? []} onChanged={load} /> : null}
+      {acct ? <DeviceSection api={p.api} vault={p.vault} signal={p.signal} credentials={acct.credentials ?? []} onChanged={load} onRemovedHere={() => p.onDeleted(COPY.manage.devices.removedHere)} /> : null}
       <EngineRows api={p.api} vault={p.vault} signal={p.signal} sync={p.sync} onVault={p.onVault} onChanged={p.onRefresh} />
-      <DeleteAccountSection api={p.api} vault={p.vault} signal={p.signal} sync={p.sync} onDeleted={p.onDeleted} />
+      <DeleteAccountSection api={p.api} vault={p.vault} signal={p.signal} sync={p.sync} onDeleted={() => p.onDeleted()} />
     </section>
   );
 }

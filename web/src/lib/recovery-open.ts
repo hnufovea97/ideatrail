@@ -88,7 +88,8 @@ export async function finishRecovery(api: Api, s: RecoveryState, created: Create
  * account (excludeCredentials) — G2 2026-11-25, Windows Chrome offered the phone. Anything else shows its name only. */
 export function lockCreateError(e: unknown): string {
   if (e instanceof DOMException && e.name === "InvalidStateError") return COPY.errors.already_here;
-  if (e instanceof DOMException && e.name === "NotReadableError") return COPY.dash.errors.browser_unsupported; // G2: Whale on Android
+  // G2 2026-11-25: Samsung Internet threw this with a lock already on the phone; Whale is stopped before reaching here
+  if (e instanceof DOMException && e.name === "NotReadableError") return COPY.errors.cannot_make;
   if (e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "AbortError")) return COPY.errors.passkey_cancel;
   return `${COPY.errors.generic} (${COPY.dash.errorCode} ${failureCode(e)})`;
 }

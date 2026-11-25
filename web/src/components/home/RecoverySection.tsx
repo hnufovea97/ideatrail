@@ -21,6 +21,7 @@ export function RecoverySection({ api, vault, signal, madeAt, onSaved }: Props) 
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const step = useStepup(api, "PUT", phase === "check" ? "/v1/envelopes" : null);
 
   const save = () => {
@@ -36,6 +37,7 @@ export function RecoverySection({ api, vault, signal, madeAt, onSaved }: Props) 
       setTyped("");
       setPhase("idle");
       setBusy(false);
+      setJustSaved(true);
       onSaved();
     }, (e: unknown) => { if (isLockedError(e, signal)) return; setError(errorMessage(e)); setBusy(false); });
   };
@@ -43,6 +45,7 @@ export function RecoverySection({ api, vault, signal, madeAt, onSaved }: Props) 
   const make = () => {
     try {
       setPlan(makeRecovery(vault));
+      setJustSaved(false);
       setPhase("show");
     } catch (e) {
       if (!isLockedError(e, signal)) setError(errorMessage(e));
@@ -55,6 +58,7 @@ export function RecoverySection({ api, vault, signal, madeAt, onSaved }: Props) 
       <p class="small">{madeAt ? m.made(shortDate(madeAt)) : m.none}</p>
       {phase === "idle" ? (
         <>
+          {justSaved ? <p class="small" role="status">{m.saved}</p> : null}
           {madeAt ? <p class="small">{m.remakeNote}</p> : null}
           <button type="button" onClick={make}>{madeAt ? m.remake : m.make}</button>
         </>
@@ -65,6 +69,7 @@ export function RecoverySection({ api, vault, signal, madeAt, onSaved }: Props) 
             <p>{r.sheetTitle}</p>
             <p class="key" data-testid="settings-recovery-key">{groups(plan.display)}</p>
           </div>
+          <p class="small" role="note">{m.notSaved}</p>
           <p class="small">{r.readHint}</p>
           <CopyButton text={plan.display} label={r.copy} />
           <button type="button" class="primary" onClick={() => setPhase("check")}>{r.wrote}</button>
@@ -72,6 +77,7 @@ export function RecoverySection({ api, vault, signal, madeAt, onSaved }: Props) 
       ) : null}
       {phase === "check" && plan ? (
         <>
+          <p class="small" role="note">{m.notSaved}</p>
           <label for="settings-first-four">{r.firstFour}</label>
           <p class="small">{r.firstFourHelp}</p>
           <input id="settings-first-four" type="text" maxLength={6} autoComplete="off" spellcheck={false} autoCapitalize="characters" value={typed} onInput={(e) => setTyped((e.target as HTMLInputElement).value)} />

@@ -128,8 +128,8 @@ describe("lockCreateError (G2 2026-11-25: Windows Chrome chose the phone that al
   it("keeps the cancel wording for a cancelled prompt", () => {
     expect(lockCreateError(new DOMException("x", "NotAllowedError"))).toBe(COPY.errors.passkey_cancel);
   });
-  it("says the browser cannot make a device lock for NotReadableError (Whale on Android)", () => {
-    expect(lockCreateError(new DOMException("x", "NotReadableError"))).toBe(COPY.dash.errors.browser_unsupported);
+  it("says the lock could not be made, pointing at both likely causes, for NotReadableError", () => {
+    expect(lockCreateError(new DOMException("x", "NotReadableError"))).toBe(COPY.errors.cannot_make); // Samsung Internet with a lock already there, or an unsupported browser
   });
   it("adds the error name, never the message, to anything else", () => {
     expect(lockCreateError(new DOMException("secret detail", "UnknownError"))).toBe(`${COPY.errors.generic} (${COPY.dash.errorCode} UnknownError)`);

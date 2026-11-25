@@ -162,6 +162,7 @@ export async function makeRecoveryKey(page: Page, label: "만들기" | "다시 �
   await page.getByRole("button", { name: label, exact: true }).click();
   const display = ((await page.getByTestId("settings-recovery-key").textContent()) ?? "").trim();
   await page.getByRole("button", { name: "다 보관했어요" }).click();
+  await expect(page.getByText("아직 저장 전이에요", { exact: false })).toBeVisible(); // G2 2026-11-25: leaving here kept the old key
   await page.getByLabel("앞 4자리").fill(display.slice(0, 4));
   const save = page.getByRole("button", { name: "확인하고 저장" });
   await expect(save).toBeEnabled();
@@ -169,5 +170,6 @@ export async function makeRecoveryKey(page: Page, label: "만들기" | "다시 �
   await save.click();
   await saved;
   await expect(page.getByRole("button", { name: "다시 만들기", exact: true })).toBeVisible();
+  await expect(page.getByText("새 비상 열쇠를 저장했어요", { exact: false })).toBeVisible();
   return display;
 }

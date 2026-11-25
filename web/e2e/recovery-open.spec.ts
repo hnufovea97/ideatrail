@@ -63,3 +63,33 @@ test("a lost device: the recovery key opens a new device lock, which then opens 
     await fresh.close();
   }
 });
+
+test("removing THIS device's lock closes the screen at once: keys gone, logged out, and it cannot open again", async ({ page, browser }) => {
+  const { engine } = await openHomeWith(page);
+  await page.getByRole("button", { name: "설정", exact: true }).click();
+  const key = await makeRecoveryKey(page, "만들기");
+  const fresh = await browser.newContext({ locale: "ko-KR" });
+  try {
+    const other = await fresh.newPage();
+    await addAuthenticator(other, { prf: true });
+    await seedIdeas(other, engine);
+    await other.goto(`${APP}/home`);
+    await other.getByRole("button", { name: "비상 열쇠로 열기" }).click();
+    await other.getByLabel("비상 열쇠", { exact: true }).fill(key);
+    await other.getByRole("button", { name: "열기", exact: true }).click();
+    await other.getByRole("button", { name: "기기 잠금 만들기" }).click();
+    await other.getByRole("button", { name: "이 기기로 열기" }).click();
+    await other.getByRole("button", { name: "설정", exact: true }).click();
+    const here = other.locator("li.panel").filter({ has: other.locator(".badge", { hasText: "이 기기" }) });
+    await here.getByRole("button", { name: "이 기기 빼기" }).click();
+    const yes = here.getByRole("button", { name: "빼기", exact: true });
+    await expect(yes).toBeEnabled();
+    const out = other.waitForResponse((r) => r.url().endsWith("/v1/logout"));
+    await yes.click();
+    await out;
+    await expect(other.getByText("이 기기의 기기 잠금을 뺐어요", { exact: false })).toBeVisible();
+    await expect(other.getByRole("button", { name: "설정", exact: true })).toHaveCount(0);
+  } finally {
+    await fresh.close();
+  }
+});

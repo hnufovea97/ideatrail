@@ -26,7 +26,7 @@ import { Settings } from "./Settings";
 import type { SourceTools } from "./VersionDetail";
 
 /** `signal` is aborted by the lock before it wipes the keys: a refresh in flight then writes nothing. */
-interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onLock(): void; onVault(patch: VaultPatch): void; onGone(): void }
+interface Props { api: Api; vault: DashboardVault; signal: AbortSignal; onLock(): void; onVault(patch: VaultPatch): void; onGone(notice?: string): void }
 type View = "home" | "approvals" | "settings";
 const CHECKING: ChainStatus = { state: "checking" };
 

@@ -27,12 +27,13 @@ export default function DashboardApp() {
   }, [api]);
 
   /** The account was deleted on the server: keys out of memory, back to the lock screen with one line. */
-  const gone = useCallback((v: DashboardVault) => {
+  const gone = useCallback((v: DashboardVault, notice: string = COPY.manage.account.notice) => {
     opened.current.abort();
     wipeVault(v);
     setVault(null);
-    setNotice(COPY.manage.account.notice);
-  }, []);
+    setNotice(notice);
+    void api.logout({}).catch(() => undefined); // this device's own lock was removed: end its session too (best effort)
+  }, [api]);
 
   /** Patches the CURRENT vault, never a stale copy, and never one the lock has already closed (a locked vault stays locked). */
   const updateVault = useCallback((forUserId: string, patch: VaultPatch) => {
@@ -56,7 +57,7 @@ export default function DashboardApp() {
     <>
       <div class="blur-cover" aria-hidden="true"><LockIcon /><span class="sr-only">{COPY.dash.cover}</span></div>
       {vault
-        ? <OpenShell api={api} vault={vault} signal={opened.current.signal} onLock={() => lock(vault, false)} onVault={(patch) => updateVault(vault.userId, patch)} onGone={() => gone(vault)} />
+        ? <OpenShell api={api} vault={vault} signal={opened.current.signal} onLock={() => lock(vault, false)} onVault={(patch) => updateVault(vault.userId, patch)} onGone={(notice) => gone(vault, notice)} />
         : <LockScreen api={api} notice={notice} onOpen={(v) => { opened.current = new AbortController(); setNotice(null); setVault(v); }} />}
     </>
   );
