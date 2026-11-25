@@ -60,6 +60,36 @@ describe("openApprovals (5.9a)", () => {
     expect(out[0]).toMatchObject({ kind: "disconnect", folders: [] });
   });
 
+  const UPDATE = { from: "0.1.0", to: "0.2.0", changes: ["기록 속도가 빨라졌어요", "오류를 고쳤어요"] };
+  const upd = (u: unknown) => ({ kind: "update", plain: { v: 1, update: u } });
+
+  it("shows an update request with its versions and changes, and no folders", async () => {
+    const w = fakeWorld();
+    const out = await openApprovals([await row(w, upd(UPDATE))], w.list, w.vault);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ kind: "update", folders: [], update: UPDATE });
+  });
+
+  it("drops update summaries with a long line, a control char, a bad version, too many lines or an empty line", async () => {
+    const w = fakeWorld();
+    const bad = [
+      { ...UPDATE, changes: ["가".repeat(201)] },
+      { ...UPDATE, changes: ["줄\u0007바꿈"] },
+      { ...UPDATE, changes: ["a\nb"] },
+      { ...UPDATE, to: "0.2" },
+      { ...UPDATE, from: "v0.1.0" },
+      { ...UPDATE, to: "12345.0.0" },
+      { ...UPDATE, changes: Array.from({ length: 21 }, (_, i) => `줄 ${i}`) },
+      { ...UPDATE, changes: [""] },
+      { ...UPDATE, changes: [1] },
+      { from: "0.1.0", to: "0.2.0" },
+    ];
+    const rows = await Promise.all(bad.map((u) => row(w, upd(u))));
+    expect(await openApprovals(rows, w.list, w.vault)).toEqual([]);
+    const edge = { ...UPDATE, changes: Array.from({ length: 20 }, () => "가".repeat(200)) };
+    expect(await openApprovals([await row(w, upd(edge))], w.list, w.vault)).toHaveLength(1);
+  });
+
   it("keeps the highest appr_seq per engine: it only goes up, and no row is dropped for its number", async () => {
     const w = fakeWorld();
     const marks = memoryStore();

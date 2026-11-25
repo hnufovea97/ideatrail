@@ -20,6 +20,17 @@ describe("schema (2.2)", () => {
     expect(results.map((r) => r.name)).toEqual(TABLES);
   });
 
+  it("pending_approvals accepts 'update' and still rejects unknown kinds", async () => {
+    const u = await seedUser();
+    const insert = (kind: string, seq: number) => env.DB.prepare(
+      "INSERT INTO pending_approvals (approval_id, user_id, engine_id, kind, summary, engine_seq, engine_sig, created_at, expires_at, change_seq) SELECT ?, ?, engine_id, ?, x'00', ?, 's', 't', 't', 0 FROM engines WHERE user_id = ? LIMIT 1")
+      .bind(newId(), u, kind, seq, u);
+    const { seedEngine } = await import("./engine");
+    await seedEngine({ userId: u });
+    expect((await insert("update", 1).run()).meta.changes).toBe(1);
+    await expect(insert("bogus", 2).run()).rejects.toThrow(/CHECK/);
+  });
+
   it("enforces foreign keys", async () => {
     await expect(env.DB.prepare("INSERT INTO sessions VALUES ('s', 'no-such-user', 't', 't')").run()).rejects.toThrow(/FOREIGN KEY/);
   });

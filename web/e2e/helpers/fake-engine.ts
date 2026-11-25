@@ -104,8 +104,17 @@ export class FakeEngine {
 
   /** A signed approval of the given kind (kind 10 summary, spec §8 approval signature). Returns the HTTP status and the id. */
   async postApproval(kind: "import" | "add_folder" | "forget_original" | "disconnect", folders: { path: string; name: string; files: number }[]): Promise<{ status: number; approvalId: string }> {
+    return this.postSummary(kind, { v: 1, folders });
+  }
+
+  /** An "update" approval: the engine asks to move to a new version (summary {v:1, update:{from,to,changes}}). */
+  async postUpdateApproval(update: { from: string; to: string; changes: string[] }): Promise<{ status: number; approvalId: string }> {
+    return this.postSummary("update", { v: 1, update });
+  }
+
+  private async postSummary(kind: string, plain: unknown): Promise<{ status: number; approvalId: string }> {
     const approvalId = newId();
-    const summary = await seal(KIND.approval_summary, this.ak(), { userId: this.userId, rootId: approvalId, version: "0" }, utf8(JSON.stringify({ v: 1, folders })));
+    const summary = await seal(KIND.approval_summary, this.ak(), { userId: this.userId, rootId: approvalId, version: "0" }, utf8(JSON.stringify(plain)));
     const apprSeq = this.apprSeq++;
     const sig = sign(this.seed, messageFor({ type: "approval", userId: this.userId, approvalId, kind, summarySealed: summary, apprSeq }));
     const r = await this.signed("POST", "/v1/approvals", { approval_id: approvalId, kind, summary: toB64u(summary), appr_seq: apprSeq.toString(), engine_sig: sig });

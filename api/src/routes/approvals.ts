@@ -25,7 +25,7 @@ const MAX_SEALED = 16 * 1024;
 
 const zApproval = z.object({
   approval_id: zId,
-  kind: z.enum(["import", "add_folder", "forget_original", "disconnect", "signup_select"]),
+  kind: z.enum(["import", "add_folder", "forget_original", "disconnect", "signup_select", "update"]),
   summary: zB64u(),
   appr_seq: zSeq,
   engine_sig: zB64u(64),

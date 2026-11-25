@@ -285,7 +285,9 @@ export const COPY = {
     approvals: {
       title: "승인을 기다리는 요청", // 새 문구
       none: "기다리는 요청이 없어요", // 새 문구
-      kinds: { import: "가져오기", add_folder: "폴더 추가", forget_original: "원문 지우기", disconnect: "연결 끊기" },
+      kinds: { import: "가져오기", add_folder: "폴더 추가", forget_original: "원문 지우기", disconnect: "연결 끊기", update: "새 버전" },
+      updateLine: (to: string, from: string) => `기록 도우미 새 버전 ${to}이 왔어요 (지금 ${from})`, // 새 문구
+      updateChanges: "바뀐 점", // 새 문구
       from: (name: string) => `${name}에서 온 요청`, // 새 문구
       files: (n: number) => `문서 ${n}개`,
       noFolders: "고른 폴더가 없어요", // 새 문구

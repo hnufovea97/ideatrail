@@ -45,9 +45,21 @@ function Item({ api, vault, signal, item, onDecided }: { api: Api; vault: Dashbo
     <li class="panel">
       <h3>{m.kinds[item.kind]}</h3>
       <p class="small">{m.from(item.engineName)} · {m.expires(shortDate(item.expiresAt))}</p>
-      {item.folders.length === 0
-        ? <p class="small">{m.noFolders}</p>
-        : <ul class="plain">{item.folders.map((f) => <li key={f.path}>{f.name} <span class="small">({m.files(f.files)})</span></li>)}</ul>}
+      {item.update
+        ? (
+          <div class="update-info">
+            <p>{m.updateLine(item.update.to, item.update.from)}</p>
+            {item.update.changes.length > 0 && (
+              <>
+                <h4>{m.updateChanges}</h4>
+                <ul class="plain" aria-label={m.updateChanges}>{item.update.changes.map((c, i) => <li key={i}>{c}</li>)}</ul>
+              </>
+            )}
+          </div>
+        )
+        : item.folders.length === 0
+          ? <p class="small">{m.noFolders}</p>
+          : <ul class="plain">{item.folders.map((f) => <li key={f.path}>{f.name} <span class="small">({m.files(f.files)})</span></li>)}</ul>}
       <p class="error" role="alert">{error ?? ""}</p>
       <p class="small">{COPY.manage.stepupAhead}</p>
       <div class="row-actions">

@@ -79,6 +79,12 @@ describe("approvals (2.9)", () => {
     expect((await s.c.post("/v1/approvals", approval("99"))).status).toBe(429);
   });
 
+  it("engine can ask for an update approval (kind 10 summary)", async () => {
+    const s = await setup();
+    expect((await s.c.post("/v1/approvals", approval("1", "update"))).status).toBe(201);
+    expect((await s.c.post("/v1/approvals", { ...approval("2", "update"), summary: sealed(11) })).status).toBe(400);
+  });
+
   it("summary kind must match the approval kind", async () => {
     const s = await setup();
     expect((await s.c.post("/v1/approvals", { ...approval("1", "signup_select"), summary: sealed(10) })).status).toBe(400);

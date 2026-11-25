@@ -49,6 +49,27 @@ test("approvals: a cancelled device lock sends nothing; approving sends one deci
   expect(msgs.map((m) => m.body)).toEqual([expect.objectContaining({ type: "approval_result", approval_id: posted.approvalId, decision: "approved" })]);
 });
 
+test("update approval: shows versions and changes as text, approving sends exactly one decide after the device lock", async ({ page }) => {
+  const w = await watch(page);
+  const { engine } = await openHomeWith(page);
+  const posted = await engine.postUpdateApproval({ from: "0.1.0", to: "0.2.0", changes: ["기록 속도가 빨라졌어요", "<b>태그</b>도 글자 그대로 보여요"] });
+  expect(posted.status).toBe(201);
+  await wake(page);
+  await page.getByRole("button", { name: "보기", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "새 버전" })).toBeVisible();
+  await expect(page.getByText("기록 도우미 새 버전 0.2.0이 왔어요 (지금 0.1.0)")).toBeVisible();
+  await expect(page.getByText("기록 속도가 빨라졌어요")).toBeVisible();
+  await expect(page.getByText("<b>태그</b>도 글자 그대로 보여요")).toBeVisible();
+  const approve = page.getByRole("button", { name: "허락하기" });
+  await expect(approve).toBeEnabled();
+  const decided = page.waitForResponse((r) => r.url().endsWith(`/v1/approvals/${posted.approvalId}/decide`) && r.status() === 200);
+  await approve.click();
+  await decided;
+  expect(w.requests.filter((r) => r.url.endsWith("/decide"))).toHaveLength(1);
+  const msgs = await engine.readInbox([posted.approvalId]);
+  expect(msgs.map((m) => m.body)).toEqual([expect.objectContaining({ type: "approval_result", approval_id: posted.approvalId, decision: "approved" })]);
+});
+
 test("pause stops the engine's writes (423); resume with the device lock lets them through", async ({ page }) => {
   const { engine } = await openHomeWith(page);
   await openSettings(page);
