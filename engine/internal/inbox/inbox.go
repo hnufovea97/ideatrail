@@ -113,6 +113,40 @@ func RequestImport(ctx context.Context, d Deps, kind string, folders []string) (
 	if err != nil {
 		return "", err
 	}
+	sealKind := ic.KindApprovalSummary
+	if kind == "signup_select" {
+		sealKind = ic.KindFolderSuggestions
+	}
+	return submit(ctx, d, st, state.Approval{Kind: kind, Folders: real}, sealKind, plain)
+}
+
+// RequestUpdate asks the user (on the dashboard) to approve a new engine version. It lists what
+// changed in plain words; it never lists folders and an answer can never register one.
+func RequestUpdate(ctx context.Context, d Deps, from, to string, changes []string) (string, error) {
+	st, err := state.Read(d.StateDir)
+	if err != nil {
+		return "", err
+	}
+	if st.UserID == "" || st.AccountPub == "" {
+		return "", ErrNotPaired
+	}
+	if openApprovals(st, d.now()) >= MaxOpen {
+		return "", ErrTooMany
+	}
+	if changes == nil {
+		changes = []string{}
+	}
+	plain, err := json.Marshal(map[string]any{"v": 1, "update": map[string]any{"from": from, "to": to, "changes": changes}})
+	if err != nil {
+		return "", err
+	}
+	return submit(ctx, d, st, state.Approval{Kind: "update", Version: to}, ic.KindApprovalSummary, plain)
+}
+
+// submit seals the summary to the account key, signs the request with the next appr_seq, records
+// it in state (a.Kind, a.Folders and a.Version come from the caller) and sends it.
+func submit(ctx context.Context, d Deps, st *state.State, a state.Approval, sealKind ic.Kind, plain []byte) (string, error) {
+	kind := a.Kind
 	akRaw, _ := ic.UnB64(st.AccountPub)
 	ak, err := ic.ParseKEMPublic(akRaw)
 	if err != nil {
@@ -121,10 +155,6 @@ func RequestImport(ctx context.Context, d Deps, kind string, folders []string) (
 	approvalID, err := ic.NewID(randReader)
 	if err != nil {
 		return "", err
-	}
-	sealKind := ic.KindApprovalSummary
-	if kind == "signup_select" {
-		sealKind = ic.KindFolderSuggestions
 	}
 	sealed, err := ic.Seal(sealKind, ak, ic.AAD{UserID: st.UserID, RootID: approvalID, Version: "0"}, plain)
 	if err != nil {
@@ -156,7 +186,8 @@ func RequestImport(ctx context.Context, d Deps, kind string, folders []string) (
 		if s.Approvals == nil {
 			s.Approvals = map[string]state.Approval{}
 		}
-		s.Approvals[approvalID] = state.Approval{Kind: kind, Folders: real, CreatedAt: ic.FormatTime(d.now()), Body: string(body), Seq: seq}
+		a.CreatedAt, a.Body, a.Seq = ic.FormatTime(d.now()), string(body), seq
+		s.Approvals[approvalID] = a
 		return nil
 	})
 	if err != nil {
@@ -231,7 +262,7 @@ func prune(s *state.State, now time.Time) {
 
 // Event is what the MCP layer acts on after processing the inbox.
 type Event struct {
-	Kind    string // "folders_registered" | "rejected" | "connect_github"
+	Kind    string // "folders_registered" | "rejected" | "connect_github" | "update_approved" | "update_rejected"
 	Folders int
 	Paths   []string // folders_registered: the folders newly registered by this message
 	Signup  bool     // folders_registered from the signup step 5 choice (first import applies)
@@ -348,6 +379,15 @@ func handle(d Deps, pub kem.PublicKey, m message) (Event, bool, bool) {
 			if !exists || a.Done || p.ApprovalID != boundTo || expired(a, d.now()) {
 				return nil
 			}
+			if a.Kind == "update" {
+				if p.Type != "approval_result" {
+					return nil // an update answer never selects folders
+				}
+				a.Done = true
+				s.Approvals[p.ApprovalID] = a
+				ev, ok = answerUpdate(s, a, p.Decision == "approved")
+				return nil
+			}
 			// signup lists close only by the browser's choice; an approval_result would register
 			// every folder offered
 			if p.Type == "approval_result" && a.Kind == "signup_select" {
@@ -397,6 +437,22 @@ func handle(d Deps, pub kem.PublicKey, m message) (Event, bool, bool) {
 		return Event{}, false, true
 	}
 	return ev, ok, false
+}
+
+// answerUpdate applies the dashboard's answer to a new engine version. It never touches folders.
+func answerUpdate(s *state.State, a state.Approval, approved bool) (Event, bool) {
+	waiting := s.UpdatePending != nil && s.UpdatePending.Version == a.Version
+	if approved {
+		s.ApprovedVersion = a.Version
+		if waiting {
+			s.UpdatePending = nil
+		}
+		return Event{Kind: "update_approved"}, true
+	}
+	if waiting {
+		s.UpdatePending.Rejected = true
+	}
+	return Event{Kind: "update_rejected"}, true
 }
 
 var errReplay = errors.New("replayed message")

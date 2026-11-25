@@ -70,29 +70,40 @@ type Approval struct {
 	Folders   []string `json:"folders"` // resolved real paths the engine asked about
 	CreatedAt string   `json:"created_at"`
 	Done      bool     `json:"done,omitempty"`
-	Seq       uint64   `json:"seq,omitempty"`  // appr_seq, so pending requests are sent in order
-	Body      string   `json:"body,omitempty"` // signed request body, kept until the server accepts it
+	Seq       uint64   `json:"seq,omitempty"`     // appr_seq, so pending requests are sent in order
+	Body      string   `json:"body,omitempty"`    // signed request body, kept until the server accepts it
+	Version   string   `json:"version,omitempty"` // kind "update": the engine version the request asks about
+}
+
+// UpdatePending is a new engine version waiting for the user's approval on the dashboard.
+type UpdatePending struct {
+	Version    string `json:"version"`
+	ApprovalID string `json:"approval_id,omitempty"`
+	Rejected   bool   `json:"rejected,omitempty"`
 }
 
 // State is the whole state.json document.
 type State struct {
-	ReqSeq         Seq                 `json:"req_seq"`
-	LogSeq         Seq                 `json:"log_seq"`
-	ApprSeq        Seq                 `json:"appr_seq"`
-	SeenMsgIDs     []string            `json:"seen_msg_ids,omitempty"`
-	UserID         string              `json:"user_id,omitempty"`
-	AccountPub     string              `json:"account_pubkey,omitempty"` // b64u, pinned at pairing
-	RepoFullName   string              `json:"repo_full_name,omitempty"`
-	LinkPending    bool                `json:"storage_link_pending,omitempty"` // token saved but not yet uploaded for the dashboard
-	Roots          map[string]Root     `json:"roots,omitempty"`
-	Folders        map[string]string   `json:"folders,omitempty"` // resolved absolute folder → root_id (registered only via approved inbox)
-	PendingUploads []string            `json:"pending_uploads,omitempty"`
-	Blocked        string              `json:"blocked,omitempty"`         // fixed code while the server keeps refusing an upload
-	BlockedVersion string              `json:"blocked_version,omitempty"` // engine version that hit the block (a new version retries)
-	AnchorsCursor  Seq                 `json:"anchors_cursor"`
-	Approvals      map[string]Approval `json:"approvals,omitempty"`
-	Import         *ImportJob          `json:"import,omitempty"`       // signup first import not finished yet
-	RecordWords    []string            `json:"record_words,omitempty"` // the user's own "record this" words; local only, never uploaded
+	ReqSeq          Seq                 `json:"req_seq"`
+	LogSeq          Seq                 `json:"log_seq"`
+	ApprSeq         Seq                 `json:"appr_seq"`
+	SeenMsgIDs      []string            `json:"seen_msg_ids,omitempty"`
+	UserID          string              `json:"user_id,omitempty"`
+	AccountPub      string              `json:"account_pubkey,omitempty"` // b64u, pinned at pairing
+	RepoFullName    string              `json:"repo_full_name,omitempty"`
+	LinkPending     bool                `json:"storage_link_pending,omitempty"` // token saved but not yet uploaded for the dashboard
+	Roots           map[string]Root     `json:"roots,omitempty"`
+	Folders         map[string]string   `json:"folders,omitempty"` // resolved absolute folder → root_id (registered only via approved inbox)
+	PendingUploads  []string            `json:"pending_uploads,omitempty"`
+	Blocked         string              `json:"blocked,omitempty"`         // fixed code while the server keeps refusing an upload
+	BlockedVersion  string              `json:"blocked_version,omitempty"` // engine version that hit the block (a new version retries)
+	AnchorsCursor   Seq                 `json:"anchors_cursor"`
+	Approvals       map[string]Approval `json:"approvals,omitempty"`
+	Import          *ImportJob          `json:"import,omitempty"`           // signup first import not finished yet
+	RecordWords     []string            `json:"record_words,omitempty"`     // the user's own "record this" words; local only, never uploaded
+	ReleaseKey      string              `json:"release_key,omitempty"`      // release signing key pinned at first run (b64u)
+	ApprovedVersion string              `json:"approved_version,omitempty"` // engine version the user has accepted
+	UpdatePending   *UpdatePending      `json:"update_pending,omitempty"`   // new version waiting for dashboard approval
 }
 
 // ImportJob is the signup first import's progress, kept so an interrupted import resumes where it

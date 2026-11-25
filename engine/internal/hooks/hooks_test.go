@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ideatrail/engine/internal/state"
+	"ideatrail/engine/internal/update"
 )
 
 func fakeHome(t *testing.T) string {
@@ -214,5 +215,20 @@ func TestHookSentencesUsePlainWords(t *testing.T) {
 	}
 	if !strings.Contains(stopReason(3), "3건") {
 		t.Errorf("stop reason %q", stopReason(3))
+	}
+}
+
+func TestSessionStartSaysWhenANewVersionWaits(t *testing.T) {
+	stateDir, folder := setup(t)
+	_ = state.With(stateDir, func(s *state.State) error {
+		s.UpdatePending = &state.UpdatePending{Version: "0.2.0"}
+		return nil
+	})
+	if got := SessionStart(strings.NewReader(hookJSON("u1", folder, false)), stateDir); got != update.WaitingLine("0.2.0") {
+		t.Fatalf("%q", got)
+	}
+	_ = state.With(stateDir, func(s *state.State) error { s.UpdatePending.Rejected = true; return nil })
+	if got := SessionStart(strings.NewReader(hookJSON("u2", folder, false)), stateDir); got != update.RejectedLine {
+		t.Fatalf("%q", got)
 	}
 }

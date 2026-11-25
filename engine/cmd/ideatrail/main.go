@@ -26,12 +26,14 @@ import (
 	"ideatrail/engine/internal/record"
 	"ideatrail/engine/internal/repo"
 	"ideatrail/engine/internal/selfcheck"
+	"ideatrail/engine/internal/update"
 )
 
 const (
 	msgUsage       = "사용법: ideatrail mcp | hook <guard|session-start|stop> | version"
 	msgNotReady    = "ideatrail: 정식으로 배포된 기록 도우미가 아니라서 실행할 수 없어요. 플러그인을 다시 설치해 주세요."
 	msgTampered    = "ideatrail: 기록 도우미 파일이 바뀐 것 같아 멈췄어요. 플러그인을 다시 설치해 주세요."
+	msgKeyChanged  = "ideatrail: 새 버전의 서명 열쇠가 처음 설치한 것과 달라서 멈췄어요. 플러그인을 다시 설치해 주세요."
 	msgSynced      = "ideatrail: 기록 도우미의 보관 폴더가 동기화 폴더(iCloud·Dropbox·Syncthing 등) 안에 있어서 멈췄어요."
 	msgStartFailed = "ideatrail: 기록 도우미를 시작하지 못했어요. Claude Code를 다시 켜 주세요."
 	githubAPI      = "https://api.github.com"
@@ -78,11 +80,40 @@ func verifySelf(stderr io.Writer) (int, bool) {
 		return 0, true
 	}
 	exe, err := os.Executable()
-	if err != nil || selfcheck.Verify(config.ReleasePub, exe, runtime.GOOS, releaseArch(), config.Version) != nil {
+	if err != nil {
+		fmt.Fprintln(stderr, msgTampered)
+		return 1, false
+	}
+	stateDir := ""
+	if paths, err := config.Locate(); err == nil {
+		stateDir = paths.Engine
+	}
+	switch err := releaseCheck(config.ReleasePub, exe, runtime.GOOS, releaseArch(), config.Version, stateDir); {
+	case errors.Is(err, update.ErrKeyChanged):
+		fmt.Fprintln(stderr, msgKeyChanged)
+		return 1, false
+	case err != nil:
 		fmt.Fprintln(stderr, msgTampered)
 		return 1, false
 	}
 	return 0, true
+}
+
+// releaseCheck refuses a binary whose embedded key differs from the key pinned at first install,
+// then verifies the file's signature. It reads the state folder only if it already exists.
+func releaseCheck(embeddedKey, exe, goos, goarch, version, stateDir string) error {
+	if embeddedKey != "" && stateDir != "" {
+		if _, err := os.Stat(stateDir); err == nil {
+			pinned, err := update.Pinned(stateDir)
+			if err != nil {
+				return selfcheck.ErrBadSignature
+			}
+			if pinned != "" && pinned != embeddedKey {
+				return update.ErrKeyChanged
+			}
+		}
+	}
+	return selfcheck.Verify(embeddedKey, exe, goos, goarch, version)
 }
 
 // releaseArch names the signed artifact: the Mac file is one universal binary for both chips.
@@ -135,6 +166,13 @@ func buildEngine() (*mcpserver.Engine, error) {
 	if err := home.Ensure(paths.Engine); err != nil {
 		return nil, err
 	}
+	if err := update.Pin(paths.Engine, config.ReleasePub); err != nil {
+		return nil, err
+	}
+	gate, err := update.Check(paths.Engine, config.Version)
+	if err != nil {
+		return nil, err
+	}
 	k, err := keys.LoadOrCreate(paths.Engine)
 	if err != nil {
 		return nil, err
@@ -152,19 +190,23 @@ func buildEngine() (*mcpserver.Engine, error) {
 		ProjectDir: projectDir(),
 		Record: record.Deps{API: client, Keys: k, StateDir: paths.Engine, ProofDir: paths.Proofs,
 			OutboxDir: paths.Outbox, Calendars: ots.SubmitCalendars},
-		Repo:     repo.Deps{API: client, Keys: k, StateDir: paths.Engine, OutboxDir: paths.Outbox, GitHubBase: githubAPI, Flow: flow},
-		Inbox:    inbox.Deps{API: client, Keys: k, StateDir: paths.Engine},
-		Pairing:  pairing.Deps{API: client, Keys: k, StateDir: paths.Engine, AppBase: config.App(), Open: pairing.OpenBrowser},
-		Computer: computerName(),
+		Repo:       repo.Deps{API: client, Keys: k, StateDir: paths.Engine, OutboxDir: paths.Outbox, GitHubBase: githubAPI, Flow: flow},
+		Inbox:      inbox.Deps{API: client, Keys: k, StateDir: paths.Engine},
+		Pairing:    pairing.Deps{API: client, Keys: k, StateDir: paths.Engine, AppBase: config.App(), Open: pairing.OpenBrowser},
+		Computer:   computerName(),
+		UpdateGate: gate,
 	}, nil
 }
 
 func runMCP(stderr io.Writer) int {
 	e, err := buildEngine()
 	if err != nil {
-		if errors.Is(err, home.ErrSyncedFolder) {
+		switch {
+		case errors.Is(err, home.ErrSyncedFolder):
 			fmt.Fprintln(stderr, msgSynced)
-		} else {
+		case errors.Is(err, update.ErrKeyChanged):
+			fmt.Fprintln(stderr, msgKeyChanged)
+		default:
 			fmt.Fprintln(stderr, msgStartFailed)
 		}
 		return 1

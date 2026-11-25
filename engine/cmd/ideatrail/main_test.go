@@ -2,13 +2,22 @@ package main
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"ideatrail/engine/internal/config"
 	"ideatrail/engine/internal/hooks"
+	"ideatrail/engine/internal/selfcheck"
+	"ideatrail/engine/internal/state"
+	"ideatrail/engine/internal/update"
 )
 
 func call(t *testing.T, stdin string, args ...string) (int, string, string) {
@@ -65,5 +74,70 @@ func TestHooksSilentOnBadInput(t *testing.T) {
 		if code, out, e := call(t, "{{", "hook", h); code != 0 || out != "" || e != "" {
 			t.Errorf("%s: %d %q %q", h, code, out, e)
 		}
+	}
+}
+
+func signedExe(t *testing.T, priv ed25519.PrivateKey, version string) string {
+	t.Helper()
+	exe := filepath.Join(t.TempDir(), "ideatrail")
+	data := []byte("engine-" + version)
+	_ = os.WriteFile(exe, data, 0o700)
+	_ = os.WriteFile(exe+".sig", []byte(selfcheck.Sign(priv, "linux", "amd64", version, sha256.Sum256(data))), 0o600)
+	return exe
+}
+
+func newKey(t *testing.T) (string, ed25519.PrivateKey) {
+	t.Helper()
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	return base64.RawURLEncoding.EncodeToString(pub), priv
+}
+
+func TestFirstRunPinsKeyAndApprovesVersion(t *testing.T) {
+	pub, priv := newKey(t)
+	exe := signedExe(t, priv, "0.1.0")
+	d := t.TempDir()
+	if err := releaseCheck(pub, exe, "linux", "amd64", "0.1.0", d); err != nil {
+		t.Fatal(err)
+	}
+	if err := update.Pin(d, pub); err != nil {
+		t.Fatal(err)
+	}
+	st, err := update.Check(d, "0.1.0")
+	s, _ := state.Read(d)
+	if err != nil || st.Pending || s.ReleaseKey != pub || s.ApprovedVersion != "0.1.0" {
+		t.Fatalf("%+v %v %+v", st, err, s)
+	}
+}
+
+func TestNewVersionSignedWithAnotherKeyIsRefused(t *testing.T) {
+	pub, _ := newKey(t)
+	_, otherPriv := newKey(t)
+	exe := signedExe(t, otherPriv, "0.2.0")
+	if err := releaseCheck(pub, exe, "linux", "amd64", "0.2.0", t.TempDir()); !errors.Is(err, selfcheck.ErrBadSignature) {
+		t.Fatalf("%v", err)
+	}
+}
+
+func TestEmbeddedKeyDifferentFromPinnedIsRefused(t *testing.T) {
+	pinned, _ := newKey(t)
+	pub, priv := newKey(t) // a perfectly signed binary, but by a different key than the first install
+	exe := signedExe(t, priv, "0.2.0")
+	d := t.TempDir()
+	if err := update.Pin(d, pinned); err != nil {
+		t.Fatal(err)
+	}
+	if err := releaseCheck(pub, exe, "linux", "amd64", "0.2.0", d); !errors.Is(err, update.ErrKeyChanged) {
+		t.Fatalf("%v", err)
+	}
+	if err := update.Pin(d, pub); !errors.Is(err, update.ErrKeyChanged) {
+		t.Fatalf("pin accepted a changed key: %v", err)
+	}
+}
+
+func TestReleaseCheckWithoutStateFolderStillVerifies(t *testing.T) {
+	pub, priv := newKey(t)
+	exe := signedExe(t, priv, "0.1.0")
+	if err := releaseCheck(pub, exe, "linux", "amd64", "0.1.0", filepath.Join(t.TempDir(), "none")); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 
 	"ideatrail/engine/internal/state"
+	"ideatrail/engine/internal/update"
 )
 
 const (
@@ -231,6 +232,8 @@ func SessionStart(r io.Reader, stateDir string) string {
 		return ""
 	case st.UserID == "" || st.AccountPub == "":
 		return msgBeforeSignup
+	case st.UpdatePending != nil:
+		return update.BlockLine(st.UpdatePending)
 	case st.Blocked != "":
 		return msgBlocked
 	}

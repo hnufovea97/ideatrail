@@ -423,3 +423,87 @@ func TestApprovalResultCannotCompleteASignupList(t *testing.T) {
 		t.Fatal("approval_result closed the signup list")
 	}
 }
+
+func pendingUpdate(t *testing.T, e *env, to string) {
+	t.Helper()
+	_ = state.With(e.d.StateDir, func(s *state.State) error {
+		s.ApprovedVersion = "0.1.0"
+		s.UpdatePending = &state.UpdatePending{Version: to}
+		return nil
+	})
+}
+
+func TestRequestUpdateSummaryShapeAndStateApproval(t *testing.T) {
+	e := newEnv(t)
+	pendingUpdate(t, e, "0.2.0")
+	id, err := RequestUpdate(context.Background(), e.d, "0.1.0", "0.2.0", []string{"하나", "둘"})
+	if err != nil || len(e.approvals) != 1 || e.approvals[0]["kind"] != "update" || e.approvals[0]["appr_seq"] != "1" {
+		t.Fatalf("%v %v", err, e.approvals)
+	}
+	st, _ := state.Read(e.d.StateDir)
+	a := st.Approvals[id]
+	if a.Kind != "update" || a.Folders != nil || a.Version != "0.2.0" {
+		t.Fatalf("%+v", a)
+	}
+	// open the sealed summary with the account key: same AAD as the other approvals
+	sealed, _ := ic.UnB64(e.approvals[0]["summary"].(string))
+	pt, err := ic.Open(ic.KindApprovalSummary, e.akPriv, ic.AAD{UserID: testUser, RootID: id, Version: "0"}, sealed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(pt) != `{"update":{"changes":["하나","둘"],"from":"0.1.0","to":"0.2.0"},"v":1}` {
+		t.Fatalf("%s", pt)
+	}
+}
+
+func TestApprovedUpdateSetsVersionAndRegistersNoFolder(t *testing.T) {
+	e := newEnv(t)
+	pendingUpdate(t, e, "0.2.0")
+	id, _ := RequestUpdate(context.Background(), e.d, "0.1.0", "0.2.0", nil)
+	e.send(t, id, map[string]any{"type": "approval_result", "approval_id": id, "decision": "approved", "folders": []string{e.folder}}, e.akPriv)
+	ev := e.process(t)
+	if len(ev) != 1 || ev[0].Kind != "update_approved" {
+		t.Fatalf("%+v", ev)
+	}
+	st, _ := state.Read(e.d.StateDir)
+	if st.ApprovedVersion != "0.2.0" || st.UpdatePending != nil || len(st.Folders) != 0 {
+		t.Fatalf("%+v", st)
+	}
+}
+
+func TestRejectedUpdateStaysPendingAndRejected(t *testing.T) {
+	e := newEnv(t)
+	pendingUpdate(t, e, "0.2.0")
+	id, _ := RequestUpdate(context.Background(), e.d, "0.1.0", "0.2.0", nil)
+	e.send(t, id, map[string]any{"type": "approval_result", "approval_id": id, "decision": "rejected"}, e.akPriv)
+	ev := e.process(t)
+	if len(ev) != 1 || ev[0].Kind != "update_rejected" {
+		t.Fatalf("%+v", ev)
+	}
+	st, _ := state.Read(e.d.StateDir)
+	if st.ApprovedVersion != "0.1.0" || st.UpdatePending == nil || !st.UpdatePending.Rejected || len(st.Folders) != 0 {
+		t.Fatalf("%+v", st)
+	}
+}
+
+func TestSelectFoldersForUpdateIsIgnored(t *testing.T) {
+	e := newEnv(t)
+	pendingUpdate(t, e, "0.2.0")
+	id, _ := RequestUpdate(context.Background(), e.d, "0.1.0", "0.2.0", nil)
+	e.send(t, id, map[string]any{"type": "select_folders", "approval_id": id, "folders": []string{e.folder}}, e.akPriv)
+	if ev := e.process(t); len(ev) != 0 {
+		t.Fatalf("%+v", ev)
+	}
+	st, _ := state.Read(e.d.StateDir)
+	if st.ApprovedVersion != "0.1.0" || len(st.Folders) != 0 {
+		t.Fatalf("%+v", st)
+	}
+}
+
+func TestRequestUpdateNeedsPairing(t *testing.T) {
+	e := newEnv(t)
+	_ = state.With(e.d.StateDir, func(s *state.State) error { s.UserID = ""; return nil })
+	if _, err := RequestUpdate(context.Background(), e.d, "0.1.0", "0.2.0", nil); !errors.Is(err, ErrNotPaired) {
+		t.Fatalf("%v", err)
+	}
+}

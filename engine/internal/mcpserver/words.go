@@ -115,6 +115,9 @@ type wordsIn struct {
 
 // setRecordWordsTool is a local setting: no pairing, no server call.
 func (e *Engine) setRecordWordsTool(_ context.Context, in wordsIn) string {
+	if line, blocked := e.updateBlock(); blocked {
+		return e.blockedTool(line)
+	}
 	words, err := cleanRecordWords(in.Words)
 	if err != nil {
 		return msgWordsBad

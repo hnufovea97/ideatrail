@@ -23,6 +23,7 @@ import (
 	"ideatrail/engine/internal/record"
 	"ideatrail/engine/internal/repo"
 	"ideatrail/engine/internal/state"
+	"ideatrail/engine/internal/update"
 )
 
 const (
@@ -43,12 +44,14 @@ type Engine struct {
 	Inbox      inbox.Deps
 	Pairing    pairing.Deps
 	Computer   string
+	UpdateGate update.Status          // the update check made at start (Pending: a new version waits for approval)
 	Home       func() (string, error) // the person's home folder; default os.UserHomeDir (tests inject a temp one)
 
 	timing      signupTiming // zero: defaultSignupTiming
 	bg          sync.Mutex
 	pairMu      sync.Mutex
 	lastPairing time.Time
+	updateMu    sync.Mutex // one approval request for a waiting update at a time
 	connecting  atomic.Bool
 	importing   atomic.Bool
 	life        sync.Mutex // guards closing and wg.Add against Close
@@ -128,6 +131,11 @@ func (e *Engine) Server() *mcp.Server {
 // Run serves over stdio until the client disconnects.
 func (e *Engine) Run(ctx context.Context) error {
 	defer e.Close(closeWait)
+	e.goSafe(func() {
+		sctx, cancel := context.WithTimeout(e.ctxBase(), backgroundBudget)
+		defer cancel()
+		e.StartUpdateGate(sctx)
+	})
 	return e.Server().Run(ctx, &mcp.StdioTransport{})
 }
 
@@ -170,6 +178,9 @@ func (in recordIn) input(paths []string) record.Input {
 }
 
 func (e *Engine) recordTool(ctx context.Context, in recordIn) string {
+	if line, blocked := e.updateBlock(); blocked {
+		return e.blockedTool(line)
+	}
 	if msg, ok := e.ensurePaired(ctx); !ok {
 		return msg
 	}
@@ -202,6 +213,9 @@ func (e *Engine) recordTool(ctx context.Context, in recordIn) string {
 }
 
 func (e *Engine) statusTool(ctx context.Context, _ struct{}) string {
+	if line, blocked := e.updateBlock(); blocked {
+		return e.blockedTool(line)
+	}
 	if msg, ok := e.ensurePaired(ctx); !ok {
 		return msg
 	}
@@ -231,6 +245,9 @@ type importIn struct {
 }
 
 func (e *Engine) importTool(ctx context.Context, in importIn) string {
+	if line, blocked := e.updateBlock(); blocked {
+		return e.blockedTool(line)
+	}
 	if msg, ok := e.ensurePaired(ctx); !ok {
 		return msg
 	}
