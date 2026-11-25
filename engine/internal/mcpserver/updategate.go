@@ -30,13 +30,8 @@ func (e *Engine) updateBlock() (string, bool) {
 	if st.UserID == "" || st.ApprovedVersion == "" || st.ApprovedVersion == e.Version {
 		return "", false
 	}
-	if st.UpdatePending == nil || st.UpdatePending.Version != e.Version {
-		// not approved and no request for this version in state: make it again
-		_, _ = update.Check(e.StateDir, e.Version)
-		if st, err = state.Read(e.StateDir); err != nil {
-			return update.WaitingLine(e.Version), true
-		}
-	}
+	// Requests are made only when a run starts (update.Check in main): a tool call never replaces
+	// another version's waiting request, so two open versions cannot keep filing new ones.
 	if st.UpdatePending != nil && st.UpdatePending.Version == e.Version {
 		return update.BlockLine(st.UpdatePending), true
 	}
@@ -84,6 +79,9 @@ func (e *Engine) ensureUpdateRequest(ctx context.Context, restart bool) {
 		return
 	}
 	p := st.UpdatePending
+	if p.Version != e.Version {
+		return // another run's version: that run asks for itself
+	}
 	if p.ApprovalID != "" && !(restart && (p.Rejected || !openApproval(st, p.ApprovalID))) {
 		return
 	}

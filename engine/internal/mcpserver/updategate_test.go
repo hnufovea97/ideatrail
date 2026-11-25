@@ -241,3 +241,29 @@ func TestBlockedEngineHandlesOnlyTheUpdateAnswer(t *testing.T) {
 		t.Fatalf("the kept message was not handled later: %d", n)
 	}
 }
+
+// Two unapproved versions open at once must not keep replacing each other's request (review M6-2).
+func TestTwoUnapprovedVersionsDoNotPingPongRequests(t *testing.T) {
+	g := newGate(t)                                                // 0.2.0 pending with one request sent
+	if _, err := update.Check(g.e.StateDir, "0.3.0"); err != nil { // a 0.3.0 session starts
+		t.Fatal(err)
+	}
+	g.mu.Lock()
+	before := len(g.posts)
+	g.mu.Unlock()
+	for i := 0; i < 5; i++ {
+		if out, _ := g.call(t, "status", map[string]any{}); out != update.WaitingLine("0.2.0") {
+			t.Fatalf("0.2.0 not blocked: %q", out)
+		}
+	}
+	g.e.Tick(context.Background())
+	if p := update.Pending(g.e.StateDir); p == nil || p.Version != "0.3.0" {
+		t.Fatalf("0.2.0 calls replaced the newer request: %+v", p)
+	}
+	g.mu.Lock()
+	after := len(g.posts)
+	g.mu.Unlock()
+	if after != before {
+		t.Fatalf("0.2.0 sent %d more requests", after-before)
+	}
+}
