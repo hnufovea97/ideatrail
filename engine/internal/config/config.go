@@ -10,11 +10,17 @@ import (
 	"ideatrail/engine/internal/home"
 )
 
+// ProductionBase is the production Worker (API + web on one origin, founder 2026-11-26).
+// Moving to ideatrail.dev: change this together with env.production in api/wrangler.jsonc and
+// scripts/deploy-production.sh; users re-register their device lock with the recovery key, the
+// server data and GitHub records stay as they are.
+const ProductionBase = "https://ideatrail-api.ideatrail.workers.dev"
+
 // Set by -ldflags "-X ideatrail/engine/internal/config.<name>=…".
 var (
 	Version        = "dev"
-	APIBase        = "https://api.ideatrail.dev"
-	AppBase        = "https://app.ideatrail.dev"
+	APIBase        = ProductionBase         // temporary workers.dev address; ideatrail.dev later (see ProductionBase)
+	AppBase        = ProductionBase         // the production Worker serves the web on the same origin
 	GitHubClientID = "Iv23lixnwrvkq3SwATx1" // development GitHub App until the production app exists (F-2)
 	ReleasePub     = ""                     // base64url Ed25519 release key; empty = dev build (no self-check)
 )

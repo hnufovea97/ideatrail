@@ -1,5 +1,6 @@
 // 최상위 = 로컬·시험(vitest)용. "staging" = workers.dev 시험 배포(가입 받지 않음, CPU·Cron 측정용).
-// 정식 배포 값(도메인·RP_ID)은 도메인 구입(F-5) 뒤 설정 초안 §1대로 "production" 환경을 추가한다.
+// "production" = 운영(2026-11-26 founder 승인, workers.dev 임시 주소로 founder가 먼저 써 봄). 도메인(ideatrail.dev)으로 옮길 때는
+// 이 환경의 RP_ID·APP_ORIGIN과 엔진 기본 주소(engine/internal/config)를 함께 바꾸고, 기기 잠금은 비상 열쇠로 다시 등록한다(서버·기록은 그대로).
 {
   "name": "ideatrail-api",
   "main": "src/index.ts",
@@ -20,6 +21,26 @@
         { "name": "WRITE_LIMITER", "namespace_id": "3002", "simple": { "limit": 10000, "period": 60 } }
       ],
       "vars": { "RP_ID": "localhost", "RP_NAME": "Ideatrail (e2e)", "APP_ORIGIN": "http://localhost:4321" }
+    },
+    "production": {
+      "name": "ideatrail-api",
+      "workers_dev": true,
+      "observability": { "enabled": true, "head_sampling_rate": 1 },
+      "triggers": { "crons": ["*/15 * * * *"] },
+      "d1_databases": [{ "binding": "DB", "database_name": "ideatrail-production", "database_id": "444e5ede-86be-4601-8afc-cb656b70e966", "migrations_dir": "migrations" }],
+      "ratelimits": [
+        { "name": "IP_LIMITER", "namespace_id": "4001", "simple": { "limit": 10, "period": 60 } },
+        { "name": "WRITE_LIMITER", "namespace_id": "4002", "simple": { "limit": 60, "period": 60 } }
+      ],
+      // 화면(web/dist)도 같은 주소에서 내보낸다 — workers.dev 하위 주소끼리는 다른 사이트라 SameSite=Strict 쿠키가 안 가기 때문.
+      // web은 PUBLIC_API_BASE=이 주소로 빌드한다(scripts/deploy-production.sh). GitHub 출입증 취소용 비밀값은 founder가 wrangler secret put으로.
+      "assets": { "directory": "../web/dist", "run_worker_first": ["/v1/*"] },
+      "vars": {
+        "RP_ID": "ideatrail-api.ideatrail.workers.dev",
+        "RP_NAME": "Ideatrail",
+        "APP_ORIGIN": "https://ideatrail-api.ideatrail.workers.dev",
+        "GITHUB_APP_CLIENT_ID": "Iv23lixnwrvkq3SwATx1"
+      }
     },
     "staging": {
       "workers_dev": true,
